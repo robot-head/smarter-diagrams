@@ -1,0 +1,450 @@
+﻿Next-Generation CS Diagramming Engine — Architecture & Design Specification
+Document ID: RFC-001
+Date: November 11, 2026
+Status: Architectural Specification & Research Blueprint
+Target Stack: Rust, WebAssembly (Wasm), Rowan Lossless CST, Separable VPSC + Visibility A* + Autodiff SDF Solver, WebGPU / Vector SVG
+1. Executive Summary & Problem Statement
+Text-to-diagram tools like Mermaid achieved ubiquitous adoption across software engineering because plain-text definitions are fast to type, trivial for Large Language Models (LLMs) to synthesize, and cleanly diffable in Git. However, Mermaid's visual output deteriorates rapidly past 10 to 15 nodes. Because it relies on legacy Sugiyama-style layered Directed Acyclic Graph (DAG) assumptions (dagre), treats nodes as point-masses without explicit perimeter ports, lacks collision-free cartographic label placement, and re-shuffles layouts unpredictably upon minor edits, engineers are forced to abandon text-as-code whenever they need publication-grade or executive-ready architecture diagrams.
+Core Architectural Thesis
+Achieving Mermaid's five-second authoring simplicity alongside studio-grade visual legibility requires decoupling semantic topology from spatial synthesis. This design specification defines a next-generation computer science diagramming engine built on four foundational breakthroughs:
+
+
+1. Progressive LL(2) Surface DSL + Lossless Concrete Syntax Tree (CST): A three-line Mermaid-simple sketch is already a valid canonical model, scaling progressively to 5-tier port constraints, cross-cutting Gestalt zones, and lossless bidirectional canvas @pin edits without corrupting comments or formatting.
+2. Three-Stage Sub-16ms Bilevel Layout Solver: Decomposes NP-hard layout optimization into (a) macro-shape and port assignment, (b) mental-map-preserving separable quadratic compaction (VPSC) with scanline orthogonal visibility routing, and (c) 0–1 integer linear label slot selection paired with forward-mode Wasm autodiff Signed Distance Field (SDF) micro-polish.
+3. Cognitive Notation Intelligence ("Physics of Notations"): Bakes perceptual discriminability, OKLCH tonal hierarchy, optical crossing bridges, and dual-coded semantic shapes into zero-configuration defaults.
+4. Executable & Epistemic Diagramming (Phase 2 Extensions): Elevates diagrams from passive drawings into live computational instruments supporting 60Hz fluid-queueing wind tunnels, OpenTelemetry/AST "Phantom Drift" reconciliation, bounded SAT/SMT counterexample choreography, 2.5D stratigraphic stacks, and bitemporal "Spatial Git" superposition.
+2. Research Foundation & Literature Review
+Modern diagram legibility sits at the intersection of four active computer science research streams: declarative spatial languages, orthogonal/compound graph drawing, cognitive notation science, and multimodal visual critique.
+2.1 Declarative Relations & Optimization-Based Synthesis (HCI & Programming Languages)
+* Pollock et al., "Bluefish: Composing Diagrams with Declarative Relations" (MIT CSAIL, ACM UIST 2024): Demonstrates why strict hierarchical UI component trees fail on computer science diagrams (such as compiler parse trees, memory layouts, and overlapping network topologies). Bluefish replaces rigid parent-child trees with a compound relational scenegraph grounded in Gestalt perceptual relations (alignment, containment, background hulls, connectors), enabling overlapping visual structures to share nodes cleanly without manual bounding-box arithmetic.
+* Ye et al., "Penrose: From Mathematical Notation to Beautiful Diagrams" (CMU, ACM SIGGRAPH 2020) & Estep, Ni, Sunshine et al., "Rose: Composable Autodiff for the Interactive Web" (CMU, 2024): Introduces a clean architectural triad separating domain vocabulary (Domain), terse declarative topology (Substance), and visual mapping rules (Style). Diagrams compile into numerical optimization problems—jointly optimizing proximity, label repulsion, and contrast—which Rose accelerates by orders of magnitude in the browser via WebAssembly automatic differentiation.
+* Bourgault et al. / Cartokit, "Direct Manipulation and Natural Language Programming, Together at Last?" (OOPSLA 2026): Introduces a shared structured edit algebra uniting code/NL synthesis with direct canvas manipulation. Empirical user studies demonstrate that engineers perform over 93% of spatial layout refinements via direct canvas manipulation while reserving text/NL for parameterizing and repeating structural patterns—proving pure text-only workflows fight human spatial cognition.
+2.2 Compound Graph Drawing, Ports & Orthogonal Routing
+* Andreola, Di Battista, Patrignani et al., "A Walk on the Wild Side: A Shape-First Methodology for Orthogonal Drawings" (GD 2025): Introduces domus, a shape-first orthogonal drawing algorithm that consistently outperforms classic Topology-Shape-Metrics (TSM) pipelines (such as OGDF) on bend minimization and visual readability across small-to-medium graphs—the exact regime of software architecture diagrams.
+* Domrös, von Hanxleden, Spönemann, Rüegg, & Schulze, "The Eclipse Layout Kernel (ELK)" (Kiel University, 2023 / GD 2024) & Schulze et al., "Drawing Layered Graphs with Port Constraints" (JVLC 2014): Establishes why CS block diagrams cannot model nodes as point-masses. ELK introduces explicit 5-tier port constraints (pinning True/False branches to distinct diamond sides or routing SQL foreign keys to exact row slots), recursive compound containers, and Coffman–Graham bounded-width layering so wide architectures pack into balanced 2D grids.
+* Alexander Wang / Terrastruct, "TALA (Terrastruct's AutoLayout Algorithm)" (Open-Sourced Sept 2026, MPL-2.0): Purpose-built for software architecture rather than generic mathematical networks. TALA evaluates candidate seeds against a human-tuned architectural scoring function and supports hybrid coordinate locking, letting humans or AI models pin specific nodes in 2D space while automatically routing unpinned subgraphs.
+2.3 Cognitive Perception & Visual Notation Science
+* Daniel Moody, "The 'Physics' of Notations: Toward a Scientific Basis for Constructing Visual Notations in Software Engineering" (IEEE TSE 2009; extended in 2025–2026 eye-tracking & notation studies): Codifies nine empirical principles for cognitive effectiveness:
+   * Perceptual Discriminability: Maximize visual distance across multiple retinal variables (silhouette, fill, stroke texture, weight, iconography); novices routinely confuse ER and flowchart nodes when shapes vary only within the quadrilateral family.
+   * Semiotic Clarity & Graphic Economy: Enforce a 1:1 correspondence between semantic concepts and visual symbols while bounding distinct symbol vocabulary size.
+   * Dual Coding & Cognitive Manageability: Pair concise text labels with purposeful structural icons to expand working memory, and decompose dense graphs into navigable semantic zoom levels.
+* Mooney, Purchase, Wybrow, & Kobourov, "The Multi-Dimensional Landscape of Graph Drawing Metrics" & "The Perception of Stress in Graph Drawings" (2024): Quantifies which geometric metrics govern human path-tracing accuracy: minimizing edge crossings first, maximizing crossing angles toward 90 degrees when crossings are unavoidable, minimizing connector bends, maintaining uniform edge lengths, and minimizing topological stress.
+2.4 VLM Aesthetic Critique & Dual Human-AI Readability (2025–2026 Frontier)
+* Tianfu Wang et al., "EvoDesign: Agentic Editable Diagram Creation via Design Expertise Evolution" (NeurIPS 2026): Formulates diagramming over a machine-actionable, object-level editable canvas schema refined iteratively through rendered visual feedback, backed by a three-tier Hierarchical Expertise Memory (local repairs → domain conventions → universal density/modularity principles).
+* PaperBanana, "Automating Academic Illustration for AI Scientists" (Jan 2026): Benchmarks NeurIPS methodology diagrams (PaperBananaBench) with a Visualizer + Critic agent loop, proving that raster diffusion models hallucinate dense graph topology whereas code-backed layout paired with VLM visual critique guarantees both structural faithfulness and aesthetic polish.
+* Di Bartolomeo et al., "Do Graph Drawing Aesthetics Matter for AI?" (Computer Graphics Forum, June 2026) & Miller, Wallinger, Kobourov et al., "Exploring MLLMs' Perception of Network Visualization Principles" (IEEE TVCG, July 2026): Demonstrates that Multimodal LLMs rely on human-like visual proxies (node crowding, edge overlap) when parsing diagrams, validating unified legibility optimization for both human engineers and AI coding agents.
+3. Competitive Landscape Benchmark
+Engine / Tool
+	Input Ergonomics
+	Layout Paradigm
+	Core Strengths
+	Primary Legibility Bottleneck
+	Mermaid
+	Ultra-terse Markdown; ubiquitous in LLM pretraining
+	dagre (legacy Sugiyama layered DAG) & partial ELK
+	Zero setup; ~20x fewer tokens than XML notations
+	Collapses past ~15 nodes; overlapping edge labels, weak container routing, no coordinate pinning
+	D2 + TALA
+	Clean declarative Go-inspired text
+	Multi-seed architectural scorer + hybrid coordinate lock
+	Strong static architecture layouts; supports locking specific node coordinates
+	Stochastic seed jumps: adding one node can reshuffle the entire layout ("mental map" breakage)
+	ELK (elkjs)
+	Verbose JSON graph AST
+	Layered Sugiyama + explicit ports + Coffman–Graham packing
+	Fast, deterministic, crisp orthogonal container & SQL-column routing
+	Low symmetry awareness; robotic extra bends; lacks native human-friendly authoring syntax
+	LikeC4 / Structurizr
+	Model-first Architecture-as-Code DSL
+	Automated hierarchical C4 view projection
+	Single source of truth across zoom levels; interactive SPA drill-down & MCP server
+	Tailored to C4 system/container views rather than arbitrary CS structures (ASTs, state machines, protocols)
+	Bluefish / Penrose
+	JSX relations (Bluefish) or Domain/Style/Substance (Penrose)
+	Compound relational solver / autodiff numerical optimization
+	Publication-grade custom CS & math diagrams; overlapping Gestalt groupings
+	High authoring ceremony compared to Mermaid; requires defining styles/relations upfront
+	Proposed Engine
+	Progressive LL(2) DSL (3-line Mermaid entry to full model)
+	3-Stage Hybrid: Shape-First Ports + Elastic VPSC + Autodiff SDF
+	Deterministic mental-map stability, collision-free labels, Gestalt zones, lossless canvas-to-Git sync
+	Requires custom Rust/Wasm multi-stage compiler & solver pipeline (specified below)
+	4. Core Seven-Pillar System Architecture
+1. Progressive "Zero-to-Model" Syntax: Three lines of plain a -> b: label text render immediately with zero boilerplate, while compiling underneath into a persistent semantic graph model. Multiple views (view checkout_flow { include gateway -> auth -> * }) project from one canonical source of truth, eliminating documentation drift across Context, Container, and Sequence diagrams.
+2. Two-Stage Hybrid Layout Pipeline: Combines discrete combinatorial routing (shape-first orthogonal domus + ELK 5-tier ports + Coffman–Graham aspect-ratio packing) with a continuous Penrose/Rose-style Wasm autodiff pass that polishes label offsets, channel symmetry, and padding halos.
+3. Mental-Map Stability via Elastic VPSC Anchoring: Eliminates random-seed layout jumps by anchoring surviving nodes to prior relative orthogonal orderings and breaking ties deterministically via DSL declaration line order.
+4. Gestalt Relational Overlays (Beyond Strict Trees): Adopts a compound relational scenegraph so cross-cutting concerns—security scopes, Raft quorums, distributed traces—render as smooth, borderless Euler contour hulls (zone) behind nodes without fighting strict tree containment (vpc_prod).
+5. Opinionated Editorial Typography & "Physics of Notations" Defaults: Infers high-discriminability silhouettes from types/keywords (broker/kafka → partitioned log; postgres → tabular port block), replaces heavy wireframe borders with OKLCH tonal elevation, and renders optical crossing bridges and inline pill knockouts.
+6. Lossless Bidirectional Editing (Canvas ↔ Text CST): Engineers author topology in text and drag nodes, ports, or channels directly on the canvas. Gestures synthesize semantic constraints (align row, container-relative @pin) spliced surgically into a lossless Red-Green CST so comments and whitespace survive byte-for-byte.
+7. Semantic Zoom, Trace Playback & Aesthetic Linter / MCP Server: Pairs crisp static SVG/PDF export with interactive semantic zoom, step-through protocol animation, a built-in heuristic/VLM aesthetic linter, and a native Model Context Protocol (MCP) interface for AI coding agents.
+5. Mathematical Solver & Multi-Objective Aesthetic Cost Specification
+Solving port-aware orthogonal routing, mental-map stability, and collision-free typography as a monolithic Mixed-Integer Nonlinear Program (MINLP) is NP-hard and far too slow for interactive 60fps authoring. The layout engine decomposes a global aesthetic energy functional into a three-stage bilevel solver pipeline targeting sub-16ms incremental execution in WebAssembly.
+Global Multi-Objective Cost Functional
+Let diagram state S = (p, Π, R, L) comprise node centroids p = {(x_v, y_v)}, perimeter port coordinates Π, orthogonal polyline routes R = {γ_e}, and label bounding boxes L. The global cost functional minimizes:
+
+
+J_total(S) = J_ortho(Π, R)
+           + λ_mm   · J_mental(p, Π | S^(t-1))
+           + λ_lbl  · J_label(L, p, R)
+           + λ_comp · J_compact(p)
+
+Pipeline Stage
+	Subproblem & Decision Variables
+	Exact Solver Formulation
+	Complexity & Latency Target
+	Stage 1A: Macro-Shape & Ports
+	Layer/grid rank, port sides s_k ∈ {N,E,S,W}, port permutations, orthogonal bend shapes
+	SAT / MaxSMT Shape-First (domus) + Barycentric Port Sweep
+	`O(
+	Stage 1B: Coordinates & Stability
+	Continuous node centroids (x_v, y_v) under non-overlap, port alignment, and mental-map anchors
+	Separable Active-Set Quadratic Program (VPSC)
+	`O(
+	Stage 2: Orthogonal Routing
+	Object-avoiding Manhattan polylines γ_e and parallel shared-channel track offsets
+	Direction-aware A* on Orthogonal Visibility Graph + L/S/R Channel Nudging
+	`O(
+	Stage 3: Labels & Micro-Polish
+	Candidate label slot binaries α_{i,k} ∈ {0,1} and continuous sliding parameters s_i ∈ [0,1]
+	0–1 ILP Conflict-Component Solver + L-BFGS Smooth SDF Autodiff Polish
+	Sub-ms ILP components + 20 Wasm autodiff steps (~2–4 ms)
+	5.1 Port-Aware Orthogonal Routing (J_ortho)
+Every incident edge endpoint attaches to an explicit port k ∈ P_v on node v with bounding box [x_v - w_v/2, x_v + w_v/2] × [y_v - h_v/2, y_v + h_v/2].
+Five-Tier Port Constraint Lattice
+1. FREE: Side s_k ∈ {N, E, S, W} and tangential offset t_k are solver variables; s_k selects the cardinal sector facing the target centroid to eliminate up to 2 bends.
+2. FIXED_SIDE: s_k = s̄_k is fixed (e.g., E for outputs, W for inputs, S for error/DLQ branches); perimeter order along s̄_k remains free.
+3. FIXED_ORDER: Clockwise perimeter rank enforces linear separation t_{k1} + δ_port ≤ t_{k2} whenever rank(k1) < rank(k2).
+4. FIXED_RATIO: Tangential coordinate locks proportionally to side length L_s: t_k = ρ_k · L_s for ρ_k ∈ (0, 1), scaling cleanly when containers resize.
+5. FIXED_POS: Exact offset t_k = t̄_k (required for SQL/ER foreign-key row anchors and memory-layout pointer slots).
+Hard Stub, Corner Clearance & Dynamic Node Expansion Rules
+Every port k on side s_k with outward unit normal n(s_k) ∈ {(0,-1), (1,0), (0,1), (-1,0)} enforces a mandatory straight exit stub prior to its first 90-degree bend:t
+q_{e,0} = π(u, k),    q_{e,1} = π(u, k) + d_stub · n(s_k),    d_stub ≥ δ_margin
+t_min(s_k) + δ_corner ≤ t_k ≤ L_{s_k} - δ_corner,             |t_{k_a} - t_{k_b}| ≥ δ_port
+Dynamic Perimeter Sizing: L_s ≥ (|P_{v,s}| - 1) · δ_port + 2 · δ_corner
+
+
+
+#### Orthogonal Visibility Graph & Route Objective
+Inflating every node bounding box by `δ_margin` forms open obstacle interiors `B°_v`. Sweeping horizontal and vertical scan-rays from all padded obstacle corners and port stub tips `q_{e,1}` constructs the **Orthogonal Visibility Graph** `VG = (V_VG, E_VG)`. Each polyline route `γ_e = (q_{e,0}, q_{e,1}, ..., q_{e,m_e})` minimizes:
+
+
+```text
+J_ortho(Π, R) = ∑_{e ∈ E} [ w_len · ∑_{j=1}^{m_e} ‖q_{e,j} - q_{e,j-1}‖₁
+                          + w_bend · (m_e - 1)
+                          + w_back · I_back(γ_e)
+                          + w_center · δ_dev(e) ]
+              + ∑_{{e, e'}} [ w_cross · χ(γ_e, γ_{e'}) + w_ovlp · Ω(γ_e, γ_{e'}) ]
+
+* Admissible Direction-Aware A* Heuristic: Over directed visibility states (v, d_in) toward target stub (t, d_target), the exact lower bound is h(v, d_in) = ‖v - t‖₁ + w_bend · b_min(v, d_in, t, d_target), where b_min ∈ {0, 1, 2, 3, 4} counts the minimum mandatory 90-degree turns needed to align d_in with -d_target across displacement (t - v).
+* Hyperedge Trunk Sharing & L ++ S ++ R Channel Nudging: Proper crossings χ(γ_e, γ_{e'}) evaluate to 0 for routes sharing a common hyperedge trunk. Collinear segments traversing a shared visibility alley are partitioned by entry turn direction—Left (L), Straight (S), Right (R)—into ordered parallel tracks O = L ++ S ++ R spaced by δ_lane via 1D VPSC centering.
+5.2 Mental-Map Stability & Separable VPSC Compaction (J_mental)
+Across incremental edits from G^(t-1) to G^(t), let V_∩ = V^(t) ∩ V^(t-1) denote surviving nodes with prior centroids p⁰ = {(x_v⁰, y_v⁰)}. Mental-map preservation combines four complementary terms:
+
+
+J_mental(p, Π | S^(t-1)) = min_{Δ ∈ ℝ²} ∑_{v ∈ V_∩} ω_v · ‖p_v - (p_v⁰ + Δ)‖₂²
+                         + μ_ord  · D_τ(p, p⁰)
+                         + μ_prox · ∑_{(u,v) ∈ E_DT⁰} ( ‖p_u - p_v‖₁ / ‖p_u⁰ - p_v⁰‖₁ - 1 )²
+                         + μ_dsl  · I_model(p)
+
+1. Translation-Invariant Anchoring (Δ-Adjusted L2): Discounts rigid global viewport shifts. Explicit @pin nodes receive ω_v = 10⁵, surviving hub nodes scale with deg(v), and newly added nodes receive ω_v = 0.
+2. Orthogonal Ordering Distance (D_τ): Counts pairwise Kendall-τ inversions in x and y across V_∩, ensuring a node previously above-left of a peer stays above-left unless rewiring justifies a flip.
+3. Delaunay Proximity Preservation: Penalizes neighborhood stretching across edges E_DT⁰ of the prior layout's Delaunay triangulation.
+4. DSL Declaration-Order Tie-Breaking (I_model): Penalizes rank inversions against source-file declaration index decl(u) < decl(v), making fresh layouts 100% seed-free and Git-deterministic.
+Elasticized Separable VPSC Quadratic Program
+Compaction decomposes into horizontal (x) and vertical (y) active-set Variable Placement with Separation Constraints (VPSC) passes via red-black tree scanline sweep, separating hard geometric validity from elastic mental-map slacks ξ_{uv}^x ≥ 0:
+
+
+minimize_{x, ξ^x}   ∑_{v ∈ V_∩} ω_v · (x_v - x̃_v⁰)²  +  λ_comp · ∑_{(u,v) ∈ E} |x_u - x_v|  +  M_flip · ∑_{(u,v) ∈ O_x⁰} ξ_{uv}^x
+
+
+subject to:
+  1. Hard Non-Overlap:       x_u + (w_u + w_v)/2 + g_pad ≤ x_v          (adjacent scanline intervals)
+  2. Compound Containment:   x_{C,left} + p_in + w_v/2 ≤ x_v ≤ x_{C,right} - p_in - w_v/2
+  3. Zero-Bend Port Align:   -ζ_e ≤ π_y(u, k1) - π_y(v, k2) ≤ ζ_e       (straightens 2-bend jogs into 0-bend wires)
+  4. Elastic Mental Order:   x_u ≤ x_v + ξ_{uv}^x,   ξ_{uv}^x ≥ 0       (flips only if topological savings > M_flip)
+5.3 Collision-Free Label Placement & Differentiable SDF Polish (J_label)
+Stage 3A: Discrete Candidate 0–1 Integer Linear Program (ZOLP)
+Each labelable feature i ∈ F generates K_i discrete candidate boxes {B_{i,1}, ..., B_{i,K_i}} (4 Imhof-ranked external port quadrants; straight-segment edge candidates scored by Centeredness, Aboveness, ideal perpendicular clearance d_ideal, and corner-straddle avoidance) plus a guaranteed feasible fallback inline pill-cutout state B_{i,0}:
+
+
+minimize_{α ∈ {0,1}}   ∑_{i ∈ F} ∑_{k=0}^{K_i} [ c_{i,k}^prior + w_edge_occ · Area(B_{i,k} ∩ R_{≠i}) + w_pill · I(k = 0) ] · α_{i,k}
+
+
+subject to:
+  ∑_{k=0}^{K_i} α_{i,k} = 1                       ∀ i ∈ F
+  α_{i,k} + α_{j,r} ≤ 1                           ∀ overlapping pairs B_{i,k} ∩ B_{j,r} ≠ ∅
+  α_{i,k} = 0                                     whenever B_{i,k} intersects any node B_v or port stub Π
+
+Connected components of the R-tree overlap conflict graph rarely exceed 8–12 contesting labels in orthogonal layouts and solve to exact optimality in under 1 millisecond. When fallback α_{i,0} = 1 activates, the renderer draws a 4px background halo knockout pill so connector strokes break cleanly around glyph ascenders and descenders.
+Stage 3B: Continuous Differentiable SDF Micro-Polish
+With discrete topology and slots locked, 15–25 iterations of forward-mode Wasm autodiff L-BFGS refine continuous tangential label slide parameters s_i ∈ [0, 1] and floating visibility-channel coordinates u_c ∈ [u_{c,min}, u_{c,max}] over a smooth Signed Distance Field (SDF) objective:
+
+
+E_polish(s, u) = ∑_{A ≠ B} w_repel · softplus_β²(τ_clear - SDF(A, B))
+               + ∑_{i ∈ F} w_anchor · (s_i - s_{i,init})²
+               + ∑_{c ∈ C} w_sym · ( u_c - (u_{c,min} + u_{c,max}) / 2 )²
+
+where softplus_β(z) = (1/β) · ln(1 + exp(β·z)) provides C²-smooth clearance repulsion.
+5.4 Calibrated Lexicographic Weight Hierarchy (Normalized to 1g = 16px)
+Priority Tier
+	Aesthetic / Structural Term
+	Normalized Weight
+	Concrete Trade-Off Invariant
+	Tier 0 (Hard)
+	Node–node, node–route, port–label overlap; container bounds
+	∞ (Hard Constraints)
+	Never violated under any finite objective gain
+	Tier 1 (10⁵)
+	Explicit user coordinate / alignment locks (@pin, align)
+	ω_pin = 1.0 × 10⁵
+	Acts as an immovable anchor unless geometrically infeasible
+	Tier 2 (10³)
+	Proper orthogonal edge–edge crossing χ(γ_e, γ_{e'})
+	w_cross = 2.0 × 10³
+	Eliminating 1 crossing justifies adding up to ~16 bends
+	Tier 3 (10²)
+	Mental-map relative-order flip M_flip; connector bend w_bend
+	M_flip = 450, w_bend = 120
+	Preserves prior x/y node order unless rewiring saves a crossing or 4+ bends
+	Tier 4 (10¹)
+	Fallback pill knockout w_pill; backward flow penalty w_back
+	w_pill = 60, w_back = 80
+	Strongly prefers clean external label space over line knockouts
+	Tier 5 (10⁰)
+	Manhattan wire length (per 16px grid g); label Centeredness
+	w_len = 1.5, β_center = 4.0
+	Breaks ties cleanly toward compact, centered, symmetric geometry
+	Tier 6 (10⁻¹)
+	DSL source declaration order μ_dsl; channel centering w_sym
+	μ_dsl = 0.25, w_sym = 0.1
+	Zero-cost tie-breaker yielding deterministic, seed-free Git stability
+	6. Progressive DSL Grammar, Lossless CST & Bidirectional @pin Synthesis
+6.1 Four-Tier Progressive Disclosure by Accretion
+# Tier 0: Zero-ceremony Mermaid-simple sketch (ports default to FREE)
+client -> gateway: HTTPS request
+gateway -> auth: validate JWT
+
+
+# Tier 1: Explicit 5-tier ports, proportional anchors, and SQL/tabular record slots
+vpc_prod: Production VPC {
+  gateway.E -> broker.W@0.25: publish command [Protobuf]
+  broker.E#orders -> worker.W: consume batch
+
+
+  postgres: Primary DB [shape: sql_table] {
+    port id: uuid [side: W, pos: 1]
+    port org_id: uuid [side: W, pos: 2]
+    port replica_wal: stream [side: E, ratio: 0.5]
+  }
+
+
+  auth.S -> postgres#id: verify user
+  worker.S(order: 1) -> postgres#org_id: write ledger
+  worker.S(order: 2) -> dlq.N: poison pill [style: dashed]
+}
+
+
+# Tier 2: Gestalt cross-cutting Euler hulls, alignments & trace flows
+zone pci_dss "PCI-DSS Scope" around [vpc_prod.auth, vpc_prod.postgres, kms_vault] {
+  hull: rounded_contour
+  padding: 1.5g
+  tint: oklch(0.72 0.14 35 / 0.12)
+}
+
+
+align row [client, vpc_prod.gateway, vpc_prod.broker]
+distribute col [vpc_prod.auth, vpc_prod.worker, dlq] [gap: 3g]
+
+
+flow checkout_trace "P99 Critical Path" {
+  client -> vpc_prod.gateway -> vpc_prod.auth -> vpc_prod.postgres#id
+}
+
+
+# Tier 3: Relational inline @pin and separated @layout block
+kms_vault: Cloud KMS @pin(x: vpc_prod.E + 4g, y: vpc_prod.auth.y) # Hardware HSM
+
+
+@layout {
+  vpc_prod.gateway @pin(grid: 12, 6)
+  vpc_prod.broker  @pin(grid: 22, 6, lock: [w: 10g, h: 6g])
+  (vpc_prod.gateway -> vpc_prod.broker) @route(channel_x: 17g) @label(slot: above, slide: 0.42)
+}
+
+Port Constraint Tier
+	Inline Endpoint Shorthand
+	Block Declaration Syntax
+	Lowered Solver Constraint
+	1. FREE
+	auth
+	port rpc
+	Solver chooses side s_k ∈ {N,E,S,W} and tangential offset t_k
+	2. FIXED_SIDE
+	auth.S
+	port err [side: S]
+	Locks s_k = S; solver permutes tangential rank to minimize crossings
+	3. FIXED_ORDER
+	worker.S(order: 2)
+	port retry [side: S, order: 2]
+	Enforces clockwise perimeter inequality t_{k1} + δ_port ≤ t_{k2}
+	4. FIXED_RATIO
+	broker.W@0.25
+	port wal [side: E, ratio: 0.5]
+	Locks proportional offset t_k = ρ_k · L_s across container resizes
+	5. FIXED_POS
+	postgres#org_id
+	port org_id [side: W, pos: 2]
+	Locks exact row/slot offset t_k = t̄_k (in g = 16px grid units)
+	6.2 Formal LL(2) Surface Grammar (EBNF)
+Diagram         ::= Statement* EOF
+Statement       ::= ZoneDecl | AlignDecl | DistributeDecl | FlowDecl
+                  | LayoutBlock | EdgeStmt | NodeOrContainer
+
+
+NodeOrContainer ::= QualifiedId (":" LabelText)? AttrList? Annotation* Block? StmtEnd
+Block           ::= "{" (PortDecl | Statement)* "}"
+PortDecl        ::= "port" Ident (":" Ident)? AttrList? Annotation* StmtEnd
+
+
+EdgeStmt        ::= Endpoint (EdgeOp Endpoint)+ (":" LabelText)? AttrList? Annotation* StmtEnd
+EdgeOp          ::= "->" | "<->" | "--" | "==>"
+Endpoint        ::= QualifiedId PortAnchor?
+PortAnchor      ::= ("." Side ("@" FloatLit | "(" AttrBody ")")?)
+                  | ("#" Ident)
+
+
+Side            ::= "N" | "E" | "S" | "W"
+ZoneDecl        ::= "zone" Ident StringLit? "around" RefList BlockOrAttrs StmtEnd
+AlignDecl       ::= "align" ("row" | "col") RefList AttrList? StmtEnd
+DistributeDecl  ::= "distribute" ("row" | "col") RefList AttrList? StmtEnd
+FlowDecl        ::= "flow" Ident StringLit? "{" EdgeChain* "}" StmtEnd
+
+
+LayoutBlock     ::= "@layout" ("(" Ident ")")? "{" LayoutRule* "}" StmtEnd
+LayoutRule      ::= (QualifiedId | "(" Endpoint EdgeOp Endpoint ")") Annotation+ StmtEnd
+
+
+Annotation      ::= "@" ("pin" | "route" | "label" | "port" | "style" | "sim" | "bind") "(" AttrBody ")"
+RefList         ::= "[" QualifiedId ("," QualifiedId)* ","? "]"
+AttrList        ::= "[" AttrBody "]"
+AttrBody        ::= KeyVal ("," KeyVal)* ","?
+KeyVal          ::= Ident ":" Expr
+Expr            ::= RelCoord | GridLit | FloatLit | IntLit | StringLit | QualifiedId | RefList
+RelCoord        ::= QualifiedId ("." ("N"|"E"|"S"|"W"|"x"|"y"))? (("+" | "-") GridLit)?
+QualifiedId     ::= Ident ("." Ident)*
+GridLit         ::= (IntLit | FloatLit) "g"?
+StmtEnd         ::= ("\n" | ";")+ | EOF
+6.3 Lossless CST & Relational IR Architecture (Rust / Wasm)
+To prevent canvas drags from reformatting user source files or destroying comments, the compiler maintains three synchronized layers:
+
+
+1. Immutable Green Tree (rowan::GreenNode): Stores exact concrete tokens including WHITESPACE and COMMENT trivia with structural sharing across undo/redo snapshots.
+2. Ephemeral Red Tree (SyntaxNode): Computes parent pointers and absolute TextRange byte spans lazily for zero-cost typed AST traversal.
+3. Relational Scenegraph IR (SceneGraphIR): Resolves QualifiedId scopes, lowers Gestalt Ref proxies into hyperedges, and retains SourceOrigin byte-span pointers back to originating CST nodes.
+
+
+use rowan::{GreenNode, TextRange};
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u16)]
+pub enum SyntaxKind {
+    IDENT, COLON, DOT, HASH, AT, ARROW, BI_ARROW, L_BRACE, R_BRACE,
+    L_BRACK, R_BRACK, L_PAREN, R_PAREN, COMMA, PLUS, MINUS,
+    INT_LIT, FLOAT_LIT, GRID_UNIT, STRING_LIT,
+    WHITESPACE, NEWLINE, COMMENT, ERROR,
+    ROOT, NODE_DECL, PORT_DECL, EDGE_STMT, ENDPOINT, PORT_ANCHOR,
+    ZONE_DECL, ALIGN_DECL, DISTRIBUTE_DECL, FLOW_DECL,
+    LAYOUT_BLOCK, LAYOUT_RULE, ANNOTATION, ATTR_LIST, KEY_VAL,
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SourceOrigin {
+    pub primary_decl: TextRange,
+    pub inline_pin: Option<TextRange>,
+    pub layout_rule: Option<TextRange>,
+}
+
+
+#[derive(Debug, Clone)]
+pub enum DiagramEditOp {
+    PinNode { node: NodeId, pin: PinExpr, size_lock: Option<(u32, u32)> },
+    SnapAlign { axis: Axis2D, members: Vec<NodeId> },
+    LockPort { node: NodeId, port: PortId, spec: PortConstraintSpec },
+    NudgeRouteChannel { edge: EdgeId, segment_idx: usize, lane_grid: f32 },
+    SlideLabel { edge: EdgeId, slot: LabelSlot, t_arc: f32 },
+    UnpinEntities { targets: Vec<NodeId> },
+}
+
+
+#[derive(Debug, Clone)]
+pub struct TextPatch {
+    pub delete_range: TextRange,
+    pub insert_text: String,
+}
+6.4 Inverse Edit Synthesizer & Surgical Patching Rules
+1. Semantic Snap Promotion Over Raw Pixels: When a dragged node v lands at (x_px, y_px), the synthesizer checks:
+   * Collinear Peer Snap (±6px): Promotes to align row [u, v] or align col [u, v] rather than emitting coordinates.
+   * Relative Perimeter Offset: Within 6g of container border C.E, emits @pin(x: C.E + 3g, y: ...) so future container expansion pushes v outward cleanly.
+   * Quantized Grid Fallback: Rounds to 16px grid integers @pin(grid: 14, 8).
+2. Trivia-Preserving Token Splicing: Updates only literal tokens inside existing @pin(...) spans, inserting single-node pins inline prior to # comments and routing multi-select drags (3+ nodes) into the trailing @layout { ... } block.
+3. Automatic Constraint Conflict Relaxation: Dragging a member of align row [auth, worker] past a 24px breakaway threshold executes an atomic compound transaction—pruning the node from align row and inserting its new @pin in one undo step.
+7. Extended Speculative Capabilities (Phase 2 Horizon)
+Once the engine combines a lossless CST, a relational hypergraph IR, and a sub-16ms differentiable solver, the diagram evolves from a static illustration into an executable, formal, and perceptually adaptive computational instrument.
+
+
+Speculative Capability
+	Epistemic Shift
+	Underlying Compiler / Solver Primitive
+	1. Counterfactual Queueing Wind Tunnel
+	Static boxes → live stochastic backpressure & retry physics
+	60Hz Wasm fluid-ODE queueing solver over @sim port traits
+	2. Live Telemetry & AST "Phantom Drift"
+	Rotting docs → homomorphic runtime + code twin
+	Tree-sitter symbol bindings + OpenTelemetry/eBPF differential graph union
+	3. Bounded Formal Counterexample Choreography
+	Informal sketch → continuous invariant verification
+	Embedded Wasm SAT/SMT bounded model checker animating race traces
+	4. Stratigraphic 2.5D Oblique Stack
+	Flat 2D hairballs → cross-layer dependency plumb lines
+	Per-stratum 2D VPSC planes under shear-orthographic projection P(θ)
+	5. Composable Spatial Lenses & Scale Homotopy
+	Jarring page swaps → continuous multi-facet semantic loupes
+	C¹-continuous zoom energy J(S; z) + non-Euclidean fisheye VPSC
+	6. Foveated De-Cluttering & Scanpath Synthesis
+	Uniform visual shouting → attention-guided perceptual hierarchy
+	Causal k-hop OKLCH modulation + differentiable saliency critic
+	7. Bitemporal "Spatial Git" Superposition
+	Side-by-side PNG squinting → interactive RFC branch morphing
+	Joint union VPSC anchoring G_base ∪ G_rfc across homotopy τ ∈ [0,1]
+	7.1 Counterfactual Fluid-Queueing Calculus ("Architectural Wind Tunnel")
+Nodes and ports accept optional @sim stochastic traits (rate, workers, service: lognormal(...), retry: exp_backoff(...), queue_cap). A background Wasm worker integrates coupled continuous-time fluid queueing Ordinary Differential Equations (ODEs) at 60Hz:
+
+
+dq_v(t)/dt = ∑_{e ∈ in(v)} λ_e^eff(t) - μ_v(q_v) · min(1, q_v(t) / c_v)
+λ_e^retry(t) = λ_e(t - τ_to) · P(W_v(t - τ_to) > τ_to)
+
+Dragging an ingress load slider or severing an edge with a Canvas Scissors gesture animates real-time queue saturation gauges, dropped-packet port spills, and metastable retry amplification storms directly on the architecture diagram.
+7.2 Homomorphic Code & Telemetry Hydration ("Phantom Drift" Detection)
+@bind(rust: "crate::broker::Partition", otel: "service.name=broker") links declared entities to static Tree-sitter AST symbols and live OpenTelemetry span graphs or eBPF socket maps. Undocumented runtime calls (E_obs \ E_decl) materialize via incremental VPSC as pulsing magenta Phantom Drift edges without dislodging pinned nodes, offering one-click reconciliation (Promote to Architecture CST splice vs. Flag Boundary Violation CI lint failure).
+7.3 Bounded Formal Synthesis & Counterexample Choreography
+Gestalt zone and flow blocks support lightweight state variables and safety assertions (invariant split_brain_free: count(role == Leader) <= 1). An embedded Wasm SAT/SMT bounded model checker verifies horizons up to k ≤ 12 on every edit; violations synthesize an animated Lamport-meets-Topology trace overlay showing exact dropped heartbeats or reordered RPCs step-by-step across the canvas.
+7.4 Stratigraphic 2.5D Oblique Stack Projection
+Declaring strata [app, protocol, hardware] solves crisp 2D VPSC + orthogonal A* layouts independently on each horizontal stratum (θ = 0 keeps flat 2D typography completely undistorted). Trackpad tilting (θ ∈ (0, π/4]) applies a shear-orthographic projection P(θ), dropping cross-layer runs_on / allocates edges as vertical plumb-line vias that expose hidden single-point-of-failure hardware sharing across logically redundant services.
+7.5 Composable Spatial Magic Lenses & Scale-Space Homotopy
+Replaces discrete C4 page drill-downs with continuous scale-space homotopy J(S; z) where container boundaries expand smoothly (C¹-continuous) as child subgraphs unfold. Users can drag composable Magic Lenses (e.g., Byte-Layout Cache-Line Lens, IAM Threat Lens, SQL Schema Lens) across the canvas; overlapping lenses render their relational intersection while surrounding nodes part via radial fisheye springs.
+7.6 Foveated Perceptual De-Cluttering & Differentiable Scanpaths
+In interactive mode, pointer hover computes real-time forward/backward k-hop causal reachability cones, snapping causally active paths to peak OKLCH lightness/chroma while stepping unrelated subgraphs down to quiet structural scaffolding. In static SVG/PDF export mode, @story [client -> gateway -> consensus -> wal] drives a center-surround saliency surrogate during Stage 3B autodiff to tune border weights and tonal elevation so human eye fixations follow the intended narrative order.
+7.7 Bitemporal "Spatial Git" Superposition & RFC Morphing
+Given main (G_0) and an architectural RFC branch (G_1), the compiler matches persistent CST entity IDs and solves a joint union VPSC layout over G_0 ∪ G_1 locking unchanged infrastructure in place (λ_lock · ‖p_v^(1) - p_v^(0)‖₂²). Deprecated components appear as cross-hatched amber ghosts, proposed components render in elevated emerald, and a continuous Branch Morph Slider (τ ∈ [0, 1]) interpolates both spatial topology and @sim wind-tunnel performance metrics between production and RFC states.
+8. Phased Engineering Roadmap & Risk Mitigation
+Implementation Milestones
+1. Milestone 1 — Core CST & Deterministic Orthogonal Kernel: Implement rowan LL(2) parser, SceneGraphIR lowering, 5-tier port constraints, scanline VPSC compaction, and direction-aware visibility A* routing in Rust/Wasm with static crisp SVG output.
+2. Milestone 2 — Collision-Free Typography & Bidirectional Canvas: Add R-tree 0–1 ILP label placement, forward-mode autodiff SDF micro-polish, Gestalt zone Euler contour generation, and surgical CST @pin / align inverse edit synthesis.
+3. Milestone 3 — Ecosystem, Aesthetic Linter & MCP Integration: Ship VS Code / Neovim live-preview extensions, CLI static exporter (SVG/PDF/PNG), heuristic + VLM aesthetic linter, and Model Context Protocol (MCP) server with grammar-constrained edit operations.
+4. Milestone 4 — Executable & Epistemic Extensions: Layer @sim 60Hz Wasm queueing worker, OpenTelemetry/Tree-sitter @bind drift engine, 2.5D WebGPU stratigraphic renderer, and Spatial Git PR diff viewer.
+Key Technical Risks & Mitigations
+* Wasm Bundle Size & Cold-Start Latency: Keep core layout + CST crates dependency-minimal (< 450 KB brotli-compressed Wasm); lazy-load Phase 2 SAT/SMT and fluid-ODE workers on demand.
+* Dense Cyclic Core Routing: Pure sequential A* exhibits ordering bias on dense feedback loops; isolate strongly connected cyclic subgraphs (|V_scc| ≤ 30) for a bounded domus MaxSMT shape-first turn-regularity pass prior to metric channel assignment.
+* Incremental Scaling Past 500 Nodes: Partition compound containers hierarchically via Salsa memoized queries so local edits inside vpc_prod re-solve only the affected container's internal VPSC + VG subgraph in under 4 milliseconds.

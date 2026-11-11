@@ -1,0 +1,218 @@
+{
+  "source": "https://docs.google.com/document/d/1Rb_rNDxsZbtLBM2VW0xSrNMh-WSSNgAnyTLzbcpJVPw/edit",
+  "milestones": [
+    {
+      "title": "1 · Language and lossless syntax",
+      "description": "Progressive four-tier DSL, immutable lossless syntax, scoped relational scenegraph and diagnostics.",
+      "number": 1,
+      "url": "https://github.com/robot-head/smarter-diagrams/milestone/1"
+    },
+    {
+      "title": "2 · Bidirectional authoring",
+      "description": "Typed atomic edits, minimal UTF-8 splices, semantic gesture synthesis and undo/redo.",
+      "number": 2,
+      "url": "https://github.com/robot-head/smarter-diagrams/milestone/2"
+    },
+    {
+      "title": "3 · Stable orthogonal layout",
+      "description": "Port constraints, compound geometry, incremental stability, visibility routing and parallel lanes.",
+      "number": 3,
+      "url": "https://github.com/robot-head/smarter-diagrams/milestone/3"
+    },
+    {
+      "title": "4 · Labels, rendering and delivery",
+      "description": "Collision-free labels, continuous polish, SVG, CLI, Wasm, documentation and measured performance.",
+      "number": 4,
+      "url": "https://github.com/robot-head/smarter-diagrams/milestone/4"
+    },
+    {
+      "title": "5 · Ecosystem and cognitive notation",
+      "description": "RFC-001 sections 4 and 8: views, semantic zoom, editorial rendering, export, editor integrations, linter and MCP.",
+      "number": 5,
+      "url": "https://github.com/robot-head/smarter-diagrams/milestone/5"
+    },
+    {
+      "title": "6 · Executable and epistemic extensions",
+      "description": "RFC-001 section 7: simulation, observed drift, formal traces, strata, lenses, attention and Spatial Git.",
+      "number": 6,
+      "url": "https://github.com/robot-head/smarter-diagrams/milestone/6"
+    }
+  ],
+  "issues": [
+    {
+      "milestone": 1,
+      "title": "Bootstrap Rust crate, CI and specification fixtures",
+      "acceptance": "Provide a documented public Rust API, reproducible dependency lockfile, CI formatting/lint/test checks, and fixtures from both uploaded specifications.",
+      "number": 1,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/1"
+    },
+    {
+      "milestone": 1,
+      "title": "Implement progressive DSL and lossless red-green CST",
+      "acceptance": "Parse nodes, containers, all edge operators/chains, five port tiers, zones, align/distribute, flows and layout annotations. Preserve every byte including CRLF, Unicode, comments and malformed input. Expose typed syntax wrappers, origins and incremental reparsing.",
+      "number": 2,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/2"
+    },
+    {
+      "milestone": 1,
+      "title": "Lower scoped relational scenegraph with source origins",
+      "acceptance": "Resolve qualified and lexical references, inferred nodes, explicit ports and shapes. Represent zones as shared references rather than parents; retain flow steps, layout variants, attributes, source origins and actionable diagnostics.",
+      "number": 3,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/3"
+    },
+    {
+      "milestone": 2,
+      "title": "Implement atomic source-preserving structured edits",
+      "acceptance": "Support pin/size locks, alignment, port constraints, route channels, label slides and unpin. Patch only affected tokens; preserve trivia; reject overlapping or stale UTF-8 patches atomically.",
+      "number": 4,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/4"
+    },
+    {
+      "milestone": 2,
+      "title": "Synthesize semantic gestures and relax conflicting alignments",
+      "acceptance": "Promote peer snaps within 6px, container-relative pins within 6g, quantized 16px fallback, three-node layout-block placement and 24px breakaway alignment pruning in a single transaction.",
+      "number": 5,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/5"
+    },
+    {
+      "milestone": 2,
+      "title": "Add immutable document snapshots and undo/redo",
+      "acceptance": "Maintain synchronized syntax/IR/layout snapshots with versioned transactions, safe incremental reparsing and undo/redo restoring exact bytes.",
+      "number": 6,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/6"
+    },
+    {
+      "milestone": 3,
+      "title": "Assign five-tier ports and deterministic topology",
+      "acceptance": "Honor free, side, clockwise order, ratio and exact slot constraints, outward stubs and corner/port clearance. Resize high-fanout nodes; use deterministic barycentric ordering and bounded cyclic shape optimization.",
+      "number": 7,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/7"
+    },
+    {
+      "milestone": 3,
+      "title": "Implement separable VPSC and recursive containers",
+      "acceptance": "Solve weighted coordinate projection with separation/equality constraints, hard non-overlap and containment, pins, relative anchors, align/distribute and port straightening; diagnose infeasible geometry.",
+      "number": 8,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/8"
+    },
+    {
+      "milestone": 3,
+      "title": "Preserve mental map across incremental layouts",
+      "acceptance": "Implement translation-adjusted anchors, degree weights, elastic relative ordering, Delaunay proximity and source-order tie breaks. Expose metrics and accept prior layout state.",
+      "number": 9,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/9"
+    },
+    {
+      "milestone": 3,
+      "title": "Route obstacle-avoiding orthogonal connectors",
+      "acceptance": "Build visibility graph from padded obstacles and mandatory port stubs. Use direction-aware A* with length, bend, backward, crossing and overlap costs; handle self-loops, cycles and compound boundaries.",
+      "number": 10,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/10"
+    },
+    {
+      "milestone": 3,
+      "title": "Separate shared-channel connector tracks",
+      "acceptance": "Deterministically order left/straight/right channel entries, assign spaced centered lanes within obstacle clearance and reroute affected edges incrementally.",
+      "number": 11,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/11"
+    },
+    {
+      "milestone": 4,
+      "title": "Place collision-free labels with discrete optimization",
+      "acceptance": "Generate port and edge candidates with cartographic priors, spatially index conflicts, solve conflict components with bounded exact selection and feasible pill/callout fallbacks; forbid node/port/label collisions.",
+      "number": 12,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/12"
+    },
+    {
+      "milestone": 4,
+      "title": "Polish label slides and channels with smooth distances",
+      "acceptance": "Provide rectangle SDF, stable softplus, forward derivatives and bounded L-BFGS polish over safe label slides/channel intervals; preserve hard geometry and expose calibrated objective weights.",
+      "number": 13,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/13"
+    },
+    {
+      "milestone": 4,
+      "title": "Render SVG with zones, ports, semantic flows and safe labels",
+      "acceptance": "Export deterministic escaped accessible SVG with compound containers, shapes, padded contours, numbered flow badges, port anchors, styled arrows and label knockout halos; include runnable examples and CLI.",
+      "number": 14,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/14"
+    },
+    {
+      "milestone": 4,
+      "title": "Deliver Wasm API, benchmarks and end-to-end validation",
+      "acceptance": "Expose text-to-diagram and edit APIs to Wasm, document supported syntax/algorithms/limits, run release benchmarks against the stated sub-16ms/sub-ms targets, and validate full specification fixtures and adversarial geometry.",
+      "number": 15,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/15"
+    },
+    {
+      "milestone": 5,
+      "title": "Implement canonical views, semantic zoom and composable lenses",
+      "acceptance": "RFC-001 §§4, 7.5: project named views from one canonical graph; provide C1 continuous zoom and intersecting semantic lens membership with non-overlap fisheye layout.",
+      "number": 16,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/16"
+    },
+    {
+      "milestone": 5,
+      "title": "Add cognitive notation defaults, attention cones and story saliency",
+      "acceptance": "RFC-001 §§4, 7.6: infer distinct silhouettes, provide OKLCH tonal hierarchy, crossing bridges, causal k-hop hover emphasis and @story-guided static saliency.",
+      "number": 17,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/17"
+    },
+    {
+      "milestone": 5,
+      "title": "Ship SVG/PDF/PNG exporter and editor previews",
+      "acceptance": "RFC-001 §8 milestone 3: static SVG/PDF/PNG CLI export, VS Code and Neovim live previews with diagnostics and source-safe edits.",
+      "number": 18,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/18"
+    },
+    {
+      "milestone": 5,
+      "title": "Expose aesthetic linter and grammar-constrained MCP server",
+      "acceptance": "RFC-001 §§4, 8: heuristic and pluggable VLM critique, structured actionable findings and an MCP interface for lossless edit transactions.",
+      "number": 19,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/19"
+    },
+    {
+      "milestone": 6,
+      "title": "Integrate fluid queueing simulation and counterfactual controls",
+      "acceptance": "RFC-001 §7.1: @sim traits, coupled queue ODEs at 60Hz, ingress load, capacity/workers, timeout retries, severed edges, saturation, drops and browser-worker integration.",
+      "number": 20,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/20"
+    },
+    {
+      "milestone": 6,
+      "title": "Reconcile telemetry and code bindings as Phantom Drift",
+      "acceptance": "RFC-001 §7.2: @bind symbol and OTel bindings, static symbol/observed-edge hydration, declared-vs-observed differential, pinned-node stability and promotion/CI violation actions.",
+      "number": 21,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/21"
+    },
+    {
+      "milestone": 6,
+      "title": "Verify bounded safety invariants and choreograph counterexamples",
+      "acceptance": "RFC-001 §7.3: state variables, assertions and bounded SAT/SMT checking up to k=12; emit exact transition traces suitable for animated flow playback.",
+      "number": 22,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/22"
+    },
+    {
+      "milestone": 6,
+      "title": "Project independently laid out strata into oblique 2.5D",
+      "acceptance": "RFC-001 §7.4: strata declarations, independent VPSC/A* planes, undistorted flat typography at theta=0, shear projection through pi/4, cross-layer via geometry and interactive rendering example.",
+      "number": 23,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/23"
+    },
+    {
+      "milestone": 6,
+      "title": "Implement bitemporal Spatial Git union layout and branch morph",
+      "acceptance": "RFC-001 §7.7: stable entity matching, union compaction, locked unchanged infrastructure, amber removals/emerald additions, tau interpolation of geometry and simulation metrics, and PR diff viewer.",
+      "number": 24,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/24"
+    },
+    {
+      "milestone": 5,
+      "title": "Meet Wasm size and hierarchical incremental scaling budgets",
+      "acceptance": "RFC-001 §8: measure <450KB Brotli core Wasm, lazy extension loading, memoized container-level invalidation, >500-node local edits under 4ms; retain original latency and exact-solver requirements.",
+      "number": 25,
+      "url": "https://github.com/robot-head/smarter-diagrams/issues/25"
+    }
+  ]
+}
