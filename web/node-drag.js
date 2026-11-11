@@ -21,10 +21,11 @@ export class NodeDragController {
     if(!body)return;
     event.preventDefault();this.canvas.focus({preventScroll:true});
     const svg=this.canvas.querySelector('svg'),box=body.getBBox(),point=this.point(event);
-    this.gesture={node:id,pointer:event.pointerId,x:event.clientX,y:event.clientY,offset:{x:point.x-box.x-box.width/2,y:point.y-box.y-box.height/2},bounds:[...this.view.bounds],fitted:this.view.fitted,markup:svg.outerHTML,status:this.status.textContent,document:this.getDocument(),frame:0,moved:false};
+    const doc=this.getDocument();
+    this.gesture={node:id,pointer:event.pointerId,x:event.clientX,y:event.clientY,offset:{x:point.x-box.x-box.width/2,y:point.y-box.y-box.height/2},bounds:[...this.view.bounds],fitted:this.view.fitted,markup:svg.outerHTML,status:this.status.textContent,document:doc,preview:doc.begin_drag(),frame:0,timer:0,moved:false};
     this.view.fitted=false;
     this.canvas.classList.add('is-dragging');document.body.classList.add('diagram-dragging');
-    this.canvas.setPointerCapture(event.pointerId);
+    try{this.canvas.setPointerCapture(event.pointerId)}catch(error){this.cancel();this.status.textContent=String(error)}
   }
   operations(event){
     const point=this.point(event),gesture=this.gesture;
@@ -33,21 +34,27 @@ export class NodeDragController {
   move(event){
     const gesture=this.gesture;if(!gesture||event.pointerId!==gesture.pointer)return;
     event.preventDefault();
+    clearTimeout(gesture.timer);
     gesture.moved=Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>=4;
     gesture.operations=this.operations(event);
     if(!gesture.frame)gesture.frame=requestAnimationFrame(()=>{
       gesture.frame=0;if(this.gesture!==gesture)return;
       try{
-        const markup=gesture.moved?gesture.document.preview_drag(gesture.operations):gesture.markup;
+        if(gesture.moved)gesture.preview.update(gesture.operations);
+        const markup=gesture.moved?gesture.preview.svg():gesture.markup;
         this.show(markup,gesture.bounds);
         this.status.textContent=gesture.status;
         this.canvas.classList.remove('invalid-drag');
+        if(gesture.moved)gesture.timer=setTimeout(()=>{
+          if(this.gesture!==gesture||gesture.frame)return;
+          try{gesture.preview.settle();this.show(gesture.preview.svg(),gesture.bounds)}catch{}
+        },120);
       }catch(error){this.canvas.classList.add('invalid-drag');this.status.textContent=String(error)}
     });
   }
   release(){
     const gesture=this.gesture;if(!gesture)return;
-    this.gesture=undefined;cancelAnimationFrame(gesture.frame);
+    this.gesture=undefined;cancelAnimationFrame(gesture.frame);clearTimeout(gesture.timer);gesture.preview.free();
     this.view.fitted=gesture.fitted;
     this.canvas.classList.remove('is-dragging','invalid-drag');document.body.classList.remove('diagram-dragging');
     if(this.canvas.hasPointerCapture(gesture.pointer))this.canvas.releasePointerCapture(gesture.pointer);

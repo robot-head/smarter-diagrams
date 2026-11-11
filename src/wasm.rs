@@ -104,11 +104,16 @@ pub fn check_safety(
 impl WasmDocument {
     /// Render a provisional gesture without changing source, revision or history.
     pub fn preview_drag(&self, drags_json: &str) -> Result<String, JsValue> {
-        let mut preview = Self {
-            inner: self.inner.clone(),
-        };
-        preview.drag(drags_json)?;
+        let mut preview = self.begin_drag();
+        preview.update(drags_json)?;
         Ok(preview.svg())
+    }
+
+    pub fn begin_drag(&self) -> WasmDragPreview {
+        let snapshot = self.inner.snapshot();
+        WasmDragPreview {
+            inner: crate::drag::Preview::new(&snapshot.scene, &snapshot.layout),
+        }
     }
 
     pub fn drag(&mut self, drags_json: &str) -> Result<(), JsValue> {
@@ -119,6 +124,24 @@ impl WasmDocument {
         self.inner
             .edit(self.inner.revision(), &operations, Default::default())
             .map_err(js_error)
+    }
+}
+
+#[wasm_bindgen]
+pub struct WasmDragPreview {
+    inner: crate::drag::Preview,
+}
+#[wasm_bindgen]
+impl WasmDragPreview {
+    pub fn update(&mut self, drags_json: &str) -> Result<(), JsValue> {
+        let drags: Vec<crate::edit::Drag> = serde_json::from_str(drags_json).map_err(js_error)?;
+        self.inner.update(&drags).map_err(js_error)
+    }
+    pub fn settle(&mut self) -> Result<(), JsValue> {
+        self.inner.settle().map_err(js_error)
+    }
+    pub fn svg(&self) -> String {
+        self.inner.svg()
     }
 }
 #[cfg(feature = "wasm-runtime")]
