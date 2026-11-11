@@ -2,10 +2,16 @@
   "name": "smarter-diagrams-browser-checks",
   "private": true,
   "scripts": {
+    "docs:dev": "node scripts/prepare-docs.cjs && vitepress dev site",
+    "docs:build": "node scripts/prepare-docs.cjs --release && vitepress build site",
+    "docs:preview": "vitepress preview site --host 127.0.0.1",
+    "docs:check": "node scripts/check-docs.cjs",
+    "test:docs": "node scripts/docs-test.cjs",
     "test:browser": "node scripts/browser-test.cjs",
     "bench:browser": "node scripts/browser-benchmark.cjs"
   },
   "devDependencies": {
-    "playwright": "1.62.1"
+    "playwright": "1.62.1",
+    "vitepress": "1.6.4"
   }
 }

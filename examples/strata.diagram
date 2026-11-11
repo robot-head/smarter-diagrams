@@ -1,0 +1,7 @@
+strata [app, hardware]
+api [stratum: app]
+worker [stratum: app]
+host [stratum: hardware]
+api -> worker: RPC
+api -> host [relation: runs_on]
+worker -> host [relation: runs_on]

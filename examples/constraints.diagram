@@ -1,0 +1,6 @@
+api: API @pin(grid: 0, 0)
+cache: Cache @pin(grid: 15, 0)
+db: Database @pin(grid: 30, 0)
+align row [api, cache, db]
+api.E -> cache.W: lookup
+api.S -> db.S: query

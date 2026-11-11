@@ -1,0 +1,5 @@
+client: Web client
+api: API service
+db: Postgres
+client -> api: HTTPS
+api -> db: SQL

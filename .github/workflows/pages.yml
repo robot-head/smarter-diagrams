@@ -1,0 +1,75 @@
+name: Documentation and Pages
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: cargo build --locked --all-features
+      - name: Install pinned wasm-bindgen CLI
+        run: |
+          curl -fL --retry 3 https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.130/wasm-bindgen-0.2.130-x86_64-unknown-linux-musl.tar.gz -o /tmp/wasm-bindgen.tar.gz
+          echo '9687f3bb551b9f66f37ed32a40d7913a00f7962db653054e56857bc306c3227f  /tmp/wasm-bindgen.tar.gz' | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/diagram-wasm-bindgen"
+          tar -xzf /tmp/wasm-bindgen.tar.gz --strip-components=1 -C "$RUNNER_TEMP/diagram-wasm-bindgen"
+          echo "$RUNNER_TEMP/diagram-wasm-bindgen" >> "$GITHUB_PATH"
+      - run: scripts/build-wasm.sh core && scripts/build-wasm.sh runtime
+      - run: cargo doc --locked --all-features --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - run: npm run docs:check && npm run docs:build
+      - run: npx playwright install --with-deps chromium
+      - name: Test the complete site under its Pages base path
+        run: |
+          npm run docs:preview -- --port 4173 > /tmp/diagram-docs-preview.log 2>&1 &
+          npm run test:docs
+        env:
+          DOCS_TEST_URL: http://127.0.0.1:4173/smarter-diagrams/
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: documentation-browser-evidence
+          path: artifacts/
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: site/.vitepress/dist
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

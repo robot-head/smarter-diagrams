@@ -2,10 +2,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Smarter Diagrams · Rust/Wasm example</title>
+<link rel="icon" type="image/svg+xml" href="./logo.svg">
 <style>
 :root{font-family:system-ui,sans-serif;color:#24364b;background:#f6f8fb}body{margin:24px}h1{font-size:22px}nav{display:flex;gap:8px;align-items:center;margin-bottom:16px}button{padding:8px 14px;border:1px solid #bdcbdc;border-radius:6px;background:white;cursor:pointer}main{display:grid;grid-template-columns:minmax(280px,1fr) 2fr;gap:16px}textarea{box-sizing:border-box;width:100%;height:560px;padding:16px;border:1px solid #c4d0df;border-radius:8px;font:13px/1.6 ui-monospace,monospace}#canvas{overflow:auto;min-height:560px;background:white;border:1px solid #d6dfeb;border-radius:8px;padding:16px}svg{max-width:100%;height:auto;touch-action:none}[data-node]{cursor:grab}#status{font-size:13px;white-space:pre-wrap}#metrics{font:12px ui-monospace,monospace}@media(max-width:760px){main{grid-template-columns:1fr}}
 </style>
-<h1>Smarter Diagrams</h1><a href="./advanced.html">Strata and Spatial Git examples</a>
+<style>nav{flex-wrap:wrap}nav label{display:flex;align-items:center;gap:8px}nav input{max-width:120px}select{max-width:100%;padding:8px;border:1px solid #bdcbdc;border-radius:6px;background:white;color:inherit}section{min-width:0}a{color:#176e62}#download{padding:8px 0}textarea:focus-visible,button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #168c7b;outline-offset:3px}.demo-links{display:flex;gap:18px;flex-wrap:wrap}@media(max-width:760px){body{margin:16px}textarea{height:400px}#canvas{min-height:420px}nav{gap:10px}h1{margin-bottom:12px}}</style>
+<h1>Smarter Diagrams</h1><div class="demo-links"><a href="https://robot-head.github.io/smarter-diagrams/">Documentation</a><a href="./advanced.html">Strata and Spatial Git</a></div>
 <p>Author topology in text. Drag a node to write a semantic constraint back into the source. Shift-click a connector to cut it during simulation.</p>
 <nav><button id="render">Render</button><button id="undo">Undo</button><button id="redo">Redo</button><button id="simulate">Run simulation</button><select id="trace" aria-label="Protocol trace"></select><button id="next">Next step</button><label>Ingress <input id="load" type="range" min="0" max="300" value="80"></label><a id="download" download="diagram.svg">Download SVG</a></nav>
 <main><section><label for="source">Diagram source</label><textarea id="source" spellcheck="false">client: Client @sim(rate: 80, service_rate: 200)
@@ -23,7 +25,10 @@ const source=document.querySelector('#source'),canvas=document.querySelector('#c
 let doc,worker,objectUrl,timer,drag,focus;let traceStep=-1;const cuts=new Set();
 function paint(){traceStep=-1;const select=document.querySelector('#trace');select.replaceChildren();for(const flow of JSON.parse(doc.flows_json())){const option=document.createElement('option');option.value=flow.id;option.textContent=flow.label;select.append(option);}canvas.innerHTML=doc.svg();source.value=doc.source();status.textContent=`${Number(doc.revision())} · source revision`;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(new Blob([doc.svg()],{type:'image/svg+xml'}));document.querySelector('#download').href=objectUrl;}
 function render(){try{if(doc)doc.replace_source(doc.revision(),source.value);else doc=new WasmDocument(source.value);paint();if(worker)worker.postMessage({type:'open',source:doc.source()});}catch(e){status.textContent=String(e);}}
-await init();render();
+await init();
+const example=new URLSearchParams(location.search).get('example');
+if(example){try{if(!/^[a-z0-9_-]+$/.test(example))throw new Error('Invalid example name');const response=await fetch(new URL(`../examples/${example}.diagram`,location.href));if(!response.ok)throw new Error('Example unavailable');source.value=await response.text();}catch(error){status.textContent=String(error);}}
+render();
 document.querySelector('#render').onclick=render;
 document.querySelector('#next').onclick=()=>{try{const id=document.querySelector('#trace').value;const flow=JSON.parse(doc.flows_json()).find(f=>f.id===id);if(!flow?.edges.length)return;traceStep=(traceStep+1)%flow.edges.length;canvas.innerHTML=doc.flow_frame_svg(id,traceStep);status.textContent=`${flow.label}: step ${traceStep+1}/${flow.edges.length}`;}catch(e){status.textContent=String(e);}};
 source.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(render,200);});

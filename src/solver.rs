@@ -30,7 +30,7 @@ impl Default for Weights {
         }
     }
 }
-/// Sparse linear constraint: sum(coefficients[i] * x[i]) >= rhs, or == rhs.
+/// Sparse linear constraint: `sum(coefficients[i] * x[i]) >= rhs`, or equality.
 #[derive(Debug, Clone)]
 pub struct Constraint {
     pub coefficients: Vec<(usize, f64)>,
