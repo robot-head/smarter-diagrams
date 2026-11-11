@@ -21,9 +21,9 @@ export class NodeDragController {
     if(!body)return;
     event.preventDefault();this.canvas.focus({preventScroll:true});
     const svg=this.canvas.querySelector('svg'),box=body.getBBox(),point=this.point(event);
-    const doc=this.getDocument();
-    this.gesture={node:id,pointer:event.pointerId,x:event.clientX,y:event.clientY,offset:{x:point.x-box.x-box.width/2,y:point.y-box.y-box.height/2},bounds:[...this.view.bounds],fitted:this.view.fitted,markup:svg.outerHTML,status:this.status.textContent,document:doc,preview:doc.begin_drag(),frame:0,timer:0,moved:false};
-    this.view.fitted=false;
+    const doc=this.getDocument();let preview;try{preview=doc.begin_drag()}catch(error){this.status.textContent=String(error);return}
+    this.gesture={node:id,pointer:event.pointerId,x:event.clientX,y:event.clientY,offset:{x:point.x-box.x-box.width/2,y:point.y-box.y-box.height/2},bounds:[...this.view.bounds],fitted:this.view.fitted,markup:svg.outerHTML,status:this.status.textContent,document:doc,preview,frame:0,moved:false,savedFrame:this.view.frame&&[...this.view.frame],valid:true};
+    this.view.lockFrame(this.gesture.bounds);
     this.canvas.classList.add('is-dragging');document.body.classList.add('diagram-dragging');
     try{this.canvas.setPointerCapture(event.pointerId)}catch(error){this.cancel();this.status.textContent=String(error)}
   }
@@ -34,28 +34,24 @@ export class NodeDragController {
   move(event){
     const gesture=this.gesture;if(!gesture||event.pointerId!==gesture.pointer)return;
     event.preventDefault();
-    clearTimeout(gesture.timer);
     gesture.moved=Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>=4;
     gesture.operations=this.operations(event);
     if(!gesture.frame)gesture.frame=requestAnimationFrame(()=>{
       gesture.frame=0;if(this.gesture!==gesture)return;
-      try{
-        if(gesture.moved)gesture.preview.update(gesture.operations);
-        const markup=gesture.moved?gesture.preview.svg():gesture.markup;
-        this.show(markup,gesture.bounds);
-        this.status.textContent=gesture.status;
-        this.canvas.classList.remove('invalid-drag');
-        if(gesture.moved)gesture.timer=setTimeout(()=>{
-          if(this.gesture!==gesture||gesture.frame)return;
-          try{gesture.preview.settle();this.show(gesture.preview.svg(),gesture.bounds)}catch{}
-        },120);
-      }catch(error){this.canvas.classList.add('invalid-drag');this.status.textContent=String(error)}
+      this.preview(gesture);
     });
   }
-  release(){
+  preview(gesture){
+    try{
+      if(gesture.moved&&gesture.applied!==gesture.operations){gesture.preview.update(gesture.operations);gesture.applied=gesture.operations}
+      this.show(gesture.moved?gesture.preview.svg():gesture.markup,gesture.bounds);
+      gesture.valid=true;this.status.textContent=gesture.status;this.canvas.classList.remove('invalid-drag');
+    }catch(error){gesture.applied=undefined;gesture.valid=false;this.canvas.classList.add('invalid-drag');this.status.textContent=`Cannot place here: ${String(error)}. Move to a clear position or press Escape.`}
+  }
+  release(restore=true){
     const gesture=this.gesture;if(!gesture)return;
-    this.gesture=undefined;cancelAnimationFrame(gesture.frame);clearTimeout(gesture.timer);gesture.preview.free();
-    this.view.fitted=gesture.fitted;
+    this.gesture=undefined;cancelAnimationFrame(gesture.frame);gesture.preview.free();
+    if(restore){this.view.frame=gesture.savedFrame;this.view.fitted=gesture.fitted}
     this.canvas.classList.remove('is-dragging','invalid-drag');document.body.classList.remove('diagram-dragging');
     if(this.canvas.hasPointerCapture(gesture.pointer))this.canvas.releasePointerCapture(gesture.pointer);
     return gesture;
@@ -64,11 +60,14 @@ export class NodeDragController {
     const gesture=this.gesture;if(!gesture||event.pointerId!==gesture.pointer)return;
     event.preventDefault();
     const operations=this.operations(event),moved=Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>=4;
-    this.release();
-    if(!moved){this.show(gesture.markup);this.status.textContent=gesture.status;return}
-    try{gesture.document.drag(operations);this.onCommit()}
-    catch(error){this.show(gesture.markup);this.status.textContent=String(error)}
+    if(!moved){this.cancel();return}
+    gesture.operations=operations;gesture.moved=true;
+    this.preview(gesture);
+    if(!gesture.valid){const message=this.status.textContent;this.cancel();this.status.textContent=`Move canceled. ${message}`;return}
+    try{gesture.document.commit_drag(gesture.preview);this.release(false);this.onCommit()}
+    catch(error){this.cancel();this.status.textContent=String(error)}
   }
+
   cancel(){
     const gesture=this.release();if(!gesture)return;
     this.show(gesture.markup);this.status.textContent=gesture.status;

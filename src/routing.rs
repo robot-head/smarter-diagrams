@@ -65,6 +65,10 @@ pub fn route_all(
     prior: Option<&Layout>,
     l: &mut Layout,
 ) -> Result<(), Error> {
+    // Costs include only routes accepted for this frame, never an edge's old
+    // path or paths left over from a previous pointer position.
+    l.routes.clear();
+    l.reused_routes = 0;
     for e in &scene.edges {
         let a = l.ports[&port_key(e, true)].clone();
         let b = l.ports[&port_key(e, false)].clone();
@@ -75,9 +79,7 @@ pub fn route_all(
             && old.ports.get(&b.key) == Some(&b)
             && effective_annotations(scene, &e.id, &e.annotations, o.variant.as_deref()).is_empty()
             && let Some(r) = old.routes.get(&e.id)
-            && r.points
-                .windows(2)
-                .all(|p| !obs.iter().any(|r| r.blocks(p[0], p[1])))
+            && route_is_valid(scene, l, e, r, o.margin)
         {
             reused = Some(r.clone());
         }
@@ -105,7 +107,24 @@ pub fn route_all(
                 "route channel exceeds finite coordinate range".into(),
             ));
         }
-        let route = if let Some(x) = channel {
+        let (nx, ny) = a.side.normal();
+        let distance = (b.point.x - a.point.x) * nx + (b.point.y - a.point.y) * ny;
+        let tight_straight = channel.is_none()
+            && !annotations.iter().any(|a| a.name == "route")
+            && dir(a.side) == opposite(dir(b.side))
+            && distance > 0.
+            && ((b.point.x - a.point.x) * ny - (b.point.y - a.point.y) * nx).abs() < 1e-6
+            && distance <= a.point.distance(a.stub) + b.point.distance(b.stub) + 1e-6;
+        let route = if tight_straight {
+            // Facing stubs can overlap on a short straight connection. Order
+            // their vertices along the shaft instead of drawing a hairpin.
+            let mut points = vec![a.stub, b.stub];
+            points.sort_by(|p, q| {
+                ((p.x - a.point.x) * nx + (p.y - a.point.y) * ny)
+                    .total_cmp(&((q.x - a.point.x) * nx + (q.y - a.point.y) * ny))
+            });
+            points
+        } else if let Some(x) = channel {
             let p = Point::new(x, a.stub.y);
             let q = Point::new(x, b.stub.y);
             if obs
@@ -117,8 +136,17 @@ pub fn route_all(
                     e.id
                 )));
             }
-            let mut one = search(a.stub, p, dir(a.side), 2, &obs, l, o)?;
-            let two = search(q, b.stub, 2, opposite(dir(b.side)), &obs, l, o)?;
+            let channel_direction = if q.y >= p.y { 1 } else { 3 };
+            let mut one = search(a.stub, p, dir(a.side), channel_direction, &obs, l, o)?;
+            let two = search(
+                q,
+                b.stub,
+                channel_direction,
+                opposite(dir(b.side)),
+                &obs,
+                l,
+                o,
+            )?;
             one.push(q);
             one.extend(two.into_iter().skip(1));
             one
@@ -184,15 +212,102 @@ pub fn route_all(
         }
 
         // Keep explicit port stub points even when collinear, so geometry consumers can inspect them.
-        l.routes.insert(
-            e.id.clone(),
-            Route {
-                edge: e.id.clone(),
-                points,
-            },
-        );
+        let route = Route {
+            edge: e.id.clone(),
+            points,
+        };
+        if !route_is_valid(scene, l, e, &route, o.margin) {
+            return Err(Error::Layout(format!(
+                "route {} cannot preserve its attachments and clearance",
+                e.id
+            )));
+        }
+        l.routes.insert(e.id.clone(), route);
     }
     Ok(())
+}
+/// Reused and newly computed paths obey the same geometry contract.
+pub(crate) fn route_is_valid(
+    scene: &SceneGraph,
+    l: &Layout,
+    e: &Edge,
+    route: &Route,
+    margin: f64,
+) -> bool {
+    let points = &route.points;
+    let Some(a) = l.ports.get(&port_key(e, true)) else {
+        return false;
+    };
+    let Some(b) = l.ports.get(&port_key(e, false)) else {
+        return false;
+    };
+    if points.len() < 2
+        || points.iter().any(|p| !p.x.is_finite() || !p.y.is_finite())
+        || points[0].distance(a.point) > 1e-6
+        || points.last().unwrap().distance(b.point) > 1e-6
+    {
+        return false;
+    }
+    let simple = coalesced(points);
+    if simple.len() < 2 {
+        return false;
+    }
+    for (port, neighbor) in [(a, simple[1]), (b, simple[simple.len() - 2])] {
+        let (nx, ny) = port.side.normal();
+        let dx = neighbor.x - port.point.x;
+        let dy = neighbor.y - port.point.y;
+        let required = (port.stub.x - port.point.x) * nx + (port.stub.y - port.point.y) * ny;
+        if (dx * ny - dy * nx).abs() > 1e-6 || dx * nx + dy * ny < required - 1e-6 {
+            return false;
+        }
+    }
+    let obs = obstacles(scene, l, e, margin);
+    let endpoints = [
+        l.nodes[&e.source.node].inflate(margin),
+        l.nodes[&e.target.node].inflate(margin),
+    ];
+    for (i, p) in points.windows(2).enumerate() {
+        if p[0].distance(p[1]) < 1e-7
+            || (p[0].x - p[1].x).abs() > 1e-6 && (p[0].y - p[1].y).abs() > 1e-6
+            || obs.iter().any(|r| r.blocks(p[0], p[1]))
+            || i > 0 && i + 2 < points.len() && endpoints.iter().any(|r| r.blocks(p[0], p[1]))
+        {
+            return false;
+        }
+    }
+    for p in simple.windows(3) {
+        if (p[1].x - p[0].x) * (p[2].x - p[1].x) + (p[1].y - p[0].y) * (p[2].y - p[1].y) < -1e-6 {
+            return false;
+        }
+    }
+    for (i, p) in simple.windows(2).enumerate() {
+        for (j, q) in simple.windows(2).enumerate().skip(i + 2) {
+            if i == 0
+                && j + 2 == simple.len()
+                && e.source.node == e.target.node
+                && simple[0].distance(*simple.last().unwrap()) < 1e-6
+            {
+                continue;
+            }
+            let horizontal = (p[0].y - p[1].y).abs() < 1e-6;
+            let other_horizontal = (q[0].y - q[1].y).abs() < 1e-6;
+            if horizontal == other_horizontal {
+                if collinear_overlap(p[0], p[1], q[0], q[1]) > 1e-6 {
+                    return false;
+                }
+            } else {
+                let (h, v) = if horizontal { (p, q) } else { (q, p) };
+                if v[0].x >= h[0].x.min(h[1].x) - 1e-6
+                    && v[0].x <= h[0].x.max(h[1].x) + 1e-6
+                    && h[0].y >= v[0].y.min(v[1].y) - 1e-6
+                    && h[0].y <= v[0].y.max(v[1].y) + 1e-6
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    true
 }
 fn dir(s: Side) -> usize {
     match s {
@@ -321,6 +436,9 @@ fn search(
         let d = q.state % 4;
         let p = point(i);
         if i == ti {
+            if d == opposite(arrival) {
+                continue;
+            }
             let total = q.g + turns(d, arrival) * o.weights.bend;
             if total < best {
                 best = total;
@@ -337,7 +455,7 @@ fn search(
             (y > 0, i.saturating_sub(nx), 3),
         ];
         for (valid, j, nd) in neighbors {
-            if !valid {
+            if !valid || nd == opposite(d) {
                 continue;
             }
             let v = point(j);
@@ -618,6 +736,10 @@ pub fn nudge_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
             }
             for (id, r) in &candidates {
                 let e = scene.edge(id).unwrap();
+                if !route_is_valid(scene, l, e, r, o.margin) {
+                    valid = false;
+                    break;
+                }
                 let external = obstacles(scene, l, e, o.margin);
                 let mut internal = external.clone();
                 internal.push(l.nodes[&e.source.node].inflate(o.margin));

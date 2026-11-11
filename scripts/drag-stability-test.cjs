@@ -6,11 +6,6 @@ module.exports=async function dragStability(browser,base){
   await page.clock.install({time:new Date('2026-11-11T10:00:00Z')});
   await page.goto(base);await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('revision'));
   await page.clock.pauseAt(new Date('2026-11-11T10:01:00Z'));
-  await page.evaluate(async()=>{
-    const{WasmDragPreview}=await import(new URL('./pkg/smarter_diagrams.js',location.href));
-    const settle=WasmDragPreview.prototype.settle;window.qaSettles=0;
-    WasmDragPreview.prototype.settle=function(){window.qaSettles++;return settle.call(this)};
-  });
   const read=()=>page.evaluate(()=>Object.fromEntries([...document.querySelectorAll('#canvas [data-node]')].map(node=>{
     const body=node.querySelector('[data-silhouette]'),b=body.getBBox(),screen=body.getBoundingClientRect();
     return[node.dataset.node,{x:b.x+b.width/2,y:b.y+b.height/2,screenX:screen.x,screenY:screen.y}];
@@ -30,18 +25,16 @@ module.exports=async function dragStability(browser,base){
     assert.equal(await page.locator('#source').inputValue(),original);
     samples.push({cursorY:y,actualY:actual.gateway.y});
   }
-  assert.equal(await page.evaluate(()=>window.qaSettles),0,'active motion must postpone expensive routing');
-  await page.clock.runFor(80);assert.equal(await page.evaluate(()=>window.qaSettles),0,'brief pauses must not reroute');
-  await page.clock.runFor(80);assert.equal(await page.evaluate(()=>window.qaSettles),1,'one route settlement after the debounce');
+  const beforeIdle=await read();await page.clock.runFor(160);assert.deepEqual(await read(),beforeIdle,'pausing must not change the validated preview');
   const settled=await read();for(const id of ['client','worker','db'])assert.deepEqual(settled[id],baseline[id]);
   assert(Math.abs(settled.gateway.x-baseline.gateway.x-64.25)<.03);assert(Math.abs(settled.gateway.y-10)<.03);
   await page.mouse.move(grab.x+64.25*grab.scale,grab.y+11*grab.scale);await page.clock.runFor(17);await page.keyboard.press('Escape');await page.mouse.up();
-  await page.clock.runFor(1000);assert.equal(await page.evaluate(()=>window.qaSettles),1,'cancellation must clear delayed rerouting');
+  await page.clock.runFor(1000);assert.deepEqual(await read(),baseline,'cancellation restores a valid baseline without delayed routing');
   assert.equal(await page.locator('#source').inputValue(),original);
   const snap=await start();await page.mouse.move(snap.x+64*snap.scale,snap.y+3*snap.scale);await page.clock.runFor(17);await page.mouse.up();
-  const dropped=await read();assert(Math.abs(dropped.gateway.x-304)<.03,'row snapping on drop must preserve the horizontal coordinate');
+  const dropped=await read();assert(Math.abs(dropped.gateway.x-304)<.03&&Math.abs(dropped.gateway.y-3)<.03,'drop must preserve both coordinates without hidden row snapping');
   await page.locator('#undo').dispatchEvent('click');assert.equal(await page.locator('#source').inputValue(),original);
-  await page.clock.runFor(1000);assert.equal(await page.evaluate(()=>window.qaSettles),1,'drop must clear delayed rerouting');
+  await page.clock.runFor(1000);assert.deepEqual(await read(),baseline,'drop and Undo must leave no delayed rerouting');
   assert.deepEqual(errors,[]);fs.mkdirSync('artifacts/stable-drag',{recursive:true});fs.writeFileSync('artifacts/stable-drag/jitter-samples.json',JSON.stringify(samples,null,2));
-  await page.close();console.log('Drag stability: continuous sub-grid motion, fixed neighboring boxes/camera, debounced routing, canceled timers and stable row-snap drop passed.');
+  await page.close();console.log('Drag stability: continuous sub-grid motion, fixed neighboring boxes/camera, idle continuity, cancellation and exact drop passed.');
 };

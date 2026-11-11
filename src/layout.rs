@@ -245,7 +245,8 @@ pub fn layout(
         cached.stability = StabilityMetrics::default();
         for label in &mut cached.labels {
             if let Some(edge) = scene.edge(&label.feature) {
-                label.text = edge.label.clone();
+                label.text =
+                    crate::render::flow_caption(scene, edge).unwrap_or_else(|| edge.label.clone());
             } else if let Some(node) = scene.node(&label.feature) {
                 label.text = node.label.clone();
             } else if let Some((node, port)) = label.feature.rsplit_once('#')
@@ -254,7 +255,9 @@ pub fn layout(
                 label.text = p.label.clone();
             }
         }
-        return Ok(cached);
+        if validate(scene, &cached, o).is_ok() && crate::labels::placements_clear(scene, &cached) {
+            return Ok(cached);
+        }
     }
     if let Some(prior) = previous.filter(|p| p.cache_config == cache_config)
         && let Some(mut local) = local_query(scene, options, prior, &entity_keys)
@@ -1508,7 +1511,16 @@ pub fn validate(scene: &SceneGraph, l: &Layout, o: &LayoutOptions) -> Result<(),
         }
     }
     for e in &scene.edges {
-        let route = &l.routes[&e.id];
+        let route = l
+            .routes
+            .get(&e.id)
+            .ok_or_else(|| Error::Layout(format!("missing route {}", e.id)))?;
+        if !crate::routing::route_is_valid(scene, l, e, route, o.margin) {
+            return Err(Error::Layout(format!(
+                "route {} violates attachment, clearance or simple-path constraints",
+                e.id
+            )));
+        }
         if route
             .points
             .iter()

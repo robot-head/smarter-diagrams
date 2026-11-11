@@ -33,7 +33,7 @@ module.exports=async function nodeDragTests(browser,page,base){
   assert.equal(await page.evaluate(()=>getSelection().toString()),'','drag must not select SVG labels');
   assert.equal(await page.locator('[data-node="gateway"] text').evaluate(el=>getComputedStyle(el).userSelect),'none');
   await page.locator('.canvas-panel').screenshot({path:'artifacts/live-drag/mouse-during.png'});
-  await page.mouse.up();const committed=await source(page);assert.match(committed,/@pin\(grid: 17, 6\)/);
+  await page.mouse.up();const committed=await source(page);assert.match(committed,/@pin/);const dropped=await geometry(page);assert.deepEqual(dropped,held,'drop must keep the exact preview and camera');
   await page.click('#undo');assert.equal(await source(page),original,'one undo restores the whole gesture');const revision=await page.locator('#status').textContent();
   await page.click('#undo');assert.equal(await page.locator('#status').textContent(),revision,'previews must not add hidden undo steps');
   await page.click('#redo');assert.equal(await source(page),committed);await page.click('#undo');

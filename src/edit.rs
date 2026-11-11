@@ -821,10 +821,56 @@ fn upsert_layout(
         )])
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Drag {
     pub node: NodeId,
     pub position: Point,
+}
+// Freeze automatic axes for a manual canvas gesture while retaining declared
+// relative anchors, existing locks, comments and topology text.
+pub(crate) fn anchor_geometry(
+    source: &str,
+    node: &str,
+    bounds: crate::layout::Rect,
+    grid: f64,
+) -> Result<String, Error> {
+    let scene = lower(&syntax::parse(source));
+    let n = scene
+        .node(node)
+        .ok_or_else(|| Error::Edit(format!("unknown node {node}")))?;
+    let existing = scene
+        .layout_rules
+        .iter()
+        .rev()
+        .find(|r| r.variant.is_none() && r.target == node)
+        .and_then(|r| r.annotations.iter().find(|a| a.name == "pin"))
+        .or_else(|| n.annotations.iter().find(|a| a.name == "pin"));
+    let mut attrs = BTreeMap::new();
+    if !existing.is_some_and(|a| a.attrs.contains_key("grid")) {
+        for (key, value) in [("x", bounds.x), ("y", bounds.y)] {
+            if !existing.is_some_and(|a| a.attrs.contains_key(key)) {
+                attrs.insert(key.into(), format!("{}g", value / grid));
+            }
+        }
+    }
+    if n.container
+        && n.shape != "sql_table"
+        && !existing.is_some_and(|a| a.attrs.contains_key("lock"))
+    {
+        attrs.insert(
+            "lock".into(),
+            format!("[w: {}g, h: {}g]", bounds.w / grid, bounds.h / grid),
+        );
+    }
+    if attrs.is_empty() {
+        return Ok(source.into());
+    }
+    let patches = if let Some(a) = existing {
+        update_annotation(source, a, &attrs, &[])?
+    } else {
+        upsert_layout(source, &scene, node, "pin", attrs)?
+    };
+    apply_patches(source, &patches)
 }
 /// Convert canvas positions into semantic edits. Positions are node centroids in pixels.
 pub fn synthesize_drag(

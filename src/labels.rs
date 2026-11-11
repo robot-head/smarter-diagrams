@@ -97,7 +97,6 @@ fn conflict(a: &LabelPlacement, b: &LabelPlacement) -> bool {
         || leader(b).is_some_and(|(x, y)| segment_hits(x, y, clearance(a)))
 }
 /// Keep a valid gesture caption instead of searching for a new preferred slot.
-#[cfg(any(feature = "wasm", test))]
 pub(crate) fn placements_clear(scene: &SceneGraph, layout: &Layout) -> bool {
     for (i, label) in layout.labels.iter().enumerate() {
         if layout.labels[i + 1..]
