@@ -76,6 +76,7 @@ const checkSvg = require('./check-rendered-svg.cjs');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'spatial viewer must contain mobile overflow');
   await page.screenshot({path:'artifacts/spatial-tools-mobile.png',fullPage:true});
   await require('./visual-regression-test.cjs')(browser,page,process.env.DIAGRAM_TEST_URL || 'http://127.0.0.1:8765/web/');
+  await require('./node-drag-test.cjs')(browser,page,process.env.DIAGRAM_TEST_URL || 'http://127.0.0.1:8765/web/');
   assert.deepEqual(errors, []); console.log('Browser: Wasm geometry, pointer edits, trace playback, visible overload/cut state, semantic strata, branch morph, and mobile source/zoom controls passed.');
   await browser.close();
 })().catch(error => { console.error(error); process.exit(1); });
