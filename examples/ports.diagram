@@ -1,0 +1,12 @@
+api: API service
+broker: Event log [shape: queue] {
+  port orders [side: E, ratio: 0.5]
+}
+worker: Order worker
+db: Orders [shape: sql_table] {
+  port id: uuid [side: W, pos: 1]
+  port customer_id: uuid [side: W, pos: 2]
+}
+api.E -> broker.W: publish
+broker#orders -> worker.W: consume
+worker.S(order: 1) -> db#id: insert

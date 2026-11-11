@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 (async () => {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox', '--enable-unsafe-webgpu', '--use-angle=swiftshader'] });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : chromium.executablePath()), headless: true, args: ['--no-sandbox', '--enable-unsafe-webgpu', '--use-angle=swiftshader'] });
   const page = await browser.newPage({ viewport: { width: 1360, height: 900 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -25,7 +25,7 @@ const fs = require('node:fs');
   assert.match(await page.locator('#status').textContent(), /Cut:/);
   await page.click('#simulate');
   const api = await page.evaluate(async () => {
-    const { WasmDocument, render_svg } = await import('/web/pkg/smarter_diagrams.js');
+    const { WasmDocument, render_svg } = await import(new URL('./pkg/smarter_diagrams.js',location.href).href);
     const d = new WasmDocument('a\nb\n');
     d.edit(d.revision(), JSON.stringify([{ PinNode: { node: 'a', pin: { AbsoluteGrid: { x: 0, y: 0 } }, size_lock: null } }]));
     const source = d.source(); const undo = d.undo(); const restored = d.source(); d.free();

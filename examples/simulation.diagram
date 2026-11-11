@@ -1,0 +1,8 @@
+client: Client @sim(rate: 80, service_rate: 200)
+gateway: API gateway @sim(service_rate: 100, queue_cap: 200)
+worker: Worker @sim(service_rate: 50, queue_cap: 100, retry: exp_backoff(0.5, 0.2))
+db: Database @sim(service_rate: 80)
+client.E -> gateway.W: HTTPS
+gateway.E -> worker.W: jobs
+worker.E -> db.W: writes
+flow request { client -> gateway -> worker -> db }

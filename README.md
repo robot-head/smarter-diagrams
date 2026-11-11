@@ -2,6 +2,8 @@
 
 A Rust library for diagrams authored in text, with a lossless Rowan syntax tree, source-preserving canvas edits, deterministic orthogonal layout, and native/Wasm integrations.
 
+[Documentation](https://robot-head.github.io/smarter-diagrams/) · [Live playground](https://robot-head.github.io/smarter-diagrams/playground.html) · [Rust API](https://robot-head.github.io/smarter-diagrams/api/smarter_diagrams/index.html)
+
 ```text
 client -> gateway: HTTPS
 gateway -> auth: JWT

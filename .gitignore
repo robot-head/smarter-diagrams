@@ -3,3 +3,13 @@
 /web/pkg/
 /web/pkg-runtime/
 /node_modules/
+/site/.vitepress/cache/
+/site/.vitepress/dist/
+/site/public/generated/
+/site/public/demo/
+/site/public/api/
+/site/public/evidence/
+/site/public/examples/
+/site/reference/architecture.md
+/site/reference/performance.md
+/site/reference/verification.md

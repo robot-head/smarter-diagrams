@@ -1,6 +1,6 @@
 //! Bounded weighted-SAT macro placement for cyclic cores.
 //!
-//! Boolean variables x[v,cell] use exactly-one row clauses and at-most-one column
+//! Boolean variables `x[v,cell]` use exactly-one row clauses and at-most-one column
 //! clauses. Pairwise soft costs estimate port-aware route turns, length and blocked
 //! channels; crossing soft clauses couple completed edge shapes. The search branches
 //! on one-hot groups and propagates occupied cells directly. It always retains a
