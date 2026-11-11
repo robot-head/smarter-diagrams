@@ -4,9 +4,10 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const binary = path.join(root, 'target/debug/smarter-diagrams');
 const files = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.name.startsWith('.') || e.name === 'public' ? [] : e.isDirectory() ? files(path.join(dir, e.name)) : [path.join(dir, e.name)]);
-let diagrams = 0, snippets = 0, configurations = 0;
-function checkDiagram(source, label) {
+let diagrams = 0, snippets = 0, configurations = 0, diagnostics = 0;
+function checkDiagram(source, label, expectError = false) {
   const result = spawnSync(binary, ['-', '--format', 'check'], { input: source, encoding: 'utf8' });
+  if(expectError){if(result.status===0 || !result.stderr.includes('infeasible layout'))throw Error(`${label}: expected a layout diagnostic, got ${result.stderr || result.stdout}`);diagnostics++;return;}
   if (result.status !== 0) throw Error(`${label}: ${result.stderr || result.error}`);
   diagrams++;
 }
@@ -15,7 +16,7 @@ for (const file of files(path.join(root, 'site')).filter(file => file.endsWith('
   const text = fs.readFileSync(file, 'utf8');
   for (const match of text.matchAll(/^```(diagram|rust|toml|json)([^\n]*)\n([\s\S]*?)^```/gm)) {
     const source = match[3], label = `${path.relative(root, file)}:${text.slice(0, match.index).split('\n').length}`;
-    if (match[1] === 'diagram') { checkDiagram(source, label); continue; }
+    if (match[1] === 'diagram') { checkDiagram(source, label, /\bexpect-error\b/.test(match[2])); continue; }
     if (match[1] === 'toml') {
       const result = spawnSync('python3', ['-c', 'import sys,tomllib; tomllib.loads(sys.stdin.read())'], { input: source, encoding: 'utf8' });
       if (result.status !== 0) throw Error(`${label}: ${result.stderr || result.error}`);
@@ -36,4 +37,4 @@ for (const file of files(path.join(root, 'site')).filter(file => file.endsWith('
   }
 }
 for (const file of fs.readdirSync(path.join(root, 'examples')).filter(file => file.endsWith('.diagram'))) checkDiagram(fs.readFileSync(path.join(root, 'examples', file), 'utf8'), file);
-console.log(`Documentation: ${diagrams} diagram examples compiled; ${snippets} Rust snippets typechecked; ${configurations} TOML/JSON blocks parsed.`);
+console.log(`Documentation: ${diagrams} diagram examples compiled; ${diagnostics} expected layout diagnostics; ${snippets} Rust snippets typechecked; ${configurations} TOML/JSON blocks parsed.`);

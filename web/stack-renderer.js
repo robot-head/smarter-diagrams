@@ -1,6 +1,6 @@
-// WebGPU rectangles/routes with an SVG text layer: glyphs remain flat and undistorted.
+// WebGPU silhouette fills with the core SVG renderer for semantic ink and text.
 export class StackRenderer {
-  constructor(container) { this.container = container; this.mode = 'SVG';this.vertexBuffers=new Map();this.retiredBuffers=[]; }
+  constructor(container,onStage) { this.container = container;this.onStage=onStage; this.mode = 'SVG';this.vertexBuffers=new Map();this.retiredBuffers=[]; }
   async initialize() {
     this.gpu=navigator.gpu;if (!this.gpu) return;
     this.adapter = await this.gpu.requestAdapter() || await this.gpu.requestAdapter({forceFallbackAdapter:true}); if (!this.adapter) return;
@@ -24,25 +24,45 @@ struct Out { @builtin(position) position: vec4f, @location(0) color: vec4f }
     this.format = format; this.mode = 'WebGPU';
   }
   async draw(stack) {
-    const nodes = stack.planes.flatMap(plane => Object.entries(plane.layout.nodes).map(([id, r]) => ({ id, ...r, layer: plane.index })));
-    if (!nodes.length) { this.container.textContent = 'Empty stack'; return; }
-    const left = Math.min(...nodes.map(r => r.x-r.w/2))-32, top = Math.min(...nodes.map(r => r.y-r.h/2))-32;
-    const right = Math.max(...nodes.map(r => r.x+r.w/2))+32, bottom = Math.max(...nodes.map(r => r.y+r.h/2))+32;
-    const width=right-left, height=bottom-top;
-    this.container.replaceChildren(); this.container.style.position='relative'; this.container.style.aspectRatio=`${width}/${height}`;
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.setAttribute('viewBox',`${left} ${top} ${width} ${height}`); svg.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
-    const triangles=[], lines=[]; const colors=[[.78,.87,.98,1],[.85,.93,.85,1],[.95,.88,.76,1]];
-    const vertex=(out,x,y,color)=>out.push((x-left)/width*2-1,1-(y-top)/height*2,...color);
-    const line=(a,b,color=[.35,.43,.55,1])=>{vertex(lines,a.x,a.y,color);vertex(lines,b.x,b.y,color);};
-    for(const plane of stack.planes) for(const route of Object.values(plane.layout.routes)) for(let i=1;i<route.points.length;i++) line(route.points[i-1],route.points[i]);
-    for(const via of stack.vias) line(via.source,via.target,[.6,.35,.65,1]);
-    for(const r of nodes){const x=r.x-r.w/2,y=r.y-r.h/2,c=colors[r.layer%colors.length];for(const [dx,dy] of [[0,0],[r.w,0],[r.w,r.h],[0,0],[r.w,r.h],[0,r.h]])vertex(triangles,x+dx,y+dy,c);
-      if(!this.device){const rect=document.createElementNS(svg.namespaceURI,'rect');for(const [k,v] of Object.entries({x,y,width:r.w,height:r.h,rx:8,fill:`rgb(${c.slice(0,3).map(v=>v*255).join(' ')})`,stroke:'#9db2c7'}))rect.setAttribute(k,String(v));svg.append(rect);}
-      const text=document.createElementNS(svg.namespaceURI,'text');text.setAttribute('x',r.x);text.setAttribute('y',r.y+4);text.setAttribute('text-anchor','middle');text.setAttribute('font-size','14');text.textContent=r.id;svg.append(text);
+    if (!stack.svg) throw new Error('Stack presentation is missing; rebuild the runtime bundle.');
+    const svg = new DOMParser().parseFromString(stack.svg, 'image/svg+xml').documentElement;
+    if (svg.localName !== 'svg' || svg.querySelector('parsererror')) throw new Error('Invalid stack SVG');
+    const [left,top,width,height] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+    this.container.replaceChildren();
+    const stage=document.createElement('div');stage.className='stack-stage';stage.style.cssText=`position:relative;aspect-ratio:${width}/${height}`;
+    svg.style.cssText='position:absolute;inset:0;width:100%;height:100%';
+    // Prefix paint/description IDs when the native SVG shares a page with a diff.
+    const names=new Map([...svg.querySelectorAll('[id]')].map(el=>[el.id,`stack-${el.id}`]));
+    for(const el of [svg,...svg.querySelectorAll('*')])for(const attr of [...el.attributes]){
+      let value=attr.value;
+      if(attr.name==='id')value=names.get(value)||value;
+      else if(attr.name==='aria-labelledby')value=value.split(' ').map(id=>names.get(id)||id).join(' ');
+      else for(const [id,next]of names)value=value.replaceAll(`url(#${id})`,`url(#${next})`);
+      el.setAttribute(attr.name,value);
     }
-    if(this.device){const canvas=this.canvas||(this.canvas=document.createElement('canvas'));canvas.style.cssText='width:100%;height:100%;position:absolute;inset:0';canvas.width=Math.max(1,Math.ceil(this.container.clientWidth*devicePixelRatio));canvas.height=Math.max(1,Math.ceil(canvas.width*height/width));this.container.append(canvas);const context=this.context||(this.context=canvas.getContext('webgpu'));context.configure({device:this.device,format:this.format,alphaMode:'premultiplied'});const encoder=this.device.createCommandEncoder();const pass=encoder.beginRenderPass({colorAttachments:[{view:context.getCurrentTexture().createView(),clearValue:{r:1,g:1,b:1,a:1},loadOp:'clear',storeOp:'store'}]});for(const [kind,values,pipeline] of [['fill',triangles,this.fill],['line',lines,this.line]]){if(!values.length)continue;const data=new Float32Array(values);let allocation=this.vertexBuffers.get(kind);if(!allocation||allocation.size<data.byteLength){if(allocation)this.retiredBuffers.push(allocation.buffer);const size=2**Math.ceil(Math.log2(Math.max(4,data.byteLength)));allocation={size,buffer:this.device.createBuffer({size,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST})};this.vertexBuffers.set(kind,allocation);}const buffer=allocation.buffer;this.device.queue.writeBuffer(buffer,0,data);pass.setPipeline(pipeline);pass.setVertexBuffer(0,buffer);pass.draw(values.length/6);}pass.end();this.device.queue.submit([encoder.finish()]);}
-    else {for(let i=0;i<lines.length;i+=12){const p=document.createElementNS(svg.namespaceURI,'line');p.setAttribute('x1',left+(lines[i]+1)/2*width);p.setAttribute('y1',top+(1-lines[i+1])/2*height);p.setAttribute('x2',left+(lines[i+6]+1)/2*width);p.setAttribute('y2',top+(1-lines[i+7])/2*height);p.setAttribute('stroke','#8b65a0');svg.prepend(p);}}
-    this.container.append(svg);
-    if(this.device){try{await this.device.queue.onSubmittedWorkDone();}catch(error){console.warn('WebGPU submission unavailable; using SVG',String(error));this.device=undefined;this.mode='SVG';return this.draw(stack);}}
+    stage.append(svg);this.container.append(stage);this.onStage?.(stage,[left,top,width,height]);
+    if(this.device){
+      // Native silhouettes supply both SVG fallback ink and GPU fill geometry.
+      // Directions, captions, and relation dashes remain the same SVG in either mode.
+      const triangles=[];
+      const vertex=(x,y,color)=>triangles.push((x-left)/width*2-1,1-(y-top)/height*2,...color);
+      for(const shape of svg.querySelectorAll('[data-plane-background],[data-silhouette],[data-zone]')){
+        const style=getComputedStyle(shape), rgba=style.fill.match(/[\d.]+/g)?.map(Number);
+        if(!rgba || style.fill==='none')continue;
+        const color=[rgba[0]/255,rgba[1]/255,rgba[2]/255,(rgba[3]??1)*Number(style.fillOpacity)];
+        const box=shape.getBBox(),cx=box.x+box.width/2,cy=box.y+box.height/2;
+        const length=shape.getTotalLength(),count=96;
+        for(let i=0;i<count;i++){const a=shape.getPointAtLength(length*i/count),b=shape.getPointAtLength(length*(i+1)/count);vertex(cx,cy,color);vertex(a.x,a.y,color);vertex(b.x,b.y,color);}
+        shape.style.fill='none';
+      }
+      const canvas=this.canvas||(this.canvas=document.createElement('canvas'));canvas.style.cssText='width:100%;height:100%;position:absolute;inset:0';
+      canvas.width=Math.max(1,Math.ceil(stage.clientWidth*devicePixelRatio));canvas.height=Math.max(1,Math.ceil(canvas.width*height/width));stage.prepend(canvas);
+      const context=this.context||(this.context=canvas.getContext('webgpu'));context.configure({device:this.device,format:this.format,alphaMode:'premultiplied'});
+      const encoder=this.device.createCommandEncoder();const pass=encoder.beginRenderPass({colorAttachments:[{view:context.getCurrentTexture().createView(),clearValue:{r:1,g:1,b:1,a:1},loadOp:'clear',storeOp:'store'}]});
+      if(triangles.length){const data=new Float32Array(triangles);let allocation=this.vertexBuffers.get('fill');if(!allocation||allocation.size<data.byteLength){if(allocation)this.retiredBuffers.push(allocation.buffer);const size=2**Math.ceil(Math.log2(Math.max(4,data.byteLength)));allocation={size,buffer:this.device.createBuffer({size,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST})};this.vertexBuffers.set('fill',allocation);}this.device.queue.writeBuffer(allocation.buffer,0,data);pass.setPipeline(this.fill);pass.setVertexBuffer(0,allocation.buffer);pass.draw(triangles.length/6);}
+      pass.end();this.device.queue.submit([encoder.finish()]);
+      try{await this.device.queue.onSubmittedWorkDone();}catch(error){console.warn('WebGPU submission unavailable; using SVG',String(error));this.device=undefined;this.mode='SVG';return this.draw(stack);}
+    }
+    const legend=document.createElement('p');legend.className='stack-legend';legend.textContent='Solid arrows connect services within a stratum. Dashed arrows cross strata; their labels name the relationship.';this.container.append(legend);
   }
 }

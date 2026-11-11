@@ -3,6 +3,105 @@ use crate::{layout::*, model::Side};
 
 pub(crate) const CYLINDER_RY: f64 = 8.;
 
+pub(crate) fn title_gutter(shape: &str) -> f64 {
+    match shape {
+        "queue" => 32.,
+        "actor" => 20.,
+        _ => 0.,
+    }
+}
+#[cfg(feature = "wasm-runtime")]
+pub(crate) fn ray_attachment(shape: &str, r: Rect, toward: Point) -> Point {
+    let (dx, dy) = (toward.x - r.x, toward.y - r.y);
+    let length = dx.hypot(dy);
+    if length < 1e-9 {
+        return Point::new(r.x, r.bottom());
+    }
+    let inside = |p: Point| {
+        if let Some(v) = polygon(shape, r) {
+            return (0..4).all(|i| {
+                let a = v[i];
+                let b = v[(i + 1) % 4];
+                (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) >= -1e-9
+            });
+        }
+        if shape == "database" {
+            if p.x < r.left() || p.x > r.right() || p.y < r.top() || p.y > r.bottom() {
+                return false;
+            }
+            let ry = CYLINDER_RY.min(r.h / 2.);
+            let cy = p.y.clamp(r.top() + ry, r.bottom() - ry);
+            return ((p.x - r.x) / (r.w / 2.)).powi(2) + ((p.y - cy) / ry).powi(2) <= 1.;
+        }
+        let radius: f64 = match shape {
+            "actor" => 18.,
+            "container" => 12.,
+            "sql_table" => 2.,
+            _ => 8.,
+        };
+        let radius = radius.min(r.w / 2.).min(r.h / 2.);
+        let x = p.x.clamp(r.left() + radius, r.right() - radius);
+        let y = p.y.clamp(r.top() + radius, r.bottom() - radius);
+        (p.x - x).hypot(p.y - y) <= radius
+    };
+    let (mut low, mut high) = (0., r.w.hypot(r.h));
+    for _ in 0..48 {
+        let mid = (low + high) / 2.;
+        if inside(r.center().offset(dx / length * mid, dy / length * mid)) {
+            low = mid
+        } else {
+            high = mid
+        }
+    }
+    r.center().offset(dx / length * low, dy / length * low)
+}
+
+pub(crate) fn outline(shape: &str, r: Rect) -> String {
+    if let Some(points) = polygon(shape, r) {
+        return format!("{}Z", crate::render::path(&points));
+    }
+    if shape == "database" {
+        let ry = CYLINDER_RY.min(r.h / 2.);
+        return format!(
+            "M {} {} A {} {ry} 0 0 1 {} {} L {} {} A {} {ry} 0 0 1 {} {} Z",
+            r.left(),
+            r.top() + ry,
+            r.w / 2.,
+            r.right(),
+            r.top() + ry,
+            r.right(),
+            r.bottom() - ry,
+            r.w / 2.,
+            r.left(),
+            r.bottom() - ry
+        );
+    }
+    let radius: f64 = match shape {
+        "actor" => 18.,
+        "container" => 12.,
+        "sql_table" => 2.,
+        _ => 8.,
+    };
+    let radius = radius.min(r.w / 2.).min(r.h / 2.);
+    format!(
+        "M {} {} H {} A {radius} {radius} 0 0 1 {} {} V {} A {radius} {radius} 0 0 1 {} {} H {} A {radius} {radius} 0 0 1 {} {} V {} A {radius} {radius} 0 0 1 {} {} Z",
+        r.left() + radius,
+        r.top(),
+        r.right() - radius,
+        r.right(),
+        r.top() + radius,
+        r.bottom() - radius,
+        r.right() - radius,
+        r.bottom(),
+        r.left() + radius,
+        r.left(),
+        r.bottom() - radius,
+        r.top() + radius,
+        r.left() + radius,
+        r.top()
+    )
+}
+
 pub(crate) fn polygon(shape: &str, r: Rect) -> Option<[Point; 4]> {
     Some(match shape {
         "diamond" | "decision" => [

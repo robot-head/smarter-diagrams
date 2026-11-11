@@ -96,6 +96,11 @@ pub fn strata(scene: &SceneGraph, options: &LayoutOptions, theta: f64) -> Result
             label.bounds.y += dy;
             label.anchor = label.anchor.offset(dx, dy);
         }
+        for points in plane.layout.zones.values_mut() {
+            for point in points {
+                *point = point.offset(dx, dy);
+            }
+        }
     }
     let mut vias = Vec::new();
     for e in &scene.edges {
@@ -119,6 +124,146 @@ pub fn strata(scene: &SceneGraph, options: &LayoutOptions, theta: f64) -> Result
         vias,
         theta,
     })
+}
+
+/// Presentation keeps the core renderer's silhouettes, directions, and labels
+/// in both the SVG fallback and the WebGPU fill/text composition.
+#[cfg(feature = "wasm-runtime")]
+pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_json::Value, Error> {
+    let mut layout = Layout::default();
+    let mut drawing = scene.clone();
+    let mut surfaces = Vec::new();
+    for plane in &stack.planes {
+        layout.nodes.extend(plane.layout.nodes.clone());
+        layout.ports.extend(plane.layout.ports.clone());
+        layout.routes.extend(plane.layout.routes.clone());
+        layout.labels.extend(plane.layout.labels.clone());
+        layout.zones.extend(plane.layout.zones.clone());
+        let keep = plane.layout.nodes.keys().cloned().collect();
+        surfaces.push((
+            plane.id.clone(),
+            crate::render::bounds(&views::filter(scene, &keep), &plane.layout),
+        ));
+    }
+    for via in &stack.vias {
+        let edge = drawing
+            .edges
+            .iter_mut()
+            .find(|e| e.id == via.edge)
+            .ok_or_else(|| Error::Layout("unknown via".into()))?;
+        let source = scene.node(&edge.source.node).unwrap();
+        let target = scene.node(&edge.target.node).unwrap();
+        let sr = layout.nodes[&source.id];
+        let tr = layout.nodes[&target.id];
+        let a = layout
+            .ports
+            .get(&crate::layout::port_key(edge, true))
+            .map(|p| p.point)
+            .unwrap_or_else(|| crate::shapes::ray_attachment(&source.shape, sr, tr.center()));
+        let b = layout
+            .ports
+            .get(&crate::layout::port_key(edge, false))
+            .map(|p| p.point)
+            .unwrap_or_else(|| crate::shapes::ray_attachment(&target.shape, tr, sr.center()));
+        layout.routes.insert(
+            edge.id.clone(),
+            Route {
+                edge: edge.id.clone(),
+                points: vec![a, b],
+            },
+        );
+        edge.attrs.insert(
+            "style".into(),
+            Value {
+                text: "dashed".into(),
+                ..Default::default()
+            },
+        );
+        if edge.label.is_empty() {
+            edge.label = edge
+                .attrs
+                .get("relation")
+                .map(|v| v.text.replace('_', " "))
+                .unwrap_or_else(|| "cross-plane".into());
+        }
+        let w = crate::labels::text_width(&edge.label) + 16.;
+        let length = (b.x - a.x).hypot(b.y - a.y).max(1.);
+        let (nx, ny) = (-(b.y - a.y) / length, (b.x - a.x) / length);
+        let distance = nx.abs() * w / 2. + ny.abs() * 12. + 8.;
+        let mut placed = None;
+        'positions: for extra in [0., 24., 48., 96., 160.] {
+            for t in [0.5, 0.3, 0.7] {
+                for side in [-1., 1.] {
+                    let anchor = Point::new(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+                    let center = anchor.offset(
+                        nx * (distance + extra) * side,
+                        ny * (distance + extra) * side,
+                    );
+                    let bounds = Rect::new(center.x, center.y, w, 24.);
+                    if scene
+                        .nodes
+                        .iter()
+                        .filter(|n| !n.container)
+                        .any(|n| bounds.inflate(2.).intersects(layout.nodes[&n.id]))
+                        || layout
+                            .labels
+                            .iter()
+                            .any(|l| bounds.inflate(2.).intersects(l.bounds.inflate(2.)))
+                    {
+                        continue;
+                    }
+                    placed = Some(crate::labels::LabelPlacement {
+                        feature: edge.id.clone(),
+                        text: edge.label.clone(),
+                        bounds,
+                        anchor,
+                        knockout: false,
+                        callout: false,
+                        horizontal: true,
+                        slide: t,
+                    });
+                    break 'positions;
+                }
+            }
+        }
+        if let Some(label) = placed {
+            layout.labels.push(label);
+        }
+    }
+    let mut svg = crate::render::svg(&drawing, &layout);
+    let mut backdrops = String::new();
+    let mut bounds = crate::render::bounds(&drawing, &layout);
+    for (name, r) in &surfaces {
+        use std::fmt::Write;
+        bounds = bounds.union(r.inflate(4.));
+        let _ = write!(
+            backdrops,
+            "<rect data-plane-background=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"12\" fill=\"#edf3fa\" fill-opacity=\"0.45\" stroke=\"#73869b\"/><text x=\"{}\" y=\"{}\" style=\"font-size:12px;font-weight:600\">Stratum: {}</text>",
+            crate::render::escape(name),
+            r.left(),
+            r.top(),
+            r.w,
+            r.h,
+            r.left() + 8.,
+            r.top() + 16.,
+            crate::render::escape(name)
+        );
+    }
+    svg = svg.replacen("</style>", &format!("</style>{backdrops}"), 1);
+    let rest = &svg[svg.find('>').unwrap() + 1..];
+    svg = format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{} {} {} {}\" width=\"{}\" height=\"{}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\">{rest}",
+        bounds.left(),
+        bounds.top(),
+        bounds.w,
+        bounds.h,
+        bounds.w,
+        bounds.h
+    );
+    let mut result = serde_json::to_value(stack).map_err(|e| Error::Layout(e.to_string()))?;
+    result["svg"] = serde_json::json!(svg);
+    result["description"] = serde_json::json!(crate::render::description(&drawing));
+    Ok(result)
 }
 fn graph_ids_missing(
     _scene: &SceneGraph,
@@ -471,4 +616,19 @@ fn annotations_equal(a: &[Annotation], b: &[Annotation]) -> bool {
         && a.iter()
             .zip(b)
             .all(|(a, b)| a.name == b.name && attrs_equal(&a.attrs, &b.attrs))
+}
+
+#[cfg(all(test, feature = "wasm-runtime"))]
+mod presentation_tests {
+    #[test]
+    fn stack_presentation_preserves_directions_labels_and_plane_names() {
+        let d=crate::compile("strata [app, hardware]\napi [stratum: app]\nworker [stratum: app]\nhost [stratum: hardware]\napi -> worker: RPC\napi -> host [relation: runs_on]\nworker -> host [relation: runs_on]\n").unwrap();
+        let stack = super::strata(&d.scene, &Default::default(), 0.4).unwrap();
+        let result = super::presentation(&d.scene, &stack).unwrap();
+        let svg = result["svg"].as_str().unwrap();
+        assert_eq!(svg.matches("data-arrowhead=\"end\"").count(), 3);
+        assert!(svg.contains("RPC") && svg.contains("runs on"));
+        assert!(svg.contains("Stratum: app") && svg.contains("Stratum: hardware"));
+        assert!(svg.contains("stroke-dasharray=\"6 4\""));
+    }
 }

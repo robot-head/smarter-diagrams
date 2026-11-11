@@ -45,6 +45,66 @@ fn clearance(label: &LabelPlacement) -> Rect {
         2.
     })
 }
+/// Leader ink stops outside the nearest edge of its own text box.
+pub fn leader(label: &LabelPlacement) -> Option<(Point, Point)> {
+    if !label.callout {
+        return None;
+    }
+    let r = label.bounds.inflate(2.);
+    let dx = label.anchor.x - r.x;
+    let dy = label.anchor.y - r.y;
+    let t = (r.w / 2. / dx.abs().max(1e-9))
+        .min(r.h / 2. / dy.abs().max(1e-9))
+        .min(1.);
+    Some((label.anchor, Point::new(r.x + dx * t, r.y + dy * t)))
+}
+pub(crate) fn segment_hits(a: Point, b: Point, r: Rect) -> bool {
+    let mut lo: f64 = 0.;
+    let mut hi: f64 = 1.;
+    for (start, delta, min, max) in [
+        (a.x, b.x - a.x, r.left() + 1e-6, r.right() - 1e-6),
+        (a.y, b.y - a.y, r.top() + 1e-6, r.bottom() - 1e-6),
+    ] {
+        if delta.abs() < 1e-9 {
+            if start < min || start > max {
+                return false;
+            }
+        } else {
+            let x = (min - start) / delta;
+            let y = (max - start) / delta;
+            lo = lo.max(x.min(y));
+            hi = hi.min(x.max(y));
+        }
+    }
+    lo <= hi
+}
+fn footprint(label: &LabelPlacement) -> Rect {
+    let r = clearance(label);
+    leader(label)
+        .map(|(a, b)| {
+            r.union(Rect::new(
+                (a.x + b.x) / 2.,
+                (a.y + b.y) / 2.,
+                (a.x - b.x).abs() + 2.,
+                (a.y - b.y).abs() + 2.,
+            ))
+        })
+        .unwrap_or(r)
+}
+fn conflict(a: &LabelPlacement, b: &LabelPlacement) -> bool {
+    clearance(a).intersects(clearance(b))
+        || leader(a).is_some_and(|(x, y)| segment_hits(x, y, clearance(b)))
+        || leader(b).is_some_and(|(x, y)| segment_hits(x, y, clearance(a)))
+}
+fn feature_width(f: &Feature, scene: &SceneGraph) -> f64 {
+    text_width(&f.text)
+        * if scene.node(&f.id).is_some() {
+            14. / 13.
+        } else {
+            1.
+        }
+        + 16.
+}
 #[derive(Clone)]
 struct Feature {
     id: String,
@@ -72,7 +132,7 @@ pub fn place(
         features.push(Feature {
             id: e.id.clone(),
             text: e.label.clone(),
-            route: l.routes[&e.id].points.clone(),
+            route: crate::routing::coalesced(&l.routes[&e.id].points),
             ignore,
             slot: ann
                 .and_then(|a| a.attrs.get("slot"))
@@ -81,6 +141,22 @@ pub fn place(
         });
     }
     for node in &scene.nodes {
+        if node.shape == "sql_table" {
+            let r = l.nodes[&node.id];
+            let mut ignore = ancestors(scene, &node.id);
+            ignore.remove(&node.id);
+            features.push(Feature {
+                id: node.id.clone(),
+                text: node.label.clone(),
+                route: vec![
+                    Point::new(r.left(), r.top()),
+                    Point::new(r.right(), r.top()),
+                ],
+                ignore,
+                slot: Some("above".into()),
+                slide: Some(0.5),
+            });
+        }
         for port in node.ports.values() {
             if node.shape == "sql_table"
                 && matches!(port.constraint, PortConstraint::FixedPos { .. })
@@ -135,7 +211,7 @@ pub fn place(
     );
     for (i, f) in features.iter().enumerate() {
         let mut candidates = generate(f, o, l, scene);
-        let w = text_width(&f.text) + 16.;
+        let w = feature_width(f, scene);
         let anchor = f.route.get(f.route.len() / 2).copied().unwrap_or_default();
         candidates.push(Candidate {
             label: LabelPlacement {
@@ -171,7 +247,7 @@ pub fn place(
             .enumerate()
             .map(|(id, c)| Indexed {
                 id,
-                bounds: clearance(&c.label),
+                bounds: footprint(&c.label),
             })
             .collect(),
     );
@@ -184,10 +260,8 @@ pub fn place(
     }
     let mut neighbors = vec![BTreeSet::new(); features.len()];
     for (i, c) in all.iter().enumerate() {
-        for hit in index.locate_in_envelope_intersecting(&envelope(clearance(&c.label))) {
-            if owner[i] != owner[hit.id]
-                && clearance(&c.label).intersects(clearance(&all[hit.id].label))
-            {
+        for hit in index.locate_in_envelope_intersecting(&envelope(footprint(&c.label))) {
+            if owner[i] != owner[hit.id] && conflict(&c.label, &all[hit.id].label) {
                 conflicts[i].insert(hit.id);
                 neighbors[owner[i]].insert(owner[hit.id]);
             }
@@ -229,7 +303,7 @@ pub fn place(
     Ok(labels)
 }
 fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> Vec<Candidate> {
-    let w = text_width(&f.text) + 16.;
+    let w = feature_width(f, scene);
     let h = 24.;
     let lengths: Vec<_> = f.route.windows(2).map(|p| p[0].distance(p[1])).collect();
     let total = lengths.iter().sum::<f64>().max(1.);
@@ -373,9 +447,12 @@ fn valid(
     index: &RTree<Indexed>,
 ) -> bool {
     let r = clearance(label);
-    for hit in index.locate_in_envelope_intersecting(&envelope(r)) {
+    for hit in index.locate_in_envelope_intersecting(&envelope(footprint(label))) {
         let n = &scene.nodes[hit.id];
-        if !f.ignore.contains(&n.id) && r.intersects(hit.bounds) {
+        if !f.ignore.contains(&n.id)
+            && (r.intersects(hit.bounds)
+                || leader(label).is_some_and(|(a, b)| segment_hits(a, b, hit.bounds)))
+        {
             return false;
         }
     }
@@ -590,7 +667,7 @@ fn polish(labels: &mut [LabelPlacement], scene: &SceneGraph, l: &Layout, o: &Lay
             && labels
                 .iter()
                 .enumerate()
-                .all(|(j, b)| i == j || !clearance(&candidate).intersects(clearance(b)))
+                .all(|(j, b)| i == j || !conflict(&candidate, b))
         {
             labels[i] = candidate;
         }
@@ -612,6 +689,12 @@ pub fn polish_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
     }
     let mut lanes = Vec::new();
     for e in &scene.edges {
+        if l.labels
+            .iter()
+            .any(|label| label.feature == e.id && label.callout)
+        {
+            continue;
+        }
         if effective_annotations(scene, &e.id, &e.annotations, o.variant.as_deref())
             .iter()
             .any(|a| a.name == "route")

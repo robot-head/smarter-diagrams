@@ -66,7 +66,7 @@ producer.E -> broker#input: publish
 
 ### 5. Exact position
 
-The named `id` anchor stays exactly `1g` below the table's top edge.
+The named `id` anchor stays exactly `1g` below the record body's top edge.
 
 ```diagram
 api.E -> db#id: insert
@@ -96,7 +96,7 @@ orders: Orders [shape: sql_table] {
 }
 ```
 
-The slot offsets are `1g` and `2g` from the top on the west side. At the default grid, that is 16 and 32 pixels. Fixed-position SQL ports render their captions inside the record. Other port captions use external placement.
+The slot offsets are `1g` and `2g` from the top on the west side. At the default grid, that is 16 and 32 pixels. Fixed-position SQL ports render their captions inside the record. The record title sits above the body, keeping its header separate without changing offsets from the body’s top edge. Other port captions use external placement.
 
 ## Virtual ports
 

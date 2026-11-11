@@ -30,10 +30,13 @@ for (const file of ['architecture', 'performance', 'verification']) {
   fs.writeFileSync(path.join(root, 'site/reference', `${file}.md`), `---\neditLink: false\n---\n\n${text}`);
 }
 const languageSamples = new Map();
+const comparisons = [];
 for (const file of fs.readdirSync(path.join(root, 'site/language')).filter(file => file.endsWith('.md'))) {
   const text = fs.readFileSync(path.join(root, 'site/language', file), 'utf8');
   for (const match of text.matchAll(/^```(diagram[^\n]*)\n([\s\S]*?)^```/gm)) {
-    for (const sample of samples(match[2], match[1])) languageSamples.set(key(sample), { ...sample, label: `${file}: ${sample.label}` });
+    const group=samples(match[2],match[1]);
+    for (const sample of group) languageSamples.set(key(sample), { ...sample, label: `${file}: ${sample.label}` });
+    if(group.length>1)comparisons.push(group.map(key));
   }
 }
 for (const file of fs.readdirSync(path.join(root, 'examples')).filter(file => file.endsWith('.diagram'))) {
@@ -53,10 +56,20 @@ const requests = [...languageSamples.values()];
 const rendered = spawnSync(path.join(root, 'target/debug/examples/render_docs'), [], { input: JSON.stringify(requests), encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
 if (rendered.status !== 0) throw Error(rendered.stderr || rendered.error);
 const manifest = {}, images = JSON.parse(rendered.stdout);
+const results=new Map(requests.map((request,i)=>[key(request),images[i]]));
+for(const group of comparisons){
+  const boxes=group.map(id=>results.get(id).viewBox);
+  const left=Math.min(...boxes.map(b=>b[0])),top=Math.min(...boxes.map(b=>b[1]));
+  const right=Math.max(...boxes.map(b=>b[0]+b[2])),bottom=Math.max(...boxes.map(b=>b[1]+b[3]));
+  for(const id of group){const result=results.get(id);result.viewBox=[left,top,right-left,bottom-top];result.svg=result.svg.replace(/viewBox="[^"]+" width="[^"]+" height="[^"]+"/,`viewBox="${result.viewBox.join(' ')}" width="${right-left}" height="${bottom-top}"`);}
+}
 const destination = path.join(publicDir, 'generated/language'); fs.mkdirSync(destination, { recursive: true });
 for (let i = 0; i < requests.length; i++) {
-  const file = `${createHash('sha256').update(images[i]).digest('hex')}.svg`;
-  fs.writeFileSync(path.join(destination, file), images[i]); manifest[key(requests[i])] = file;
+  const result=images[i];
+  if(result.diagnostic){manifest[key(requests[i])]=result;continue;}
+  const {svg,...metadata}=result;
+  const file = `${createHash('sha256').update(svg).digest('hex')}.svg`;
+  fs.writeFileSync(path.join(destination, file), svg); manifest[key(requests[i])] = {file,...metadata};
 }
 fs.writeFileSync(path.join(destination, 'manifest.json'), JSON.stringify(manifest));
 console.log(`Prepared documentation, examples, Wasm, Rust API and ${requests.length} language diagram renders.`);

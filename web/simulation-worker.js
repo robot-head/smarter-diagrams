@@ -6,6 +6,7 @@ self.onmessage = ({ data }) => {commands=commands.then(async()=>{
   try {
     if (data.type === 'open') {
       await init(); clearInterval(timer); if(simulation)simulation.free();simulation = new WasmSimulation(data.source);
+      for(const edge of data.cuts||[])simulation.sever(edge,true);
       timer = setInterval(() => { simulation.tick(); self.postMessage({ type: 'frame', state: JSON.parse(simulation.state()) }); }, 1000 / 60);
     } else if (data.type === 'rate') simulation.set_rate(data.node, data.rate);
     else if (data.type === 'sever') simulation.sever(data.edge, data.severed);

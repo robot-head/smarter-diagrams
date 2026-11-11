@@ -1,6 +1,6 @@
 //! Accessible, deterministic vector output. User strings are always XML escaped.
 use crate::{layout::*, model::*};
-use std::fmt::Write;
+use std::{collections::BTreeMap, fmt::Write};
 pub fn escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -8,9 +8,165 @@ pub fn escape(s: &str) -> String {
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
 }
-pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
-    let bounds = l
+/// A text alternative for vector exports and the documentation's graph tables.
+pub fn description(scene: &SceneGraph) -> String {
+    let endpoint = |ep: &Endpoint| {
+        format!(
+            "{}{}",
+            ep.node,
+            ep.port
+                .as_ref()
+                .map(|p| format!("#{p}"))
+                .unwrap_or_else(|| ep
+                    .constraint
+                    .side()
+                    .map(|side| format!(".{side:?}"))
+                    .unwrap_or_default())
+        )
+    };
+    let nodes = scene
         .nodes
+        .iter()
+        .map(|n| {
+            format!(
+                "{} ({}, {}{}{})",
+                n.id,
+                n.label,
+                n.shape,
+                n.parent
+                    .as_ref()
+                    .map(|p| format!(", inside {p}"))
+                    .unwrap_or_default(),
+                if n.ports.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        ", ports {}",
+                        n.ports
+                            .values()
+                            .map(|p| format!("{}: {}", p.id, p.label))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                }
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let edges = scene
+        .edges
+        .iter()
+        .map(|e| {
+            format!(
+                "{} {} {}{}",
+                endpoint(&e.source),
+                match e.kind {
+                    EdgeKind::Undirected => "connects to",
+                    EdgeKind::Bidirectional => "exchanges with",
+                    _ => "points to",
+                },
+                endpoint(&e.target),
+                if e.label.is_empty() {
+                    String::new()
+                } else {
+                    format!(" via {}", e.label)
+                }
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+    let zones = scene
+        .zones
+        .iter()
+        .map(|z| format!("{} contains {}", z.label, z.members.join(", ")))
+        .collect::<Vec<_>>()
+        .join("; ");
+    let flows = scene
+        .flows
+        .iter()
+        .map(|f| format!("{}: {}", f.label, f.steps.join(" → ")))
+        .collect::<Vec<_>>()
+        .join("; ");
+    format!(
+        "{} nodes and {} connections. Nodes: {nodes}. Connections: {edges}.{}{}",
+        scene.nodes.len(),
+        scene.edges.len(),
+        if zones.is_empty() {
+            String::new()
+        } else {
+            format!(" Zones: {zones}.")
+        },
+        if flows.is_empty() && scene.story.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "{}{}",
+                if flows.is_empty() {
+                    String::new()
+                } else {
+                    format!(" Flows: {flows}.")
+                },
+                if scene.story.is_empty() {
+                    String::new()
+                } else {
+                    format!(" Story: {}.", scene.story.join(" → "))
+                }
+            )
+        }
+    )
+}
+fn zone_label(zone: &Zone, l: &Layout) -> Option<Rect> {
+    let points = l.zones.get(&zone.id)?;
+    let left = points.iter().map(|p| p.x).reduce(f64::min)?;
+    let top = points.iter().map(|p| p.y).reduce(f64::min)?;
+    let w = crate::labels::text_width(&zone.label) + 8.;
+    Some(Rect::new(left + 4. + w / 2., top - 16., w, 24.))
+}
+fn crossing_gaps(l: &Layout) -> BTreeMap<String, Vec<Point>> {
+    let routes: Vec<_> = l
+        .routes
+        .iter()
+        .map(|(id, r)| (id, crate::routing::coalesced(&r.points)))
+        .collect();
+    let mut gaps: BTreeMap<String, Vec<Point>> = BTreeMap::new();
+    for (i, (aid, a)) in routes.iter().enumerate() {
+        for (bid, b) in &routes[i + 1..] {
+            for p in a.windows(2) {
+                for q in b.windows(2) {
+                    if !crate::routing::proper_crossing(p[0], p[1], q[0], q[1]) {
+                        continue;
+                    }
+                    let (vertical, point) = if (p[0].x - p[1].x).abs() < 1e-6 {
+                        (*aid, Point::new(p[0].x, q[0].y))
+                    } else {
+                        (*bid, Point::new(q[0].x, p[0].y))
+                    };
+                    if [a.first(), a.last(), b.first(), b.last()]
+                        .into_iter()
+                        .flatten()
+                        .any(|end| end.distance(point) < 12.)
+                    {
+                        continue;
+                    }
+                    let points = gaps.entry(vertical.clone()).or_default();
+                    if !points.iter().any(|p| p.distance(point) < 1e-6) {
+                        points.push(point);
+                    }
+                }
+            }
+        }
+    }
+    gaps
+}
+fn gap_mask(id: &str, gaps: &BTreeMap<String, Vec<Point>>) -> String {
+    gaps.keys()
+        .position(|key| key == id)
+        .map(|i| format!(" mask=\"url(#gap-{i})\""))
+        .unwrap_or_default()
+}
+/// Bounds of every painted feature, including external record and zone titles.
+pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
+    l.nodes
         .values()
         .copied()
         .chain(l.labels.iter().map(|a| a.bounds))
@@ -24,40 +180,46 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
                 .values()
                 .flat_map(|z| z.iter().map(|p| Rect::new(p.x, p.y, 1., 1.))),
         )
+        .chain(scene.zones.iter().filter_map(|z| zone_label(z, l)))
         .reduce(Rect::union)
         .unwrap_or(Rect::new(0., 0., 160., 80.))
-        .inflate(32.);
+        .inflate(32.)
+}
+
+pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
+    let bounds = bounds(scene, l);
+    let gaps = crossing_gaps(l);
     let mut s = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{} nodes and {} connections</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:13px;fill:#233347}}.node-title{{font-weight:600;font-size:14px}}.port-label{{font-size:11px}}.edge{{fill:none;stroke:#53657a;stroke-width:1.7;stroke-linejoin:round}}.flow{{fill:none;stroke:#356bd9;stroke-width:3;stroke-linejoin:round}}</style>",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:13px;fill:#233347}}.node-title{{font-weight:600;font-size:14px}}.port-label{{font-size:11px}}.edge{{fill:none;stroke:#53657a;stroke-width:1.7;stroke-linejoin:round}}.flow{{fill:none;stroke:#356bd9;stroke-width:3;stroke-linejoin:round}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:#53657a}}</style>",
         bounds.left(),
         bounds.top(),
         bounds.w,
         bounds.h,
         bounds.w,
         bounds.h,
-        scene.nodes.len(),
-        scene.edges.len()
+        escape(&description(scene))
     );
-    for z in &scene.zones {
-        if let Some(hull) = l.zones.get(&z.id) {
-            let tint = z
-                .attrs
-                .get("tint")
-                .map(|v| v.text.as_str())
-                .unwrap_or("oklch(0.8 0.08 230 / 0.18)");
-            let (tint, alpha) = paint(tint);
+    for (i, (_, points)) in gaps.iter().enumerate() {
+        let _ = write!(
+            s,
+            "<defs><mask id=\"gap-{i}\" maskUnits=\"userSpaceOnUse\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"white\"/>",
+            bounds.left(),
+            bounds.top(),
+            bounds.w,
+            bounds.h,
+            bounds.left(),
+            bounds.top(),
+            bounds.w,
+            bounds.h
+        );
+        for p in points {
             let _ = write!(
                 s,
-                "<g aria-label=\"{}\"><path d=\"{}\" fill=\"{}\" fill-opacity=\"{}\"/><text x=\"{:.2}\" y=\"{:.2}\">{}</text></g>",
-                escape(&z.label),
-                rounded_hull(hull),
-                escape(&tint),
-                alpha,
-                hull.first().map(|p| p.x).unwrap_or(0.),
-                hull.first().map(|p| p.y - 10.).unwrap_or(0.),
-                escape(&z.label)
+                "<circle data-crossing=\"true\" cx=\"{}\" cy=\"{}\" r=\"4\" fill=\"black\"/>",
+                p.x, p.y
             );
         }
+        s.push_str("</mask></defs>");
     }
     for n in scene
         .nodes
@@ -67,17 +229,32 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
         let r = l.nodes[&n.id];
         let _ = write!(
             s,
-            "<g data-node=\"{}\" aria-label=\"{}\"><rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"12\" fill=\"#f0f4f9\" fill-opacity=\"0.55\" stroke=\"#c5d0dd\"/><text class=\"node-title\" x=\"{:.2}\" y=\"{:.2}\">{}</text></g>",
+            "<g data-node=\"{}\" data-shape=\"container\" aria-label=\"{}\"><rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"12\" fill=\"#f0f4f9\" stroke=\"#73869b\"/></g>",
             escape(&n.id),
             escape(&n.label),
             r.left(),
             r.top(),
             r.w,
-            r.h,
-            r.left() + 16.,
-            r.top() + 22.,
-            escape(&n.label)
+            r.h
         );
+    }
+    for z in &scene.zones {
+        if let Some(hull) = l.zones.get(&z.id) {
+            let (tint, alpha) = paint(
+                z.attrs
+                    .get("tint")
+                    .map(|v| v.text.as_str())
+                    .unwrap_or("oklch(0.8 0.08 230 / 0.18)"),
+            );
+            let _ = write!(
+                s,
+                "<path data-zone=\"{}\" d=\"{}\" fill=\"{}\" fill-opacity=\"{}\"/>",
+                escape(&z.id),
+                rounded_hull(hull),
+                escape(&tint),
+                alpha
+            );
+        }
     }
     for e in &scene.edges {
         let r = &l.routes[&e.id];
@@ -107,9 +284,10 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
             1.7
         };
         let (shaft, heads) = connector(&r.points, e.kind, width);
+        let mask = gap_mask(&e.id, &gaps);
         let _ = write!(
             s,
-            "<path data-edge=\"{}\" class=\"edge\" style=\"stroke:{color};stroke-width:{width}\" d=\"{}\"{dash}{phantom}><title>{}</title></path>",
+            "<path data-edge=\"{}\" class=\"edge\" style=\"stroke:{color};stroke-width:{width}\" d=\"{}\"{mask}{dash}{phantom}><title>{}</title></path>",
             escape(&e.id),
             path(&shaft),
             escape(&format!(
@@ -126,34 +304,6 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
             );
         }
     }
-    // Optical crossing bridges: white under-stroke separates crossing ink without changing topology.
-    let routes: Vec<_> = l.routes.values().collect();
-    for (i, a) in routes.iter().enumerate() {
-        for b in &routes[i + 1..] {
-            for p in a.points.windows(2) {
-                for q in b.points.windows(2) {
-                    if crate::routing::proper_crossing(p[0], p[1], q[0], q[1]) {
-                        let (x, y) = if (p[0].y - p[1].y).abs() < 1e-6 {
-                            (q[0].x, p[0].y)
-                        } else {
-                            (p[0].x, q[0].y)
-                        };
-                        let _ = write!(
-                            s,
-                            "<path d=\"M {:.2} {:.2} Q {x:.2} {:.2} {:.2} {y:.2}\" fill=\"none\" stroke=\"white\" stroke-width=\"6\"/><path d=\"M {:.2} {y:.2} Q {x:.2} {:.2} {:.2} {y:.2}\" fill=\"none\" stroke=\"#53657a\" stroke-width=\"1.7\"/>",
-                            x - 5.,
-                            y,
-                            y - 7.,
-                            x + 5.,
-                            x - 5.,
-                            y - 7.,
-                            x + 5.
-                        );
-                    }
-                }
-            }
-        }
-    }
     for n in scene
         .nodes
         .iter()
@@ -162,16 +312,17 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
         let r = l.nodes[&n.id];
         let _ = write!(
             s,
-            "<g data-node=\"{}\" aria-label=\"{}\"><title>{}</title>",
+            "<g data-node=\"{}\" data-shape=\"{}\" aria-label=\"{}\"><title>{}</title>",
             escape(&n.id),
-            escape(&n.id),
+            escape(&n.shape),
+            escape(&n.label),
             escape(&n.label)
         );
         match n.shape.as_str() {
             "actor" => {
                 let _ = write!(
                     s,
-                    "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"18\" fill=\"#e4f2ea\" stroke=\"#a6c9b5\"/><circle cx=\"{}\" cy=\"{}\" r=\"5\" fill=\"none\" stroke=\"#608b75\"/><path d=\"M {} {} Q {} {} {} {}\" fill=\"none\" stroke=\"#608b75\"/>",
+                    "<rect data-silhouette=\"true\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"18\" fill=\"#e4f2ea\" stroke=\"#608b75\"/><circle cx=\"{}\" cy=\"{}\" r=\"5\" fill=\"none\" stroke=\"#608b75\"/><path d=\"M {} {} Q {} {} {} {}\" fill=\"none\" stroke=\"#608b75\"/>",
                     r.left(),
                     r.top(),
                     r.w,
@@ -189,13 +340,13 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
             "cache" | "diamond" | "decision" => {
                 let vertices = crate::shapes::polygon(&n.shape, r).unwrap();
                 let (fill, stroke) = if n.shape == "cache" {
-                    ("#fff1d6", "#ceb98c")
+                    ("#fff1d6", "#95723b")
                 } else {
-                    ("#fff0d8", "#cfab70")
+                    ("#fff0d8", "#98702e")
                 };
                 let _ = write!(
                     s,
-                    "<path d=\"{}Z\" fill=\"{fill}\" stroke=\"{stroke}\"/>",
+                    "<path data-silhouette=\"true\" d=\"{}Z\" fill=\"{fill}\" stroke=\"{stroke}\"/>",
                     path(&vertices)
                 );
             }
@@ -203,7 +354,7 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
                 let ry = crate::shapes::CYLINDER_RY.min(r.h / 2.);
                 let _ = write!(
                     s,
-                    "<path d=\"M {} {} A {} {ry} 0 0 1 {} {} L {} {} A {} {ry} 0 0 1 {} {} Z\" fill=\"#e1edf9\" stroke=\"#9ab6d4\"/><ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{ry}\" fill=\"#d1e3f5\" stroke=\"#9ab6d4\"/>",
+                    "<path data-silhouette=\"true\" d=\"M {} {} A {} {ry} 0 0 1 {} {} L {} {} A {} {ry} 0 0 1 {} {} Z\" fill=\"#e1edf9\" stroke=\"#6483a2\"/><ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{ry}\" fill=\"#d1e3f5\" stroke=\"#6483a2\"/>",
                     r.left(),
                     r.top() + ry,
                     r.w / 2.,
@@ -227,7 +378,7 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
                 };
                 let _ = write!(
                     s,
-                    "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"{}\" fill=\"{fill}\" stroke=\"#b8c9da\"/>",
+                    "<rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"{}\" fill=\"{fill}\" stroke=\"#6b8198\"/>",
                     r.left(),
                     r.top(),
                     r.w,
@@ -250,22 +401,13 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
         if let Some(index) = scene.story.iter().position(|id| id == &n.id) {
             let _ = write!(
                 s,
-                "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"8\" fill=\"none\" stroke=\"#3f6dc5\" stroke-width=\"2.5\"><title>Story step {}</title></rect>",
-                r.left(),
-                r.top(),
-                r.w,
-                r.h,
+                "<path data-story-outline=\"{}\" d=\"{}\" fill=\"none\" stroke=\"#3f6dc5\" stroke-width=\"2.5\"><title>Story step {}</title></path>",
+                escape(&n.id),
+                crate::shapes::outline(&n.shape, r),
                 index + 1
             );
         }
         if n.shape == "sql_table" {
-            let _ = write!(
-                s,
-                "<text class=\"node-title\" style=\"font-size:10px\" x=\"{}\" y=\"{}\">{}</text>",
-                r.left() + 12.,
-                r.top() + 8.,
-                escape(&n.label)
-            );
             for (pidx, p) in n.ports.values().enumerate() {
                 if !matches!(p.constraint, PortConstraint::FixedPos { .. }) {
                     continue;
@@ -287,7 +429,7 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
             let _ = write!(
                 s,
                 "<text class=\"node-title\" text-anchor=\"middle\" dominant-baseline=\"central\" x=\"{:.2}\" y=\"{:.2}\">{}</text>",
-                r.x,
+                r.x + crate::shapes::title_gutter(&n.shape) / 2.,
                 r.y,
                 escape(&n.label)
             );
@@ -295,25 +437,52 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
         s.push_str("</g>");
     }
     for p in l.ports.values() {
-        // Keep invisible anchors for consumers, without covering arrow tips or
-        // turning every implicit attachment into a visible junction dot.
+        let unused = p
+            .key
+            .rsplit_once('#')
+            .and_then(|(id, port)| scene.node(id).and_then(|n| n.ports.get(port)))
+            .is_some_and(|port| port.explicit)
+            && !scene
+                .edges
+                .iter()
+                .any(|edge| port_key(edge, true) == p.key || port_key(edge, false) == p.key);
+        let (radius, paint) = if unused {
+            (
+                2.5,
+                "data-unused-port=\"true\" fill=\"white\" stroke=\"#53657a\" stroke-width=\"1.5\"",
+            )
+        } else {
+            (4., "fill=\"transparent\"")
+        };
         let _ = write!(
             s,
-            "<circle data-port=\"{}\" cx=\"{:.2}\" cy=\"{:.2}\" r=\"4\" fill=\"transparent\"><title>{}</title></circle>",
+            "<circle data-port=\"{}\" cx=\"{:.2}\" cy=\"{:.2}\" r=\"{radius}\" {paint}><title>{}</title></circle>",
             escape(&p.key),
             p.point.x,
             p.point.y,
             escape(&p.key)
         );
     }
+    // Keep callout ink behind flow badges so leaders cannot strike through
+    // their step numbers when a label anchors at the route midpoint.
+    for label in &l.labels {
+        if let Some((a, b)) = crate::labels::leader(label) {
+            let _ = write!(
+                s,
+                "<path data-callout=\"true\" d=\"M {} {} L {} {}\" stroke=\"#73869b\" fill=\"none\"/>",
+                a.x, a.y, b.x, b.y
+            );
+        }
+    }
     for flow in &scene.flows {
         for (step, id) in flow.edges.iter().enumerate() {
             if let Some(r) = l.routes.get(id) {
                 let mid = at_arc(&r.points, 0.5);
                 let (shaft, heads) = connector(&r.points, scene.edge(id).unwrap().kind, 3.);
+                let mask = gap_mask(id, &gaps);
                 let _ = write!(
                     s,
-                    "<g aria-label=\"{} step {}\"><path data-edge=\"{}\" class=\"flow\" d=\"{}\"/><circle cx=\"{}\" cy=\"{}\" r=\"10\" fill=\"#356bd9\"/><text x=\"{}\" y=\"{}\" text-anchor=\"middle\" style=\"fill:white;font-size:11px\">{}</text></g>",
+                    "<g aria-label=\"{} step {}\"><path data-edge=\"{}\" class=\"flow\" d=\"{}\"{mask}/><circle cx=\"{}\" cy=\"{}\" r=\"10\" fill=\"#356bd9\"/><text x=\"{}\" y=\"{}\" text-anchor=\"middle\" style=\"fill:white;font-size:11px\">{}</text></g>",
                     escape(&flow.label),
                     step + 1,
                     escape(id),
@@ -335,19 +504,34 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
             }
         }
     }
+    for n in scene
+        .nodes
+        .iter()
+        .filter(|n| n.container && n.shape != "sql_table")
+    {
+        let r = l.nodes[&n.id];
+        let _ = write!(
+            s,
+            "<text data-owner-node=\"{}\" class=\"node-title\" x=\"{}\" y=\"{}\">{}</text>",
+            escape(&n.id),
+            r.left() + 16.,
+            r.top() + 22.,
+            escape(&n.label)
+        );
+    }
     for label in &l.labels {
-        let _ = write!(s, "<g data-label=\"{}\">", escape(&label.feature));
+        let _ = write!(
+            s,
+            "<g data-label=\"{}\" data-knockout=\"{}\">",
+            escape(&label.feature),
+            label.knockout && !label.callout
+        );
         let r = label.bounds;
-        if label.callout {
-            let _ = write!(
-                s,
-                "<path d=\"M {} {} L {} {}\" stroke=\"#9eacba\" fill=\"none\"/>",
-                label.anchor.x,
-                label.anchor.y,
-                r.x,
-                r.top()
-            );
-        }
+        let class = if scene.node(&label.feature).is_some() {
+            "node-title"
+        } else {
+            "connection-label"
+        };
         if label.knockout && !label.callout {
             let _ = write!(
                 s,
@@ -360,12 +544,24 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
         }
         let _ = write!(
             s,
-            "<text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" dominant-baseline=\"central\">{}</text>",
+            "<text class=\"{class}\" x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" dominant-baseline=\"central\">{}</text>",
             r.x,
             r.y,
             escape(&label.text)
         );
         s.push_str("</g>");
+    }
+    for z in &scene.zones {
+        if let Some(r) = zone_label(z, l) {
+            let _ = write!(
+                s,
+                "<text data-zone-label=\"{}\" x=\"{}\" y=\"{}\" style=\"font-weight:600;fill:#29493f;paint-order:stroke;stroke:white;stroke-width:3;stroke-linejoin:round\">{}</text>",
+                escape(&z.id),
+                r.left(),
+                r.y + 4.,
+                escape(&z.label)
+            );
+        }
     }
     s.push_str("</svg>\n");
     s
@@ -391,7 +587,7 @@ fn connector(points: &[Point], kind: EdgeKind, width: f64) -> (Vec<Point>, Arrow
     let length = 8. + width;
     let half_width = 3. + width / 2.;
     let mut add = |end, tip: Point, neighbor: Point, index| {
-        let available = tip.distance(neighbor);
+        let available = (tip.x - neighbor.x).hypot(tip.y - neighbor.y);
         let length = length.min(
             available
                 * if last == 1 && kind == EdgeKind::Bidirectional {
@@ -483,10 +679,13 @@ pub fn at_arc(points: &[Point], t: f64) -> Point {
 pub fn focused_svg(scene: &SceneGraph, l: &Layout, focus: &str, hops: usize) -> String {
     let mut svg = svg(scene, l);
     for (id, tone) in crate::views::attention(scene, Some(focus), hops) {
+        if tone.opacity >= 1. {
+            continue;
+        }
         svg = svg.replace(
             &format!("<g data-node=\"{}\"", escape(&id)),
             &format!(
-                "<g opacity=\"{}\" data-node=\"{}\"",
+                "<g class=\"context-node\" data-focus-opacity=\"{}\" data-node=\"{}\"",
                 tone.opacity,
                 escape(&id)
             ),
@@ -579,6 +778,40 @@ pub fn flow_frame_svg(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn crossing_gaps_include_collinear_stub_vertices_but_not_junctions() {
+        let route = |id: &str, points: Vec<Point>| Route {
+            edge: id.into(),
+            points,
+        };
+        let mut l = Layout::default();
+        l.routes.insert(
+            "horizontal".into(),
+            route(
+                "horizontal",
+                vec![
+                    Point::new(-40., 0.),
+                    Point::new(0., 0.),
+                    Point::new(40., 0.),
+                ],
+            ),
+        );
+        l.routes.insert(
+            "vertical".into(),
+            route(
+                "vertical",
+                vec![
+                    Point::new(0., -40.),
+                    Point::new(0., 0.),
+                    Point::new(0., 40.),
+                ],
+            ),
+        );
+        assert_eq!(crossing_gaps(&l)["vertical"], vec![Point::new(0., 0.)]);
+        l.routes.get_mut("vertical").unwrap().points.remove(0);
+        assert!(crossing_gaps(&l).is_empty());
+    }
 
     #[test]
     fn arrow_tips_and_shafts_join_exactly_in_every_direction() {

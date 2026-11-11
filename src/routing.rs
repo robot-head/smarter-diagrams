@@ -375,7 +375,7 @@ pub fn proper_crossing(a: Point, b: Point, c: Point, d: Point) -> bool {
             && c.x < a.x.max(b.x) - 1e-6
             && a.y > c.y.min(d.y) + 1e-6
             && a.y < c.y.max(d.y) - 1e-6
-    } else if !h && !v {
+    } else if (a.x - b.x).abs() < 1e-6 && (c.y - d.y).abs() < 1e-6 {
         proper_crossing(c, d, a, b)
     } else {
         false
@@ -392,6 +392,32 @@ pub fn collinear_overlap(a: Point, b: Point, c: Point, d: Point) -> f64 {
 }
 fn dedup_points(p: &mut Vec<Point>) {
     p.dedup_by(|a, b| a.distance(*b) < 1e-7);
+}
+/// A drawing/label view of a route. The public route keeps its mandatory stub
+/// vertices; consumers that measure straight runs need their full length.
+pub(crate) fn coalesced(points: &[Point]) -> Vec<Point> {
+    let mut out: Vec<Point> = Vec::new();
+    for &point in points {
+        if out.last().is_some_and(|p| p.distance(point) < 1e-7) {
+            continue;
+        }
+        while out.len() >= 2 {
+            let a = out[out.len() - 2];
+            let b = out[out.len() - 1];
+            let straight = ((a.x - b.x).abs() < 1e-6
+                && (b.x - point.x).abs() < 1e-6
+                && (b.y - a.y) * (point.y - b.y) >= 0.)
+                || ((a.y - b.y).abs() < 1e-6
+                    && (b.y - point.y).abs() < 1e-6
+                    && (b.x - a.x) * (point.x - b.x) >= 0.);
+            if !straight {
+                break;
+            }
+            out.pop();
+        }
+        out.push(point);
+    }
+    out
 }
 fn simplify(p: &mut Vec<Point>) {
     dedup_points(p);

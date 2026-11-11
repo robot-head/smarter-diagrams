@@ -8,7 +8,6 @@ Every example below is compiled by the Rust CLI during the site build. Download 
 
 <<< ../examples/hello.diagram
 
-![Client, API and database diagram](/generated/hello.svg)
 
 ## Ports and record slots
 
@@ -16,7 +15,6 @@ Every example below is compiled by the Rust CLI during the site build. Download 
 
 <<< ../examples/ports.diagram
 
-![Named queue port and SQL record diagram](/generated/ports.svg)
 
 ## Intentional layout
 
@@ -24,7 +22,6 @@ Every example below is compiled by the Rust CLI during the site build. Download 
 
 <<< ../examples/constraints.diagram
 
-![Pinned nodes and row alignment diagram](/generated/constraints.svg)
 
 ## Shared scope and a protocol trace
 
@@ -32,7 +29,6 @@ Every example below is compiled by the Rust CLI during the site build. Download 
 
 <<< ../examples/architecture.diagram
 
-![Production architecture with security zone diagram](/generated/architecture.svg)
 
 ## Queue overload
 

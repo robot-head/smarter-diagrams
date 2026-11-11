@@ -8,10 +8,11 @@ function samples(source, info = 'diagram') {
     view,
     variant,
     focus: focusNode,
+    expectError: /\bexpect-error\b/.test(info),
     label: [views.length ? view ? `View: ${view}` : 'Canonical graph' : '', variants.length ? variant ? `Layout: ${variant}` : 'Default layout' : '', focus.length ? focusNode ? `Focus: ${focusNode} (1 hop)` : 'Full context' : ''].filter(Boolean).join(' · ') || 'Rendered output',
   }))));
 }
 function key(sample) {
-  return createHash('sha256').update(JSON.stringify([sample.source.trim(), sample.view, sample.variant, sample.focus])).digest('hex');
+  return createHash('sha256').update(JSON.stringify([sample.source.trim(), sample.view, sample.variant, sample.focus, sample.expectError])).digest('hex');
 }
 module.exports = { samples, key };

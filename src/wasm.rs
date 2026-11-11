@@ -117,7 +117,8 @@ impl WasmDocument {
 pub fn stack_json(source: &str, theta: f64) -> Result<String, JsValue> {
     let scene = crate::model::lower(&crate::syntax::parse(source));
     let stack = crate::spatial::strata(&scene, &Default::default(), theta).map_err(js_error)?;
-    serde_json::to_string(&stack).map_err(js_error)
+    serde_json::to_string(&crate::spatial::presentation(&scene, &stack).map_err(js_error)?)
+        .map_err(js_error)
 }
 #[cfg(feature = "wasm-runtime")]
 #[wasm_bindgen]

@@ -16,7 +16,7 @@ worker -> host [relation: runs_on]
 
 `spatial::strata(scene, options, theta)` lays out each plane independently and creates cross-layer vias. Tilt is a finite angle in radians from 0 through `π/4`. At zero, typography stays flat. Plane projection changes presentation without changing the underlying source graph.
 
-The browser example draws geometry with WebGPU and places undistorted SVG text above it. It probes shader/queue support and falls back to SVG if the adapter or submissions fail. A usable GPU is optional; the fallback retains the interactive tilt control.
+The browser example draws silhouette fills with WebGPU and uses the core SVG renderer for outlines, arrows, and undistorted text. It probes shader/queue support and falls back to SVG if the adapter or submissions fail. Both modes preserve edge direction, labels, plane names, and dashed cross-plane relationships. A usable GPU is optional; the fallback retains the interactive tilt control.
 
 Ordinary `compile` renders the canonical 2D graph. Call `strata` explicitly when you want the independent-plane presentation.
 
