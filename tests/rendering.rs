@@ -136,6 +136,11 @@ fn documented_connector_artifacts_stay_connected_and_labels_leave_the_ink_clear(
                         .next()
                         .unwrap()
                         .contains("fill=\"transparent\"")
+                        || port
+                            .split('>')
+                            .next()
+                            .unwrap()
+                            .contains("data-unused-port=\"true\"")
                 );
             }
             for label in svg.split("<g data-label=").skip(1) {
@@ -143,6 +148,87 @@ fn documented_connector_artifacts_stay_connected_and_labels_leave_the_ink_clear(
             }
         }
     }
+}
+
+#[test]
+fn visual_qa_fixtures_have_clear_titles_and_leaders() {
+    for source in [
+        "broker: Event log [shape: queue] { port orders [side: E, ratio: 0.5] }\nbroker#orders -> worker.W: consume\n",
+        "α: \"Public API\"; β: \"Ledger λ\"\nα -> β: \"read / write\"\n",
+        include_str!("../examples/architecture.diagram"),
+    ] {
+        let d = compile(source).unwrap();
+        for (i, label) in d.layout.labels.iter().enumerate() {
+            if let Some((a, b)) = smarter_diagrams::labels::leader(label) {
+                // Leaders terminate outside their own box and cannot enter a
+                // different selected label, in either horizontal or diagonal form.
+                for (j, other) in d.layout.labels.iter().enumerate() {
+                    for t in 0..=100 {
+                        let p = Point::new(
+                            a.x + (b.x - a.x) * t as f64 / 100.,
+                            a.y + (b.y - a.y) * t as f64 / 100.,
+                        );
+                        assert!(
+                            !other.bounds.contains(p),
+                            "leader {i} enters label {j}: {source}"
+                        );
+                    }
+                }
+            }
+        }
+        for node in &d.scene.nodes {
+            if node.shape == "queue" {
+                assert!(
+                    d.layout.nodes[&node.id].w
+                        >= smarter_diagrams::labels::text_width(&node.label) * 14. / 13. + 64.
+                            - 1e-6
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn records_keep_their_fixed_slots_below_a_separate_title() {
+    let d = compile(
+        "api -> orders#id\norders: Orders [shape: sql_table] { port id: uuid [side: W, pos: 1] }\n",
+    )
+    .unwrap();
+    let body = d.layout.nodes["orders"];
+    let slot = &d.layout.ports["orders#id"];
+    assert!((slot.point.y - body.top() - 16.).abs() < 1e-6);
+    let title = d
+        .layout
+        .labels
+        .iter()
+        .find(|l| l.feature == "orders")
+        .unwrap();
+    assert!(title.bounds.bottom() < body.top());
+    assert!(d.to_svg().contains("Orders"));
+}
+
+#[test]
+fn unused_explicit_ports_are_visible_without_covering_connected_tips() {
+    let d=compile("a -> broker#input\nbroker { port input [side: W, ratio: 0.25]; port ack [side: W, ratio: 0.75] }\n").unwrap();
+    let svg = d.to_svg();
+    for (id, unused) in [("broker#input", false), ("broker#ack", true)] {
+        let tag = svg
+            .split(&format!("<circle data-port=\"{id}\""))
+            .nth(1)
+            .unwrap()
+            .split('>')
+            .next()
+            .unwrap();
+        assert_eq!(tag.contains("data-unused-port"), unused);
+    }
+}
+
+#[test]
+fn fresh_unpinned_containers_fit_their_children() {
+    let d = compile("prod { api -> db }\nclient -> prod.api\n").unwrap();
+    let children = d.layout.nodes["prod.api"].union(d.layout.nodes["prod.db"]);
+    assert!((d.layout.nodes["prod"].h - children.h - 88.).abs() < 1e-6);
+    assert!(d.layout.nodes["prod"].encloses(children));
 }
 
 #[test]

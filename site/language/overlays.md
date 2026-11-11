@@ -46,7 +46,7 @@ view downstream {
 
 Use `views::project(&scene, name)` or `--view name` in the CLI. A view chooses graph membership; an `@layout(name)` variant chooses constraints. They solve different authoring needs.
 
-Compare the three renders above: the full graph, the request path without `metrics`, and the downstream view without `client`.
+Use the comparison tabs above to inspect the full graph, the request path without `metrics`, and the downstream view without `client`.
 
 ## Story and causal focus
 
@@ -59,4 +59,4 @@ metrics -> archive
 
 The story marks a static path for saliency. `views::causal_cone` and `views::attention` calculate k-hop focus from incoming, outgoing or both directions. The browser uses `focus_svg(node, hops)` for hover emphasis while retaining context.
 
-The first render shows the story in its full context. The second applies one-hop focus to `api`: `archive` remains in place but fades because it is two hops away.
+The **Full context** tab shows the whole story. **Focus: api** applies one-hop focus to `api`: `archive` remains in place with faded shape ink because it is two hops away. Its label keeps enough contrast to remain readable.

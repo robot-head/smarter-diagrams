@@ -45,21 +45,21 @@ export default defineConfig({
       md.renderer.rules.fence = (tokens, index, options, env, renderer) => {
         const code = fence(tokens, index, options, env, renderer)
         const token = tokens[index]
-        if (!env.relativePath?.startsWith('language/') || !/^diagram(?:\s|$)/.test(token.info)) return code
+        if (!(env.relativePath?.startsWith('language/') || env.relativePath === 'examples.md') || !/^diagram(?:\s|$)/.test(token.info)) return code
         const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
         let heading = 'Language example'
         for (let i = index - 1; i >= 0; i--) {
           if (tokens[i].type === 'heading_open') { heading = tokens[i + 1].content; break }
         }
         const escape = md.utils.escapeHtml
-        const figures = diagramSamples.samples(token.content, token.info).map(sample => {
-          const file = manifest[diagramSamples.key(sample)]
-          if (!file) throw new Error(`Missing rendered language example in ${env.relativePath}; run npm run docs:build`)
-          const href = `$withBase('/generated/language/${file}')`
-          const description = escape(`${heading} — ${sample.label}`)
-          return `<figure class="diagram-example"><a :href="${href}" target="_blank" rel="noopener" aria-label="Open SVG: ${description}"><img :src="${href}" loading="lazy" alt="${description} diagram"></a><figcaption>${escape(sample.label)} · <a :href="${href}" target="_blank" rel="noopener">Open SVG ↗</a></figcaption></figure>`
-        }).join('')
-        return `${code}<div class="diagram-examples">${figures}</div>`
+        const examples = diagramSamples.samples(token.content, token.info).map(sample => {
+          const data = manifest[diagramSamples.key(sample)]
+          if (!data) throw new Error(`Missing rendered example in ${env.relativePath}; run npm run docs:build`)
+          return { ...data, label: sample.label }
+        })
+        if (examples[0].diagnostic) return `${code}<div class="diagram-diagnostic" role="note"><strong>Expected layout diagnostic</strong><pre>${escape(examples[0].diagnostic)}</pre></div>`
+        return `${code}<DiagramExamples :examples="${escape(JSON.stringify(examples))}" title="${escape(heading)}" :guides="${/\bguides\b/.test(token.info)}" />`
+
       }
       const open = md.renderer.rules.link_open!
       md.renderer.rules.link_open = (tokens, index, ...args) => {

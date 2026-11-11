@@ -7,6 +7,11 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 pub const GRID: f64 = 16.;
+fn title_width(node: &Node) -> f64 {
+    crate::labels::text_width(&node.label) * 14. / 13.
+        + 32.
+        + crate::shapes::title_gutter(&node.shape)
+}
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct Point {
     pub x: f64,
@@ -219,6 +224,8 @@ pub fn layout(
         for label in &mut cached.labels {
             if let Some(edge) = scene.edge(&label.feature) {
                 label.text = edge.label.clone();
+            } else if let Some(node) = scene.node(&label.feature) {
+                label.text = node.label.clone();
             } else if let Some((node, port)) = label.feature.rsplit_once('#')
                 && let Some(p) = scene.node(node).and_then(|n| n.ports.get(port))
             {
@@ -252,19 +259,24 @@ pub fn layout(
     let mut rects = Vec::new();
     for (i, node) in scene.nodes.iter().enumerate() {
         let row = rows.entry(ranks[i]).or_insert(0);
-        let w = (crate::labels::text_width(&node.label) * 14. / 13. + 32.)
-            .max(112.)
-            .max(
-                node.ports
-                    .values()
-                    .map(|p| crate::labels::text_width(&p.label) + 32.)
-                    .reduce(f64::max)
-                    .unwrap_or(0.),
-            );
+        let w = title_width(node).max(112.).max(
+            node.ports
+                .values()
+                .map(|p| crate::labels::text_width(&p.label) + 32.)
+                .reduce(f64::max)
+                .unwrap_or(0.),
+        );
         let h = if node.ports.is_empty() {
             48.
         } else {
             (node.ports.len() as f64 + 2.) * o.grid
+        };
+        // Simulation nodes reserve a readable occupancy strip. An explicit
+        // size lock below still wins; the viewer then uses only the thin bar.
+        let h = if node.shape != "sql_table" && node.annotations.iter().any(|a| a.name == "sim") {
+            h.max(64.)
+        } else {
+            h
         };
         let mut r = Rect::new(ranks[i] as f64 * 240., *row as f64 * 112., w, h);
         *row += 1;
@@ -786,6 +798,43 @@ pub fn layout(
         shape_search_states: shape_stats.searched_states,
         ..Default::default()
     };
+    // Refit unconstrained fresh containers after their children have settled.
+    // Shrinking stays within the solved box; referenced/pinned containers and
+    // incremental reserved frames retain their hard geometry.
+    if previous.is_none() {
+        for i in (0..n).rev() {
+            let node = &scene.nodes[i];
+            if !node.container
+                || !node.ports.is_empty()
+                || annotations[i].iter().any(|a| a.name == "pin")
+                || scene
+                    .edges
+                    .iter()
+                    .any(|e| e.source.node == node.id || e.target.node == node.id)
+                || scene.relations.iter().any(|r| r.members.contains(&node.id))
+                || relatives
+                    .iter()
+                    .any(|(x, y)| x.is_some_and(|(j, _)| j == i) || y.is_some_and(|(j, _)| j == i))
+            {
+                continue;
+            }
+            if let Some(bounds) = scene
+                .nodes
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| c.parent.as_deref() == Some(&node.id))
+                .map(|(j, _)| rects[j])
+                .reduce(Rect::union)
+            {
+                rects[i] = Rect::new(
+                    bounds.x,
+                    bounds.y - 12.,
+                    (bounds.w + 2. * o.container_padding).max(title_width(node)),
+                    bounds.h + 2. * o.container_padding + 24.,
+                );
+            }
+        }
+    }
     for (i, node) in scene.nodes.iter().enumerate() {
         out.nodes.insert(node.id.clone(), rects[i]);
     }
@@ -1442,7 +1491,7 @@ fn semantic_key(scene: &SceneGraph, options: &LayoutOptions) -> String {
         .map(|n| {
             (
                 &n.id,
-                (crate::labels::text_width(&n.label) * 14. / 13. + 32.).max(112.),
+                title_width(n).max(112.),
                 &n.parent,
                 &n.shape,
                 n.container,
@@ -1513,7 +1562,7 @@ fn query_keys(scene: &SceneGraph, o: &LayoutOptions) -> (BTreeMap<String, String
     for n in &scene.nodes {
         let key = serde_json::to_string(&(
             &n.id,
-            (crate::labels::text_width(&n.label) * 14. / 13. + 32.).max(112.),
+            title_width(n).max(112.),
             &n.parent,
             &n.shape,
             n.container,

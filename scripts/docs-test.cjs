@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { spawnSync } = require('node:child_process');
 const browserOptions = require('./browser-options.cjs');
+const checkSvg = require('./check-rendered-svg.cjs');
 const base = new URL(process.env.DOCS_TEST_URL || 'http://127.0.0.1:4173/smarter-diagrams/');
 if (!base.pathname.endsWith('/')) base.pathname += '/';
 const url = path => new URL(path, base).href;
@@ -51,65 +52,51 @@ const url = path => new URL(path, base).href;
   console.log(`Documentation: ${seen.size} pages and ${assets.size} static asset links passed.`);
 
   let diagrams = 0;
-  for (const topic of ['basics', 'ports', 'layout', 'overlays', 'reference']) {
-    await page.goto(url(`language/${topic}.html`));
-    const codeBlocks = await page.locator('.vp-doc div.language-diagram').count();
-    const figures = page.locator('figure.diagram-example');
-    assert(codeBlocks > 0 && await figures.count() >= codeBlocks, `missing visual examples: ${topic}`);
-    await figures.locator('img').evaluateAll(images => images.forEach(image => { image.loading = 'eager'; }));
-    await page.waitForFunction(() => [...document.querySelectorAll('.diagram-example img')].every(image => image.complete && image.naturalWidth > 0));
-    for (const source of await figures.locator('img').evaluateAll(images => images.map(image => image.src))) {
-      const markup = await (await page.request.get(source)).text();
-      const failures = await page.evaluate(markup => {
-        const svg = new DOMParser().parseFromString(markup, 'image/svg+xml').documentElement;
-        const holder = document.createElement('div');
-        holder.style.cssText = 'position:absolute;left:-10000px;visibility:hidden';
-        holder.append(svg); document.body.append(holder);
-        try {
-          const failures = [];
-          const close = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) < 0.02;
-          const outlines = [...svg.querySelectorAll('[data-node]')].map(node => node.querySelector('rect,path,ellipse')).filter(Boolean);
-          const attached = point => outlines.some(outline => outline.isPointInStroke(new DOMPoint(point.x, point.y)));
-          const shafts = [...svg.querySelectorAll('path.edge,path.flow')].map(path => ({
-            id: path.dataset.edge, color: getComputedStyle(path).stroke,
-            endpoints: [path.getPointAtLength(0), path.getPointAtLength(path.getTotalLength())],
-          }));
-          const heads = [...svg.querySelectorAll('[data-arrowhead]')].map(head => {
-            const n = head.getAttribute('d').match(/-?\d+(?:\.\d+)?/g).map(Number);
-            return { id: head.dataset.edge, tip: { x: n[0], y: n[1] }, base: { x: (n[2] + n[4]) / 2, y: (n[3] + n[5]) / 2 }, color: getComputedStyle(head).fill };
-          });
-          for (const port of svg.querySelectorAll('[data-port]')) if (getComputedStyle(port).fill !== 'rgba(0, 0, 0, 0)') failures.push(`visible port dot: ${port.dataset.port}`);
-          for (const head of heads) {
-            if (!attached(head.tip)) failures.push(`arrow tip detached from silhouette: ${head.id}`);
-            if (!shafts.some(shaft => shaft.id === head.id && shaft.color === head.color && shaft.endpoints.some(point => close(point, head.base)))) failures.push(`arrow/shaft gap or color mismatch: ${head.id}`);
-          }
-          for (const shaft of shafts) for (const point of shaft.endpoints) {
-            if (!attached(point) && !heads.some(head => head.id === shaft.id && close(point, head.base))) failures.push(`connector endpoint detached: ${shaft.id}`);
-          }
-          return failures;
-        } finally { holder.remove(); }
-      }, markup);
-      assert.deepEqual(failures, [], source);
-    }
-    diagrams += await figures.count();
-    if (topic === 'ports' || topic === 'layout') await page.screenshot({ path: `artifacts/language-${topic}.png`, fullPage: true });
-    if (topic === 'layout') {
-      const image = caption => figures.filter({ hasText: caption }).locator('img').getAttribute('src');
-      assert.notEqual(await image('Default layout'), await image('Layout: compact'), 'variant comparison must render different geometry');
-    }
-    if (topic === 'overlays') {
-      for (const [caption, present, absent] of [['View: request_only', 'client', 'metrics'], ['View: downstream', 'metrics', 'client']]) {
-        const source = await figures.filter({ hasText: caption }).locator('img').getAttribute('src');
-        const svg = await (await page.request.get(new URL(source, base).href)).text();
-        assert(svg.includes(`data-node="${present}"`), caption);
-        assert(!svg.includes(`data-node="${absent}"`), caption);
+  for (const topic of ['basics', 'ports', 'layout', 'overlays', 'reference', 'gallery']) {
+    await page.goto(url(topic==='gallery'?'examples.html':`language/${topic}.html`));
+    const codeBlocks=await page.locator('.vp-doc div.language-diagram').count();
+    const groups=page.locator('.diagram-examples');
+    const diagnosticCount=await page.locator('.diagram-diagnostic').count();
+    assert(codeBlocks>0 && await groups.count()+diagnosticCount>=codeBlocks,`missing examples: ${topic}`);
+    for(let i=0;i<await groups.count();i++){
+      const group=groups.nth(i),tabs=group.getByRole('tab'),choices=Math.max(1,await tabs.count());
+      let comparisonFrame;
+      for(let choice=0;choice<choices;choice++){
+        if(await tabs.count())await tabs.nth(choice).click();
+        const image=group.locator('figure img');await image.evaluate(image=>image.loading='eager');
+        await image.evaluate(image=>image.decode());
+        const source=await image.getAttribute('src');
+        const markup=await(await page.request.get(new URL(source,base).href)).text();
+        assert.deepEqual(await page.evaluate(checkSvg,markup),[],source);
+        const frame=markup.match(/viewBox="([^"]+)"/)[1];
+        if(comparisonFrame)assert.equal(frame,comparisonFrame,'comparison must keep its scale/frame');comparisonFrame=frame;
+        assert.equal(await group.locator('output').textContent(),'100%','readable native size must be the default');
+        const label=await group.locator('figcaption').textContent();
+        if(label.includes('View: request_only')){assert(markup.includes('data-node="client"'));assert(!markup.includes('data-node="metrics"'));}
+        if(label.includes('View: downstream')){assert(markup.includes('data-node="metrics"'));assert(!markup.includes('data-node="client"'));}
+        if(label.includes('Focus: api'))assert(markup.includes('data-focus-opacity="0.35" data-node="archive"'));
+        diagrams++;
       }
-      const source = await figures.filter({ hasText: 'Focus: api (1 hop)' }).locator('img').getAttribute('src');
-      const svg = await (await page.request.get(new URL(source, base).href)).text();
-      assert(svg.includes('opacity="0.35" data-node="archive"'), 'focus must fade the outer context');
+      if(i===0){await group.locator('summary').click();assert(await group.getByRole('table',{name:'Nodes and ownership'}).isVisible());await group.locator('summary').click();}
     }
+    if(topic==='layout'){
+      assert.match(await page.locator('.diagram-diagnostic').textContent(),/infeasible layout/);
+      const first=groups.first();await first.getByLabel('Show grid').check();assert(await first.getByRole('table',{name:'Grid coordinates and dimensions'}).isVisible());assert(await first.locator('.diagram-grid line').count()>4);await first.getByLabel('Show grid').uncheck();
+    }
+    if(topic==='ports'||topic==='layout')await page.screenshot({path:`artifacts/language-${topic}.png`,fullPage:true});
   }
-  console.log(`Language: ${diagrams} decoded SVG examples; silhouette attachments, arrow joins/colors, invisible port anchors, views and layout comparisons passed.`);
+  assert.equal(diagrams,40,'all language and gallery choices must be checked');
+  await page.goto(url('language/reference.html'));
+  const dense=page.locator('.diagram-examples').last();
+  await page.setViewportSize({width:375,height:812});
+  const pan=dense.locator('.diagram-viewport');await pan.focus();await pan.press('ArrowRight');
+  await page.waitForFunction(()=>[...document.querySelectorAll('.diagram-viewport')].some(el=>el.scrollLeft>0));
+  await dense.getByRole('button',{name:'Zoom in',exact:true}).click();assert.equal(await dense.locator('output').textContent(),'125%');
+  await dense.getByRole('button',{name:'Fit',exact:true}).click();assert(await dense.locator('img').evaluate(img=>img.getBoundingClientRect().width<=img.closest('.diagram-viewport').clientWidth+1));
+  await dense.getByRole('button',{name:'Actual size (100%)',exact:true}).click();assert.equal(await dense.locator('output').textContent(),'100%');
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'viewer must contain mobile overflow');
+  await page.setViewportSize({width:1440,height:1000});
+  console.log(`Examples: ${diagrams} language/gallery choices passed glyph, leader, contrast, silhouette, arrow, description, comparison, grid, and mobile zoom/pan checks.`);
 
   await page.goto(base.href);
 
