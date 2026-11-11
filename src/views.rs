@@ -41,7 +41,84 @@ pub fn project(scene: &SceneGraph, name: &str) -> Result<SceneGraph, Error> {
     }
     Ok(filter(scene, &keep))
 }
+/// Retain visible nodes and contract causal paths through hidden intermediates.
 pub fn filter(scene: &SceneGraph, keep: &BTreeSet<String>) -> SceneGraph {
+    let mut visible = keep.clone();
+    for id in keep {
+        visible.extend(ancestors(scene, id));
+    }
+    let keep = &visible;
+    let mut out = filter_exact(scene, keep);
+    // Stop at visible intermediates. Each summary represents a path whose
+    // internal nodes alone were hidden, with cycle-safe deterministic traversal.
+    for start in keep {
+        let mut queue = VecDeque::from([(start.clone(), Vec::<String>::new())]);
+        let mut seen = BTreeSet::from([start.clone()]);
+        while let Some((at, hidden)) = queue.pop_front() {
+            for edge in &scene.edges {
+                let next = if edge.source.node == at {
+                    Some((&edge.target, &edge.source))
+                } else if edge.target.node == at
+                    && matches!(edge.kind, EdgeKind::Bidirectional | EdgeKind::Undirected)
+                {
+                    Some((&edge.source, &edge.target))
+                } else {
+                    None
+                };
+                let Some((target, source)) = next else {
+                    continue;
+                };
+                if keep.contains(&target.node) {
+                    if hidden.is_empty()
+                        || target.node == *start
+                        || out
+                            .edges
+                            .iter()
+                            .any(|e| e.source.node == *start && e.target.node == target.node)
+                    {
+                        continue;
+                    }
+                    let mut summary = edge.clone();
+                    summary.id = format!("summary:{start}->{}", target.node);
+                    summary.source = source.clone();
+                    summary.source.node = start.clone();
+                    summary.source.port = None;
+                    summary.source.constraint = PortConstraint::Free;
+                    summary.source.raw_constraint = PortConstraint::Free;
+                    summary.source.anchor_span = None;
+                    summary.target = target.clone();
+                    summary.kind = EdgeKind::Directed;
+                    summary.label = format!("via {}", hidden.join(" → "));
+                    summary.attrs = BTreeMap::from([
+                        (
+                            "style".into(),
+                            Value {
+                                text: "dashed".into(),
+                                ..Default::default()
+                            },
+                        ),
+                        (
+                            "summary".into(),
+                            Value {
+                                text: "true".into(),
+                                ..Default::default()
+                            },
+                        ),
+                    ]);
+                    summary.annotations.clear();
+                    out.edges.push(summary);
+                } else if seen.insert(target.node.clone()) {
+                    let mut path = hidden.clone();
+                    path.push(target.node.clone());
+                    queue.push_back((target.node.clone(), path));
+                }
+            }
+        }
+    }
+    out.reindex();
+    out
+}
+pub(crate) fn filter_exact(scene: &SceneGraph, keep: &BTreeSet<String>) -> SceneGraph {
     let mut out = scene.clone();
     out.nodes.retain(|n| keep.contains(&n.id));
     out.edges

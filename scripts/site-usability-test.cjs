@@ -14,7 +14,7 @@ module.exports=async function siteUsability(browser,page,base){
       if(path==='playground.html'){
         const frame=await(await page.locator('iframe').elementHandle()).contentFrame();await frame.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('revision'));
         assert.equal(await frame.locator('html').getAttribute('data-theme'),theme,'embedded editor theme');
-        assert(await frame.locator('#canvas').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'initial embedded editor must fit');
+        assert(Number.parseInt(await frame.locator('#canvas-controls output').textContent())>=70,'initial desktop editor scale must remain readable');
         assert.equal(await frame.locator('#canvas-controls button').count(),5,'one percentage control, minus, plus, Fit and Move nodes');
         if(theme==='dark')assert.notEqual(await frame.locator('#canvas').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 255, 255)');
         if(theme==='light'){
@@ -68,7 +68,7 @@ module.exports=async function siteUsability(browser,page,base){
     await page.goto(url('demo/'));await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('revision'));
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`editor overflow at ${width}`);
     assert(await page.locator('nav').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`toolbar overflow at ${width}`);
-    assert(await page.locator('#canvas').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'initial editor Fit');
+    assert(Number.parseInt(await page.locator('#canvas-controls output').textContent())>=55,'initial editor scale must remain readable');await page.getByRole('button',{name:'Fit diagram',exact:true}).click();assert(await page.locator('#canvas').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'explicit Fit must show the complete graph');
     if(width<768)assert.equal(await page.locator('main').evaluate(el=>getComputedStyle(el).flexDirection),'column');
     if(width===375||width===820)await page.screenshot({path:`artifacts/visual-qa-fixed/editor-${width}.png`,fullPage:true});
   }

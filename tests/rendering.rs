@@ -180,7 +180,7 @@ fn visual_qa_fixtures_have_clear_titles_and_leaders() {
             if node.shape == "queue" {
                 assert!(
                     d.layout.nodes[&node.id].w
-                        >= smarter_diagrams::labels::text_width(&node.label) * 14. / 13. + 64.
+                        >= smarter_diagrams::labels::text_width(&node.label) * 16. / 15. + 64.
                             - 1e-6
                 );
             }
@@ -235,7 +235,7 @@ fn fresh_unpinned_containers_fit_their_children() {
 fn arrowheads_match_active_phantom_and_flow_colors_and_inline_is_explicit() {
     for (attrs, color) in [
         ("", "var(--sd-edge,#53657a)"),
-        ("[active: true]", "#356bd9"),
+        ("[active: true]", "var(--sd-flow,#356bd9)"),
         ("[phantom: true]", "#c345ac"),
     ] {
         let svg = compile(&format!("a -> b {attrs}\n")).unwrap().to_svg();
@@ -256,7 +256,7 @@ fn arrowheads_match_active_phantom_and_flow_colors_and_inline_is_explicit() {
         .split('>')
         .next()
         .unwrap();
-    assert!(flow_head.contains("fill=\"#356bd9\""));
+    assert!(flow_head.contains("fill=\"var(--sd-flow,#356bd9)\""));
     let d = compile("a -> b: inline @label(slot: inline, slide: 0.5)\n").unwrap();
     assert!(d.layout.labels[0].knockout);
     assert!(

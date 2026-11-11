@@ -21,3 +21,18 @@
 .diagram-controls button[aria-label="Actual size (100%)"]{min-width:64px}
 @media(max-width:959px){.VPNavBarMenu,.VPNavBarAppearance,.VPNavBarSocialLinks,.VPNavBarExtra{display:none!important}.VPNavBarHamburger{display:flex!important}.VPNavScreen{display:block!important}.DocSearch-Button-Keys{display:none!important}}
 @media(max-width:767px){.VPNavBarTitle .title{font-size:15px}.VPHome .image-src{max-width:100%}}
+
+/* Drawer surfaces and layers remain opaque over hero and sticky local navigation. */
+@media(max-width:959px){
+  .VPNavScreen{background:var(--vp-c-bg)!important;border-top:1px solid var(--vp-c-divider);box-shadow:0 14px 32px #0003}
+  .VPNavScreenAppearance,.VPNavScreenSocialLinks{display:flex!important;border-top:1px solid var(--vp-c-divider);padding-top:16px}
+  .VPBackdrop{z-index:60!important}.VPSidebar{z-index:61!important}
+}
+.table-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:16px 0}
+.table-scroll table{margin:0;width:max-content;min-width:100%}
+.table-scroll:focus-visible{outline:2px solid var(--vp-c-brand-1);outline-offset:2px}
+.vp-doc div[class*='language-']>button.copy{opacity:.65}
+.vp-doc div[class*='language-']>button.copy:hover,.vp-doc div[class*='language-']>button.copy:focus-visible,.vp-doc div[class*='language-']>button.copy.copied{opacity:1}
+.diagram-viewport{touch-action:none}
+.sd-copy-host{position:relative}.sd-copy{position:absolute;right:8px;top:8px;border:1px solid var(--vp-c-divider);border-radius:6px;background:var(--vp-c-bg);color:var(--vp-c-text-1);padding:4px 8px;font-size:12px;z-index:1}
+@media(pointer:coarse){.diagram-pan-hint{flex-basis:100%}.vp-doc div[class*='language-']>button.copy{opacity:1}}

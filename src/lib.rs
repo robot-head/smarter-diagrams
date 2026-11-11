@@ -35,6 +35,7 @@ pub mod topology;
 pub mod views;
 #[cfg(feature = "wasm")]
 mod wasm;
+mod zones;
 
 pub use document::Document;
 pub use layout::{Layout, LayoutOptions};
@@ -49,6 +50,41 @@ pub enum Error {
     Edit(String),
     #[error("infeasible layout: {0}")]
     Layout(String),
+}
+impl Error {
+    /// Human-readable source locations; columns count Unicode characters, not bytes.
+    pub fn with_source(&self, source: &str) -> String {
+        match self {
+            Self::Diagnostics(diagnostics) => diagnostics
+                .iter()
+                .map(|d| {
+                    let offset = if d.message.contains("complete endpoints") {
+                        d.span.end
+                    } else {
+                        d.span.start
+                    };
+                    let mut at = offset.min(source.len());
+                    while !source.is_char_boundary(at) {
+                        at -= 1;
+                    }
+                    let prefix = &source[..at];
+                    let line = prefix.bytes().filter(|b| *b == b'\n').count() + 1;
+                    let col = prefix.rsplit('\n').next().unwrap_or("").chars().count() + 1;
+                    format!(
+                        "line {line}:{col} — {}: {}",
+                        if d.severity == model::Severity::Error {
+                            "error"
+                        } else {
+                            "warning"
+                        },
+                        d.message
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+            _ => self.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

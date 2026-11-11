@@ -83,6 +83,36 @@ pub fn project(
     {
         return Err(Error::Layout("invalid projection input".into()));
     }
+    // Normalize rows before forming the KKT system. Redundant rows remain
+    // rank-revealed; tiny coefficient scales must not erase hard equalities.
+    let normalized: Vec<_> = constraints
+        .iter()
+        .map(|c| {
+            let scale = c
+                .coefficients
+                .iter()
+                .map(|(_, a)| a.abs())
+                .fold(0., f64::max);
+            if scale == 0. {
+                return c.clone();
+            }
+            Constraint {
+                coefficients: c
+                    .coefficients
+                    .iter()
+                    .map(|(i, a)| (*i, a / scale))
+                    .collect(),
+                rhs: c.rhs / scale,
+                equality: c.equality,
+            }
+        })
+        .collect();
+    let constraints = normalized.as_slice();
+    if constraints.iter().any(|c| !c.rhs.is_finite()) {
+        return Err(Error::Layout(
+            "constraint scaling exceeds finite range".into(),
+        ));
+    }
     let mut active: Vec<usize> = constraints
         .iter()
         .enumerate()

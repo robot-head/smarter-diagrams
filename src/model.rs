@@ -912,7 +912,9 @@ impl Lower<'_> {
             format!(
                 "{}: {}",
                 id,
-                ts.get(3).map(|t| t.text(self.source)).unwrap_or("")
+                ts.get(3)
+                    .map(|t| unquote(t.text(self.source)))
+                    .unwrap_or_default()
             )
         } else {
             id.clone()

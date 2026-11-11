@@ -225,6 +225,10 @@ fn patches_for(source: &str, op: &DiagramEditOp, separate: bool) -> Result<Vec<T
                     &attrs,
                     if attrs.contains_key("grid") {
                         &["x", "y"]
+                    } else if !attrs.contains_key("y") {
+                        &["grid", "y"]
+                    } else if !attrs.contains_key("x") {
+                        &["grid", "x"]
                     } else {
                         &["grid"]
                     },
@@ -285,7 +289,10 @@ fn patches_for(source: &str, op: &DiagramEditOp, separate: bool) -> Result<Vec<T
                 let remaining: Vec<_> =
                     r.members.iter().filter(|id| *id != node).cloned().collect();
                 if remaining.len() < 2 {
-                    patches.push(TextPatch::replace(source, whole_line(source, r.origin), ""));
+                    patches.push(remove_preserving_comments(
+                        source,
+                        whole_line(source, r.origin),
+                    ));
                 } else {
                     let ts: Vec<_> = syntax::lex(r.list_span.text(source))
                         .into_iter()
@@ -469,7 +476,7 @@ fn patches_for(source: &str, op: &DiagramEditOp, separate: bool) -> Result<Vec<T
                     .node(target)
                     .ok_or_else(|| Error::Edit(format!("unknown node {target}")))?;
                 for a in n.annotations.iter().filter(|a| a.name == "pin") {
-                    patches.push(TextPatch::replace(source, a.span, ""));
+                    patches.push(remove_preserving_comments(source, a.span));
                 }
                 for rule in scene
                     .layout_rules
@@ -482,7 +489,7 @@ fn patches_for(source: &str, op: &DiagramEditOp, separate: bool) -> Result<Vec<T
                         } else {
                             a.span
                         };
-                        patches.push(TextPatch::replace(source, span, ""));
+                        patches.push(remove_preserving_comments(source, span));
                     }
                 }
             }
@@ -647,6 +654,19 @@ fn whole_line(source: &str, span: Span) -> Span {
     }
     Span::new(start, end)
 }
+fn remove_preserving_comments(source: &str, span: Span) -> TextPatch {
+    let tokens = syntax::lex(span.text(source));
+    let text = if tokens.iter().any(|t| t.kind == Kind::Comment) {
+        tokens
+            .iter()
+            .filter(|t| matches!(t.kind, Kind::Whitespace | Kind::Newline | Kind::Comment))
+            .map(|t| t.span.text(span.text(source)))
+            .collect::<String>()
+    } else {
+        String::new()
+    };
+    TextPatch::replace(source, span, text)
+}
 fn update_annotation(
     source: &str,
     a: &Annotation,
@@ -703,7 +723,7 @@ fn update_annotation(
                 end += comma + 1;
             }
         }
-        patches.push(TextPatch::replace(source, Span::new(start, end), ""));
+        patches.push(remove_preserving_comments(source, Span::new(start, end)));
     }
     for (k, v) in wanted {
         if let Some(old) = a.attrs.get(k) {
@@ -862,9 +882,6 @@ pub fn synthesize_drag(
             .filter(|(_, _, d)| *d <= 6.)
             .min_by(|a, b| a.2.total_cmp(&b.2));
         if let Some((peer, axis, _)) = peer {
-            ops.push(DiagramEditOp::UnpinEntities {
-                targets: vec![n.id.clone()],
-            });
             ops.push(DiagramEditOp::SnapAlign {
                 axis,
                 members: vec![peer.id.clone(), n.id.clone()],

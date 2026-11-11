@@ -142,7 +142,7 @@ pub(crate) fn placements_clear(scene: &SceneGraph, layout: &Layout) -> bool {
 fn feature_width(f: &Feature, scene: &SceneGraph) -> f64 {
     text_width(&f.text)
         * if scene.node(&f.id).is_some() {
-            14. / 13.
+            16. / 15.
         } else {
             1.
         }
@@ -164,7 +164,8 @@ pub fn place(
 ) -> Result<Vec<LabelPlacement>, Error> {
     let mut features = Vec::new();
     for e in &scene.edges {
-        if e.label.is_empty() {
+        let text = crate::render::flow_caption(scene, e).unwrap_or_else(|| e.label.clone());
+        if text.is_empty() {
             continue;
         }
         let mut ignore = ancestors(scene, &e.source.node);
@@ -174,7 +175,7 @@ pub fn place(
         let ann = anns.iter().find(|a| a.name == "label");
         features.push(Feature {
             id: e.id.clone(),
-            text: e.label.clone(),
+            text,
             route: crate::routing::coalesced(&l.routes[&e.id].points),
             ignore,
             slot: ann
@@ -252,7 +253,8 @@ pub fn place(
             })
             .collect(),
     );
-    for (i, f) in features.iter().enumerate() {
+    let mut fallback_y = bottom;
+    for f in &features {
         let mut candidates = generate(f, o, l, scene);
         let w = feature_width(f, scene);
         let anchor = f.route.get(f.route.len() / 2).copied().unwrap_or_default();
@@ -260,7 +262,12 @@ pub fn place(
             label: LabelPlacement {
                 feature: f.id.clone(),
                 text: f.text.clone(),
-                bounds: Rect::new(anchor.x, bottom + i as f64 * 40., w, 24.),
+                bounds: Rect::new(
+                    anchor.x,
+                    fallback_y + text_height(&f.text) / 2.,
+                    w,
+                    text_height(&f.text),
+                ),
                 anchor,
                 knockout: true,
                 callout: true,
@@ -269,6 +276,7 @@ pub fn place(
             },
             cost: 10000. + o.weights.pill,
         });
+        fallback_y += text_height(&f.text) + 20.;
         let mut ids = Vec::new();
         for c in candidates {
             if valid(&c.label, f, scene, l, &node_index) {
@@ -347,7 +355,7 @@ pub fn place(
 }
 fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> Vec<Candidate> {
     let w = feature_width(f, scene);
-    let h = 24.;
+    let h = text_height(&f.text);
     let lengths: Vec<_> = f.route.windows(2).map(|p| p[0].distance(p[1])).collect();
     let total = lengths.iter().sum::<f64>().max(1.);
     let mut arc = 0.;
@@ -357,11 +365,11 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
         let len = lengths[i];
         let horizontal = (a.y - b.y).abs() < 1e-6;
         let along = if horizontal { w } else { h };
-        if len < along + 8. {
+        if len < 1e-6 {
             arc += len;
             continue;
         }
-        let low = (along / 2. + 4.) / len;
+        let low = ((along / 2. + 4.) / len).min(0.5);
         let high = 1. - low;
         let samples = if let Some(t) = f.slide {
             vec![((t * total - arc) / len).clamp(low, high)]
@@ -370,7 +378,12 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
         };
         for t in samples {
             let anchor = Point::new(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
-            for side in [-1., 1., 0.] {
+            for (side, extra) in [-1., 1., 0.].into_iter().flat_map(|side| {
+                [0., 14., 28.]
+                    .into_iter()
+                    .filter(move |extra| side != 0. || *extra == 0.)
+                    .map(move |extra| (side, extra))
+            }) {
                 if let Some(slot) = &f.slot
                     && ((slot == "above" && side != -1.)
                         || (slot == "below" && side != 1.)
@@ -378,15 +391,10 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
                 {
                     continue;
                 }
-                let badge_gap = if scene.flows.iter().any(|flow| flow.edges.contains(&f.id)) {
-                    16.
-                } else {
-                    0.
-                };
                 let offset = if horizontal {
-                    h / 2. + 6. + badge_gap
+                    h / 2. + 6. + extra
                 } else {
-                    w / 2. + 6. + badge_gap
+                    w / 2. + 6. + extra
                 };
                 let center = if horizontal {
                     anchor.offset(0., side * offset)
@@ -399,6 +407,7 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
                     .slide
                     .map(|target| 1000. * ((arc + len * t) / total - target).abs())
                     .unwrap_or(0.)
+                    + extra / 2.
                     + o.weights.centeredness * centered
                     + if side > 0. { 1. } else { 0. }
                     // Automatic cutouts are a last resort after nearby external
@@ -505,16 +514,6 @@ fn valid(
     {
         return false;
     }
-    for flow in &scene.flows {
-        for id in &flow.edges {
-            if let Some(route) = l.routes.get(id) {
-                let point = crate::render::at_arc(&route.points, 0.5);
-                if r.intersects(Rect::new(point.x, point.y, 28., 28.)) {
-                    return false;
-                }
-            }
-        }
-    }
     for route in l.routes.values() {
         if label.knockout && !label.callout && route.edge == f.id {
             continue;
@@ -597,21 +596,30 @@ fn select_component(
     search.visit(0, 0., &mut Vec::new());
     search.best
 }
+pub fn text_height(text: &str) -> f64 {
+    text.split('\n').count() as f64 * 18. + 6.
+}
 pub fn text_width(text: &str) -> f64 {
-    text.chars()
-        .map(|c| match c {
-            'W' | '@' | '%' => 13.,
-            'M' => 12.5,
-            'm' => 12.,
-            'w' => 11.,
-            'i' | 'l' | 'j' | 'f' | 't' | 'r' => 5.5,
-            'I' => 6.,
-            '.' | ',' | ':' | ';' | '!' | '\'' | ' ' => 4.5,
-            '=' | '+' | '^' | '~' | '<' | '>' => 11.5,
-            c if c.is_ascii() => 10.,
-            _ => 16.,
+    text.split('\n')
+        .map(|line| {
+            line.chars()
+                .map(|c| match c {
+                    'W' | '@' | '%' => 13.,
+                    'M' => 12.5,
+                    'm' => 12.,
+                    'w' => 11.,
+                    'i' | 'l' | 'j' | 'f' | 't' | 'r' => 5.5,
+                    'I' => 6.,
+                    '.' | ',' | ':' | ';' | '!' | '\'' | ' ' => 4.5,
+                    '=' | '+' | '^' | '~' | '<' | '>' => 11.5,
+                    c if c.is_ascii() => 10.,
+                    _ => 16.,
+                })
+                .sum::<f64>()
+                * 15.
+                / 13.
         })
-        .sum()
+        .fold(0., f64::max)
 }
 /// Exact signed distance between axis-aligned rectangles (negative under overlap).
 pub fn rectangle_sdf(a: Rect, b: Rect) -> f64 {

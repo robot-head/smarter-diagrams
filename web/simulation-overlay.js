@@ -5,7 +5,7 @@ function inside(shape,box,pad=2){
   return [box.x-pad,box.x+box.width+pad].every(x=>[box.y-pad,box.y+box.height+pad].every(y=>shape.isPointInFill(new DOMPoint(x,y))));
 }
 function statusBar(shape,box){
-  const height=2,cx=box.x+box.width/2;
+  const height=4,cx=box.x+box.width/2;
   for(const inset of [4,6,8,10]){
     const y=box.y+box.height-inset;
     const fits=x=>[y-2,y+height+2].every(y=>shape.isPointInFill(new DOMPoint(x,y)));

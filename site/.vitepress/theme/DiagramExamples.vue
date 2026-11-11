@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, useId } from 'vue'
 import { withBase, useData } from 'vitepress'
+import {touchGestures} from '../../../web/touch-gestures.js'
 
 type NodeRow = { id: string; label: string; shape: string; parent: string | null; bounds: { x:number; y:number; w:number; h:number }; ports: { id:string; label:string; constraint:unknown }[] }
 type Example = { file:string; darkFile:string; label:string; description:string; viewBox:number[]; grid:number; nodes:NodeRow[]; edges:{ id:string; source:string; target:string; label:string; kind:string }[]; zones:{label:string;members:string[]}[]; flows:{label:string;steps:string[]}[] }
 const props = defineProps<{ examples:Example[]; title:string; guides?:boolean }>()
 const { isDark } = useData()
-const fitted = ref(true)
+const fitted = ref(true), readable = ref(true), coarse = ref(false)
 const active = ref(0), zoom = ref(1), showGrid = ref(false), viewport = ref<HTMLElement>(), viewportWidth = ref(640)
 const id = useId(), current = computed(() => props.examples[active.value])
 const bounds = computed(() => current.value.viewBox)
 const imageStyle = computed(() => ({ width:`${bounds.value[2]*zoom.value}px`, height:`${bounds.value[3]*zoom.value}px` }))
-const fitScale = computed(() => Math.min(1, viewportWidth.value / bounds.value[2], 440 / bounds.value[3]))
+const fitScale = computed(() => Math.max(readable.value ? coarse.value ? .55 : .7 : .05, Math.min(1, viewportWidth.value / bounds.value[2], 440 / bounds.value[3])))
 const percent = computed(() => `${Math.round(zoom.value*100)}%`)
 const gridLines = computed(() => {
   const [x,y,w,h]=bounds.value, grid=current.value.grid
@@ -21,12 +22,12 @@ const gridLines = computed(() => {
   return {xs,ys}
 })
 let observer:ResizeObserver | undefined
-onMounted(() => { if(viewport.value){viewportWidth.value=viewport.value.clientWidth;zoom.value=fitScale.value;observer=new ResizeObserver(entries=>{viewportWidth.value=entries[0].contentRect.width;if(fitted.value)zoom.value=fitScale.value});observer.observe(viewport.value)} })
+onMounted(() => { if(viewport.value){coarse.value=matchMedia('(pointer: coarse)').matches;viewportWidth.value=viewport.value.clientWidth;zoom.value=fitScale.value;touchGestures(viewport.value,{getZoom:()=>zoom.value,setZoom});observer=new ResizeObserver(entries=>{viewportWidth.value=entries[0].contentRect.width;if(fitted.value)zoom.value=fitScale.value});observer.observe(viewport.value)} })
 onUnmounted(() => observer?.disconnect())
 function setZoom(value:number){ fitted.value=false;zoom.value=Math.max(0.05,Math.min(4,value)) }
-function fit(){fitted.value=true;zoom.value=fitScale.value}
+function fit(){readable.value=false;fitted.value=true;zoom.value=fitScale.value}
 function wheel(event:WheelEvent){if(!event.ctrlKey&&!event.metaKey)return;event.preventDefault();setZoom(zoom.value*Math.exp(-Math.max(-100,Math.min(100,event.deltaY))*.005))}
-async function choose(index:number){ active.value=index;await nextTick();if(fitted.value)fit() }
+async function choose(index:number){ active.value=index;await nextTick();if(fitted.value)zoom.value=fitScale.value }
 function tabs(event:KeyboardEvent,index:number){
   const keys=['ArrowLeft','ArrowRight','Home','End'];if(!keys.includes(event.key))return
   event.preventDefault();const n=props.examples.length
@@ -48,7 +49,7 @@ const units = (value:number) => Number((value/current.value.grid).toFixed(2))
         <button aria-label="Zoom in" @click="setZoom(zoom*1.25)">+</button>
         <button @click="fit">Fit</button>
         <label v-if="guides"><input v-model="showGrid" type="checkbox"> Show grid</label>
-        <span class="diagram-pan-hint">Ctrl/⌘ + scroll to zoom · swipe to pan</span>
+        <span class="diagram-pan-hint">{{ coarse ? 'Pinch to zoom · drag to pan' : 'Ctrl/⌘ + scroll to zoom · swipe to pan' }}</span>
       </div>
       <div ref="viewport" class="diagram-viewport" @wheel="wheel" tabindex="0" :aria-label="`${title} diagram. Ctrl or Command plus scroll to zoom; swipe or use arrow keys to pan.`">
         <div class="diagram-stage" :style="imageStyle">

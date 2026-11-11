@@ -43,6 +43,8 @@ pub struct Simulation {
     pub severed: BTreeSet<EdgeId>,
     edges: Vec<(EdgeId, NodeId, NodeId)>,
     retries: VecDeque<(f64, NodeId, f64)>,
+    #[serde(default)]
+    retry_pulses: Vec<(NodeId, f64, f64)>,
 }
 impl Simulation {
     pub fn from_scene(scene: &SceneGraph) -> Result<Self, Error> {
@@ -137,6 +139,7 @@ impl Simulation {
             severed: BTreeSet::new(),
             edges,
             retries: VecDeque::new(),
+            retry_pulses: Vec::new(),
         })
     }
     pub fn set_rate(&mut self, node: &str, rate: f64) -> Result<(), Error> {
@@ -194,9 +197,19 @@ impl Simulation {
             .is_some_and(|(time, _, _)| *time <= self.time + 1e-9)
         {
             let (_, id, amount) = self.retries.pop_front().unwrap();
-            *arrival.entry(id.clone()).or_default() += amount / dt;
-            *retry.entry(id).or_default() += amount / dt;
+            // Release each retry batch over one simulation frame. A tiny final
+            // substep must not turn a finite batch into an unbounded rate.
+            self.retry_pulses.push((id, amount, 1. / 60.));
         }
+        for (id, amount, remaining) in &mut self.retry_pulses {
+            let rate = *amount / remaining.max(dt);
+            *arrival.entry(id.clone()).or_default() += rate;
+            *retry.entry(id.clone()).or_default() += rate;
+            *amount = (*amount - rate * dt).max(0.);
+            *remaining = (*remaining - dt).max(0.);
+        }
+        self.retry_pulses
+            .retain(|(_, amount, remaining)| *amount > 0. && *remaining > 0.);
         // Simultaneous fluid rates use prior-step service output, avoiding declaration-order bias.
         for (_, from, to) in self
             .edges
@@ -242,5 +255,23 @@ impl Simulation {
             .make_contiguous()
             .sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         self.time += dt;
+    }
+}
+
+#[cfg(test)]
+mod retry_tests {
+    use super::*;
+    #[test]
+    fn retry_pulses_preserve_mass_across_tiny_variable_steps() {
+        let d = crate::compile("a @sim(service_rate: 1000000)\n").unwrap();
+        let mut sim = Simulation::from_scene(&d.scene).unwrap();
+        sim.retries.push_back((0., "a".into(), 1.));
+        sim.advance(0.000001).unwrap();
+        assert!((sim.nodes["a"].retry_rate - 60.).abs() < 1e-6);
+        sim.advance(0.004).unwrap();
+        assert!((sim.nodes["a"].retry_rate - 60.).abs() < 1e-6);
+        sim.advance(1. / 60. - 0.004001).unwrap();
+        assert!((sim.nodes["a"].processed - 1.).abs() < 1e-9);
+        assert!(sim.retry_pulses.is_empty());
     }
 }

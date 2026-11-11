@@ -12,7 +12,7 @@
 <h1>Smarter Diagrams</h1><div class="demo-links"><button id="theme-toggle" aria-label="Toggle dark theme" aria-pressed="false">Theme</button><a href="https://robot-head.github.io/smarter-diagrams/">Documentation</a><a href="./advanced.html">Strata and Spatial Git</a></div>
 <p>Author topology in text. Drag a node to write a semantic constraint back into the source. Shift-click a connector to cut it during simulation. Escape cancels a drag.</p>
 <nav aria-label="Diagram actions"><span class="toolbar-group"><button id="render">Render</button><button id="undo">Undo</button><button id="redo">Redo</button></span><span class="toolbar-group"><button id="simulate" aria-pressed="false">Run simulation</button><select id="trace" aria-label="Protocol trace"></select><button id="next">Next step</button></span><span class="toolbar-group"><label>Ingress <input id="load" type="range" min="0" max="300" value="80"></label><a id="download" download="diagram.svg">Download SVG</a></span></nav>
-<main><section><details id="source-panel" class="source-panel"><summary>Diagram source</summary><label class="sr-only" for="source">Diagram source</label><textarea id="source" spellcheck="false">client: Client @sim(rate: 80, service_rate: 200)
+<main><section><details id="source-panel" class="source-panel"><summary>Diagram source</summary><label class="sr-only" for="source">Diagram source</label><p id="editor-help" class="editor-help">Tab / Shift+Tab: indent. Escape then Tab: leave editor.</p><textarea aria-describedby="editor-help" id="source" spellcheck="false">client: Client @sim(rate: 80, service_rate: 200)
 gateway: API gateway @sim(service_rate: 100, queue_cap: 200)
 worker: Worker @sim(service_rate: 50, queue_cap: 100, retry: exp_backoff(0.5, 0.2))
 db: Database @sim(service_rate: 80)
@@ -26,12 +26,15 @@ import init,{WasmDocument} from './pkg/smarter_diagrams.js';
 import {DiagramViewport} from './diagram-viewport.js';
 import {paintQueueState} from './simulation-overlay.js';
 import {NodeDragController} from './node-drag.js';
+import {sourceEditor} from './source-editor.js';
+import {standaloneSvg} from './svg-download.js';
 const source=document.querySelector('#source'),canvas=document.querySelector('#canvas'),status=document.querySelector('#status');
+sourceEditor(source);
 const view=new DiagramViewport(canvas,document.querySelector('#canvas-controls'),'Diagram canvas');
 document.querySelector('#source-panel').open=!matchMedia('(max-width:767px)').matches;
 const moveButton=document.createElement('button');moveButton.textContent='Move nodes';moveButton.setAttribute('aria-pressed','false');document.querySelector('#canvas-controls').append(moveButton);
 function toggleState(button,active,label){button.setAttribute('aria-pressed',String(active));const icon=document.createElement('span');icon.setAttribute('aria-hidden','true');icon.textContent=active?'●':'○';button.replaceChildren(icon,document.createTextNode(' '+label));}
-moveButton.onclick=()=>{dragController?.cancel();touchMove=!touchMove;toggleState(moveButton,touchMove,'Move nodes');canvas.classList.toggle('touch-edit',touchMove);document.querySelector('#canvas-controls .diagram-pan-hint').textContent=touchMove?'Drag a node to move it':'Ctrl/⌘ + scroll to zoom · swipe to pan';};
+moveButton.onclick=()=>{dragController?.cancel();touchMove=!touchMove;toggleState(moveButton,touchMove,'Move nodes');canvas.classList.toggle('touch-edit',touchMove);view.updateHint(touchMove);};
 let doc,worker,objectUrl,timer,dragController,focus,latestState,lastFrame=0,touchMove=false,generation=0,ingressOverride=false;let traceStep=-1;const cuts=new Set();
 function applyState(){
   const svg=canvas.querySelector('svg');if(!svg)return;
@@ -41,7 +44,7 @@ function applyState(){
 function show(svg,bounds){const left=canvas.scrollLeft,top=canvas.scrollTop;canvas.innerHTML=svg;const target=canvas.querySelector('svg');if(bounds)target.setAttribute('viewBox',bounds.join(' '));view.attach(target,bounds);if(!view.fitted)canvas.scrollTo(left,top);applyState();}
 function syncSimulation(){latestState=undefined;lastFrame=0;document.querySelector('#metrics').textContent='';generation++;const live=new Set([...canvas.querySelectorAll('[data-edge]')].map(el=>el.dataset.edge));for(const id of cuts)if(!live.has(id))cuts.delete(id);if(worker){worker.postMessage({type:'open',source:doc.source(),cuts:[...cuts],generation});if(ingressOverride&&canvas.querySelector('[data-node="client"]'))worker.postMessage({type:'rate',node:'client',rate:Number(document.querySelector('#load').value)});}}
 function paint(){latestState=undefined;traceStep=-1;const select=document.querySelector('#trace');select.replaceChildren();for(const flow of JSON.parse(doc.flows_json())){const option=document.createElement('option');option.value=flow.id;option.textContent=flow.label;select.append(option);}show(doc.svg());source.value=doc.source();status.textContent=`${Number(doc.revision())} · source revision`;syncSimulation();}
-document.querySelector('#download').addEventListener('click',()=>{const svg=canvas.querySelector('svg').cloneNode(true);svg.style.removeProperty('width');svg.style.removeProperty('height');svg.style.removeProperty('max-width');svg.style.removeProperty('max-height');svg.style.removeProperty('margin');if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml'}));document.querySelector('#download').href=objectUrl;});
+document.querySelector('#download').addEventListener('click',()=>{const markup=standaloneSvg(canvas.querySelector('svg'));if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(new Blob([markup],{type:'image/svg+xml'}));document.querySelector('#download').href=objectUrl;});
 
 function render(){dragController?.cancel();clearTimeout(timer);try{if(doc)doc.replace_source(doc.revision(),source.value);else doc=new WasmDocument(source.value);paint();}catch(e){status.textContent=String(e);}}
 await init();

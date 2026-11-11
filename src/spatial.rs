@@ -52,7 +52,7 @@ pub fn strata(scene: &SceneGraph, options: &LayoutOptions, theta: f64) -> Result
             .filter(|(_, v)| *v == name)
             .map(|(k, _)| k.clone())
             .collect();
-        let mut graph = views::filter(scene, &keep);
+        let mut graph = views::filter_exact(scene, &keep);
         for node in &mut graph.nodes {
             if node
                 .parent
@@ -201,7 +201,7 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
         layout.labels.extend(plane.layout.labels.clone());
         layout.zones.extend(plane.layout.zones.clone());
         let keep = plane.layout.nodes.keys().cloned().collect();
-        let mut frame = crate::render::bounds(&views::filter(scene, &keep), &plane.layout);
+        let mut frame = crate::render::bounds(&views::filter_exact(scene, &keep), &plane.layout);
         let width = crate::labels::text_width(&format!("Stratum: {}", plane.id)) * 12. / 13. + 16.;
         if frame.w < width + 16. {
             frame = Rect::new(
@@ -375,9 +375,17 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
         );
     }
     svg = svg.replacen("</style>", &format!("</style>{backdrops}"), 1);
+    let accessible = svg
+        .split("aria-labelledby=\"")
+        .nth(1)
+        .unwrap()
+        .split('"')
+        .next()
+        .unwrap()
+        .to_owned();
     let rest = &svg[svg.find('>').unwrap() + 1..];
     svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{} {} {} {}\" width=\"{}\" height=\"{}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\">{rest}",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{} {} {} {}\" width=\"{}\" height=\"{}\" role=\"img\" aria-labelledby=\"{accessible}\">{rest}",
         bounds.left(),
         bounds.top(),
         bounds.w,
@@ -733,8 +741,21 @@ pub fn diff_svg(diff: &SpatialDiff, tau: f64) -> Result<String, Error> {
             } else {
                 String::new()
             };
+            let mark = match change {
+                Change::Added => "+",
+                Change::Removed => "−",
+                Change::Modified => "~",
+                _ => "",
+            };
+            let badge = format!(
+                "<g data-change-badge=\"true\"><circle cx=\"{}\" cy=\"{}\" r=\"9\" fill=\"var(--sd-bg,#ffffff)\" stroke=\"{color}\"/><text x=\"{}\" y=\"{}\" text-anchor=\"middle\" dominant-baseline=\"central\" style=\"font-weight:700;font-size:13px;fill:var(--sd-fg,#233347)\">{mark}</text></g>",
+                rect.right() + 8.,
+                rect.top() - 8.,
+                rect.right() + 8.,
+                rect.top() - 8.
+            );
             format!(
-                "<g data-change=\"{}\" data-change-kind=\"{change:?}\"><title>{change:?}: {}</title><path data-change-outline=\"true\" d=\"{outline}\" fill=\"{color}\" fill-opacity=\"0.12\" stroke=\"{color}\" stroke-width=\"2.5\"{dash}/>{hatch}</g>",
+                "<g data-change=\"{}\" data-change-kind=\"{change:?}\"><title>{change:?}: {}</title><path data-change-outline=\"true\" d=\"{outline}\" fill=\"{color}\" fill-opacity=\"0.12\" stroke=\"{color}\" stroke-width=\"2.5\"{dash}/>{hatch}{badge}</g>",
                 crate::render::escape(&node.id),
                 crate::render::escape(&node.label)
             )
@@ -821,7 +842,7 @@ pub fn diff_svg(diff: &SpatialDiff, tau: f64) -> Result<String, Error> {
             .filter(|(_, opacity)| **opacity > 0.)
             .map(|(id, _)| id.clone())
             .collect();
-        let mut visible = views::filter(&scene, &keep);
+        let mut visible = views::filter_exact(&scene, &keep);
         visible
             .edges
             .retain(|edge| match diff.edge_changes.get(&edge.id) {
@@ -829,18 +850,40 @@ pub fn diff_svg(diff: &SpatialDiff, tau: f64) -> Result<String, Error> {
                 Some(Change::Removed) => tau < 1.,
                 _ => true,
             });
-        if let (Some(start), Some(end)) = (
-            svg.find("<desc id=\"diagram-description\">"),
-            svg.find("</desc>"),
-        ) {
-            let start = start + "<desc id=\"diagram-description\">".len();
+        if let (Some(start), Some(end)) = (svg.find("<desc id=\""), svg.find("</desc>")) {
+            let start = start + svg[start..].find('>').unwrap() + 1;
             svg.replace_range(
                 start..end,
                 &crate::render::escape(&crate::render::description(&visible)),
             );
         }
     }
-    Ok(svg)
+    let bounds = crate::render::bounds(&scene, &layout);
+    let legend = format!(
+        "<g data-diff-legend=\"true\" aria-label=\"Changes: added, removed, modified\"><text x=\"{}\" y=\"{}\" style=\"font-size:13px\">+ Added · − Removed · ~ Modified</text></g>",
+        bounds.left() + 12.,
+        bounds.bottom() + 20.
+    );
+    svg = svg.replace("</svg>", &format!("{legend}</svg>"));
+    let root_end = svg.find('>').unwrap();
+    let rest = &svg[root_end + 1..];
+    let accessible = svg
+        .split("aria-labelledby=\"")
+        .nth(1)
+        .unwrap()
+        .split('"')
+        .next()
+        .unwrap();
+    svg = format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{} {} {} {}\" width=\"{}\" height=\"{}\" role=\"img\" aria-labelledby=\"{accessible}\">{rest}",
+        bounds.left(),
+        bounds.top(),
+        bounds.w,
+        bounds.h + 36.,
+        bounds.w,
+        bounds.h + 36.
+    );
+    Ok(crate::render::namespace_svg(svg))
 }
 
 fn attrs_equal(a: &Attributes, b: &Attributes) -> bool {

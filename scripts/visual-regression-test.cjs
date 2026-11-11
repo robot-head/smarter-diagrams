@@ -9,7 +9,7 @@ function checkChangeInk(svg){
     }
     const title=node.querySelector('text');if(title&&!(decoration.compareDocumentPosition(title)&Node.DOCUMENT_POSITION_FOLLOWING))failures.push('hatching paints over label');
   }
-  for(const change of svg.querySelectorAll('[data-change]'))if(change.querySelector('[data-change-hatch]')&&!svg.querySelector('#removed-hatch'))failures.push('hatch pattern missing');
+  for(const change of svg.querySelectorAll('[data-change]'))if(change.querySelector('[data-change-hatch]')&&!svg.querySelector('pattern[id$="removed-hatch"]'))failures.push('hatch pattern missing');
   return failures;
 }
 module.exports=async function visualRegressions(browser,page,base){
