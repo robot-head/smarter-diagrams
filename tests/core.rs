@@ -470,7 +470,7 @@ fn semantic_gesture_promotion_and_relaxation() {
         &d.layout,
         &[Drag {
             node: "b".into(),
-            position: Point::new(256., 3.),
+            position: Point::new(320., 3.),
         }],
     )
     .unwrap();
@@ -481,6 +481,11 @@ fn semantic_gesture_promotion_and_relaxation() {
             ..
         }
     )));
+    let moved = apply_ops(&d.parse.source, &ops, Placement::Auto).unwrap();
+    let moved = compile_with(&moved.source, &LayoutOptions::default(), Some(&d.layout)).unwrap();
+    assert_eq!(moved.layout.nodes["b"].x, 320.);
+    assert_eq!(moved.layout.nodes["b"].y, moved.layout.nodes["a"].y);
+    assert_eq!(moved.layout.nodes["a"], d.layout.nodes["a"]);
     let ops = synthesize_drag(
         &d.scene,
         &d.layout,

@@ -12,6 +12,8 @@
 //! # Ok::<(), smarter_diagrams::Error>(())
 //! ```
 pub mod document;
+#[cfg(any(feature = "wasm", test))]
+mod drag;
 pub mod drift;
 pub mod edit;
 #[cfg(feature = "export")]

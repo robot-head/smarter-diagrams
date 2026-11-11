@@ -96,6 +96,49 @@ fn conflict(a: &LabelPlacement, b: &LabelPlacement) -> bool {
         || leader(a).is_some_and(|(x, y)| segment_hits(x, y, clearance(b)))
         || leader(b).is_some_and(|(x, y)| segment_hits(x, y, clearance(a)))
 }
+/// Keep a valid gesture caption instead of searching for a new preferred slot.
+#[cfg(any(feature = "wasm", test))]
+pub(crate) fn placements_clear(scene: &SceneGraph, layout: &Layout) -> bool {
+    for (i, label) in layout.labels.iter().enumerate() {
+        if layout.labels[i + 1..]
+            .iter()
+            .any(|other| conflict(label, other))
+        {
+            return false;
+        }
+        let ignore = if let Some(edge) = scene.edge(&label.feature) {
+            let mut ids = ancestors(scene, &edge.source.node);
+            let target = ancestors(scene, &edge.target.node);
+            ids.retain(|id| target.contains(id));
+            ids
+        } else {
+            let node = label
+                .feature
+                .rsplit_once('#')
+                .map(|(node, _)| node)
+                .unwrap_or(&label.feature);
+            ancestors(scene, node)
+        };
+        let bounds = clearance(label);
+        if scene
+            .nodes
+            .iter()
+            .any(|node| !ignore.contains(&node.id) && bounds.intersects(layout.nodes[&node.id]))
+        {
+            return false;
+        }
+        if layout.routes.iter().any(|(id, route)| {
+            !(label.knockout && !label.callout && id == &label.feature)
+                && route
+                    .points
+                    .windows(2)
+                    .any(|p| segment_hits(p[0], p[1], bounds))
+        }) {
+            return false;
+        }
+    }
+    true
+}
 fn feature_width(f: &Feature, scene: &SceneGraph) -> f64 {
     text_width(&f.text)
         * if scene.node(&f.id).is_some() {

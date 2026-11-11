@@ -869,6 +869,20 @@ pub fn synthesize_drag(
                 axis,
                 members: vec![peer.id.clone(), n.id.clone()],
             });
+            // Alignment constrains one axis. Preserve the user's movement on
+            // the other axis instead of snapping back to the old coordinate.
+            let (axis, coordinate) = match axis {
+                Axis::Row => (Axis::Col, drag.position.x),
+                Axis::Col => (Axis::Row, drag.position.y),
+            };
+            ops.push(DiagramEditOp::PinNode {
+                node: n.id.clone(),
+                pin: PinExpr::AxisLock {
+                    axis,
+                    coord_grid: (coordinate / GRID).round() as i32,
+                },
+                size_lock: None,
+            });
             continue;
         }
         let container = scene
