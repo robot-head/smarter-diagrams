@@ -2,13 +2,13 @@ const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { spawnSync } = require('node:child_process');
+const browserOptions = require('./browser-options.cjs');
 const base = new URL(process.env.DOCS_TEST_URL || 'http://127.0.0.1:4173/smarter-diagrams/');
 if (!base.pathname.endsWith('/')) base.pathname += '/';
 const url = path => new URL(path, base).href;
 
 (async () => {
-  const executablePath = process.env.CHROMIUM_PATH || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : chromium.executablePath());
-  const browser = await chromium.launch({ executablePath, headless: true, args: ['--no-sandbox'] });
+  const browser = await chromium.launch(browserOptions(base.href));
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -50,6 +50,36 @@ const url = path => new URL(path, base).href;
   for (const target of assets) assert.equal((await page.request.get(target)).status(), 200, target);
   console.log(`Documentation: ${seen.size} pages and ${assets.size} static asset links passed.`);
 
+  let diagrams = 0;
+  for (const topic of ['basics', 'ports', 'layout', 'overlays', 'reference']) {
+    await page.goto(url(`language/${topic}.html`));
+    const codeBlocks = await page.locator('.vp-doc div.language-diagram').count();
+    const figures = page.locator('figure.diagram-example');
+    assert(codeBlocks > 0 && await figures.count() >= codeBlocks, `missing visual examples: ${topic}`);
+    await figures.locator('img').evaluateAll(images => images.forEach(image => { image.loading = 'eager'; }));
+    await page.waitForFunction(() => [...document.querySelectorAll('.diagram-example img')].every(image => image.complete && image.naturalWidth > 0));
+    diagrams += await figures.count();
+    if (topic === 'ports' || topic === 'layout') await page.screenshot({ path: `artifacts/language-${topic}.png`, fullPage: true });
+    if (topic === 'layout') {
+      const image = caption => figures.filter({ hasText: caption }).locator('img').getAttribute('src');
+      assert.notEqual(await image('Default layout'), await image('Layout: compact'), 'variant comparison must render different geometry');
+    }
+    if (topic === 'overlays') {
+      for (const [caption, present, absent] of [['View: request_only', 'client', 'metrics'], ['View: downstream', 'metrics', 'client']]) {
+        const source = await figures.filter({ hasText: caption }).locator('img').getAttribute('src');
+        const svg = await (await page.request.get(new URL(source, base).href)).text();
+        assert(svg.includes(`data-node="${present}"`), caption);
+        assert(!svg.includes(`data-node="${absent}"`), caption);
+      }
+      const source = await figures.filter({ hasText: 'Focus: api (1 hop)' }).locator('img').getAttribute('src');
+      const svg = await (await page.request.get(new URL(source, base).href)).text();
+      assert(svg.includes('opacity="0.35" data-node="archive"'), 'focus must fade the outer context');
+    }
+  }
+  console.log(`Language: ${diagrams} decoded SVG examples across all five sections; views and layout comparisons passed.`);
+
+  await page.goto(base.href);
+
   await page.getByRole('button', { name: /search/i }).first().click();
   await page.locator('#localsearch-input').fill('UnpinEntities');
   await page.waitForFunction(() => document.querySelector('.VPLocalSearchBox')?.textContent.includes('Structured editing'));
@@ -78,7 +108,7 @@ const url = path => new URL(path, base).href;
   assert.match(fs.readFileSync('artifacts/live-diagram.svg', 'utf8'), /data-node="api"/);
 
   await page.setViewportSize({ width: 375, height: 812 });
-  for (const path of ['', 'guide/getting-started.html', 'demo/']) {
+  for (const path of ['', 'guide/getting-started.html', 'language/ports.html', 'demo/']) {
     await page.goto(url(path));
     if (path === 'demo/') await page.waitForFunction(() => document.querySelector('#status')?.textContent.includes('revision'));
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `horizontal overflow: ${path}`);

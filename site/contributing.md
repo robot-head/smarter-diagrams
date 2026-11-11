@@ -44,6 +44,8 @@ Open `http://127.0.0.1:4173/smarter-diagrams/`. The project base path is deliber
 
 Architecture, performance and verification pages are generated from their canonical `docs/` files. Edit those originals rather than the generated site copies. Generated SVGs, rustdoc and Wasm bundles are ignored in Git and included in the deployment artifact.
 
+Language-page `diagram` fences automatically receive a rendered SVG. `views=name,other`, `variants=name` and `focus=node` fence options add comparisons using the real projection, layout and attention APIs. The build compiles every comparison through `examples/render_docs.rs`, and names image files by their rendered content. Re-run `npm run docs:build` after changing a visual example; do not maintain a separate illustration by hand.
+
 ## Browser verification
 
 Install Chromium through Playwright, or set `CHROMIUM_PATH` to an existing executable:

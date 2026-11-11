@@ -1,8 +1,9 @@
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const browserOptions = require('./browser-options.cjs');
 (async () => {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : chromium.executablePath()), headless: true, args: ['--no-sandbox', '--enable-unsafe-webgpu', '--use-angle=swiftshader'] });
+  const browser = await chromium.launch(browserOptions(process.env.DIAGRAM_TEST_URL || 'http://127.0.0.1:8765/web/', true));
   const page = await browser.newPage({ viewport: { width: 1360, height: 900 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
