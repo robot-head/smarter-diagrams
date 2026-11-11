@@ -1,0 +1,10 @@
+{
+  "core": {
+    "raw_bytes": 1222155,
+    "brotli_bytes": 299037
+  },
+  "runtime": {
+    "raw_bytes": 1418294,
+    "brotli_bytes": 334876
+  }
+}

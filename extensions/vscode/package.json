@@ -1,0 +1,5 @@
+{
+  "name":"smarter-diagrams","displayName":"Smarter Diagrams","version":"0.1.0","publisher":"smarter-diagrams","engines":{"vscode":"^1.96.0"},"main":"./extension.js","activationEvents":["onLanguage:smarter-diagrams"],
+  "contributes":{"languages":[{"id":"smarter-diagrams","aliases":["Smarter Diagrams"],"extensions":[".diagram"]}],"commands":[{"command":"smarterDiagrams.preview","title":"Smarter Diagrams: Open Live Preview"},{"command":"smarterDiagrams.edit","title":"Smarter Diagrams: Apply Structured Edit"}],"configuration":{"title":"Smarter Diagrams","properties":{"smarterDiagrams.binary":{"type":"string","default":"smarter-diagrams","description":"Path to the installed Rust CLI"}}}},
+  "scripts":{"test":"node --check extension.js"}
+}

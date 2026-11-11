@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spatial tools · Smarter Diagrams</title>
+<style>body{font:14px system-ui;margin:24px;color:#24364b;background:#f6f8fb}main{display:grid;grid-template-columns:1fr 1fr;gap:24px}textarea{box-sizing:border-box;width:100%;height:230px;padding:12px;font:12px/1.5 monospace}section{background:white;border:1px solid #d5dfeb;border-radius:8px;padding:16px}svg{max-width:100%;height:auto}#stack{min-height:240px}input{width:60%}@media(max-width:800px){main{grid-template-columns:1fr}}</style>
+<h1>Spatial tools</h1><a href="./">Back to authoring</a><p id="status" role="status">Loading runtime…</p><main><section><h2>Independent strata</h2><textarea id="strata">strata [app, hardware]
+api [stratum: app]
+worker [stratum: app]
+host [stratum: hardware]
+api -> worker: RPC
+api -> host [relation: runs_on]
+worker -> host [relation: runs_on]
+</textarea><p><label>Tilt <input id="tilt" type="range" min="0" max="0.785398" step="0.01" value="0.4"></label></p><div id="stack"></div></section><section><h2>Spatial Git</h2><label>Base<textarea id="base">client -> api
+api -> db
+</textarea></label><label>Proposal<textarea id="proposal">client -> api
+api -> db
+api -> worker
+</textarea></label><p><label>Branch morph <input id="morph" type="range" min="0" max="1" step="0.01" value="1"></label></p><div id="diff"></div></section></main>
+<script type="module">
+import init,{stack_json,branch_diff_svg} from './pkg-runtime/smarter_diagrams.js';import{StackRenderer}from'./stack-renderer.js';
+await init();const renderer=new StackRenderer(document.querySelector('#stack'));try{await renderer.initialize();}catch(e){renderer.device=undefined;console.warn('WebGPU unavailable',String(e));}
+let pending=Promise.resolve();function update(){pending=pending.then(async()=>{try{await renderer.draw(JSON.parse(stack_json(document.querySelector('#strata').value,Number(document.querySelector('#tilt').value))));document.querySelector('#diff').innerHTML=branch_diff_svg(document.querySelector('#base').value,document.querySelector('#proposal').value,Number(document.querySelector('#morph').value));document.querySelector('#status').textContent=`${renderer.mode} · independent planes and branch union ready`;}catch(e){document.querySelector('#status').textContent=String(e);}});}
+for(const input of document.querySelectorAll('textarea,input'))input.addEventListener('input',update);update();
+</script>
