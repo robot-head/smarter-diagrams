@@ -33,6 +33,11 @@ module.exports = function checkRenderedSvg(markup) {
       const text=label.querySelector('text');if(!text)continue;const box=rect(text.getBBox());
       for(const shaft of shafts){const length=shaft.path.getTotalLength();for(let i=0;i<=length;i+=2)if(inside(shaft.path.getPointAtLength(i),box)){failures.push(`connector enters label: ${label.dataset.label}`);break;}}
     }
+    for(const heading of svg.querySelectorAll('[data-plane-label]')){
+      const box=rect(heading.getBBox());
+      for(const shaft of shafts){const length=shaft.path.getTotalLength();for(let n=0;n<=length;n+=1)if(inside(shaft.path.getPointAtLength(n),box)){failures.push(`connector crosses plane heading: ${heading.dataset.planeLabel}`);break;}}
+      for(const head of svg.querySelectorAll('[data-arrowhead]')){const length=head.getTotalLength();for(let n=0;n<=length;n+=.5)if(inside(head.getPointAtLength(n),box)){failures.push(`arrowhead crosses plane heading: ${heading.dataset.planeLabel}`);break;}}
+    }
     for(const node of svg.querySelectorAll('[data-node]')){
       const body=node.querySelector('[data-silhouette]'),text=node.querySelector('text.node-title');if(!body)continue;
       if(node.dataset.shape==='queue'&&text){const box=body.getBBox();if(text.getBBox().x<box.x+36)failures.push(`queue title overlaps decoration: ${node.dataset.node}`);}

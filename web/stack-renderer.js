@@ -63,6 +63,5 @@ struct Out { @builtin(position) position: vec4f, @location(0) color: vec4f }
       pass.end();this.device.queue.submit([encoder.finish()]);
       try{await this.device.queue.onSubmittedWorkDone();}catch(error){console.warn('WebGPU submission unavailable; using SVG',String(error));this.device=undefined;this.mode='SVG';return this.draw(stack);}
     }
-    const legend=document.createElement('p');legend.className='stack-legend';legend.textContent='Solid arrows connect services within a stratum. Dashed arrows cross strata; their labels name the relationship.';this.container.append(legend);
   }
 }

@@ -122,10 +122,11 @@ fn zone_label(zone: &Zone, l: &Layout) -> Option<Rect> {
     let w = crate::labels::text_width(&zone.label) + 8.;
     Some(Rect::new(left + 4. + w / 2., top - 16., w, 24.))
 }
-fn crossing_gaps(l: &Layout) -> BTreeMap<String, Vec<Point>> {
+fn crossing_gaps(l: &Layout, visible: impl Fn(&str) -> bool) -> BTreeMap<String, Vec<Point>> {
     let routes: Vec<_> = l
         .routes
         .iter()
+        .filter(|(id, _)| visible(id))
         .map(|(id, r)| (id, crate::routing::coalesced(&r.points)))
         .collect();
     let mut gaps: BTreeMap<String, Vec<Point>> = BTreeMap::new();
@@ -187,8 +188,18 @@ pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
 }
 
 pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
+    svg_with_decorations(scene, l, |_| true, |_, _| String::new())
+}
+
+// Decorations belong inside the node's opacity group and below its text.
+pub(crate) fn svg_with_decorations(
+    scene: &SceneGraph,
+    l: &Layout,
+    edge_visible: impl Fn(&str) -> bool,
+    decorate: impl Fn(&Node, Rect) -> String,
+) -> String {
     let bounds = bounds(scene, l);
-    let gaps = crossing_gaps(l);
+    let gaps = crossing_gaps(l, edge_visible);
     let mut s = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:13px;fill:#233347}}.node-title{{font-weight:600;font-size:14px}}.port-label{{font-size:11px}}.edge{{fill:none;stroke:#53657a;stroke-width:1.7;stroke-linejoin:round}}.flow{{fill:none;stroke:#356bd9;stroke-width:3;stroke-linejoin:round}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:#53657a}}</style>",
         bounds.left(),
@@ -229,7 +240,7 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
         let r = l.nodes[&n.id];
         let _ = write!(
             s,
-            "<g data-node=\"{}\" data-shape=\"container\" aria-label=\"{}\"><rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"12\" fill=\"#f0f4f9\" stroke=\"#73869b\"/></g>",
+            "<g data-node=\"{}\" data-shape=\"container\" aria-label=\"{}\"><rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"12\" fill=\"#f0f4f9\" stroke=\"#73869b\"/>",
             escape(&n.id),
             escape(&n.label),
             r.left(),
@@ -237,6 +248,8 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
             r.w,
             r.h
         );
+        s.push_str(&decorate(n, r));
+        s.push_str("</g>");
     }
     for z in &scene.zones {
         if let Some(hull) = l.zones.get(&z.id) {
@@ -398,6 +411,7 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
                 }
             }
         }
+        s.push_str(&decorate(n, r));
         if let Some(index) = scene.story.iter().position(|id| id == &n.id) {
             let _ = write!(
                 s,
@@ -808,9 +822,13 @@ mod tests {
                 ],
             ),
         );
-        assert_eq!(crossing_gaps(&l)["vertical"], vec![Point::new(0., 0.)]);
+        assert_eq!(
+            crossing_gaps(&l, |_| true)["vertical"],
+            vec![Point::new(0., 0.)]
+        );
+        assert!(crossing_gaps(&l, |id| id != "horizontal").is_empty());
         l.routes.get_mut("vertical").unwrap().points.remove(0);
-        assert!(crossing_gaps(&l).is_empty());
+        assert!(crossing_gaps(&l, |_| true).is_empty());
     }
 
     #[test]

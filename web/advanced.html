@@ -8,7 +8,7 @@ host [stratum: hardware]
 api -> worker: RPC
 api -> host [relation: runs_on]
 worker -> host [relation: runs_on]
-</textarea></details><p><label>Tilt <input id="tilt" type="range" min="0" max="0.785398" step="0.01" value="0.4"></label></p><div id="stack-controls"></div><div id="stack"></div></section><section><h2>Spatial Git</h2><details class="source-panel"><summary>Base and proposal source</summary><label>Base<textarea id="base">client -> api
+</textarea></details><p><label>Tilt <input id="tilt" type="range" min="0" max="0.785398" step="0.01" value="0.4"></label></p><div id="stack-controls"></div><div id="stack" aria-describedby="stack-legend"></div><p id="stack-legend" class="stack-legend">Solid arrows connect services within a stratum. Dashed arrows cross strata; their labels name the relationship.</p></section><section><h2>Spatial Git</h2><details class="source-panel"><summary>Base and proposal source</summary><label>Base<textarea id="base">client -> api
 api -> db
 </textarea></label><label>Proposal<textarea id="proposal">client -> api
 api -> db
