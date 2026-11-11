@@ -32,6 +32,15 @@ pub enum CheckResult {
     SafeThrough { horizon: usize },
     Violation(Counterexample),
 }
+impl CheckResult {
+    /// A bounded result caption suitable for verification badges in a host UI.
+    pub fn label(&self) -> String {
+        match self {
+            Self::SafeThrough { horizon } => format!("Safe ≤ {horizon} steps"),
+            Self::Violation(trace) => format!("Violation at step {}", trace.horizon),
+        }
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Invariant {
     Equals {
@@ -70,6 +79,13 @@ impl Invariant {
 }
 /// CNF literals use signed, one-based variable IDs; deterministic unit-propagating DPLL.
 pub fn satisfy(variables: usize, clauses: &[Vec<i32>]) -> Result<Option<Vec<bool>>, Error> {
+    satisfy_budget(variables, clauses, 2_000_000)
+}
+fn satisfy_budget(
+    variables: usize,
+    clauses: &[Vec<i32>],
+    search_budget: usize,
+) -> Result<Option<Vec<bool>>, Error> {
     if clauses
         .iter()
         .flatten()
@@ -143,7 +159,7 @@ pub fn satisfy(variables: usize, clauses: &[Vec<i32>]) -> Result<Option<Vec<bool
         }
         None
     }
-    let mut budget = 2_000_000;
+    let mut budget = search_budget;
     let result = solve(clauses, vec![0; variables], &mut budget);
     if budget == 0 && result.is_none() {
         return Err(Error::Layout(
@@ -313,4 +329,19 @@ pub fn trace_frame(trace: &Counterexample, step: usize) -> Option<TraceFrame> {
             .flatten(),
         step,
     })
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::*;
+    #[test]
+    fn exhaustion_is_unknown_and_never_an_unsatisfiability_proof() {
+        let error = satisfy_budget(2, &[vec![1, 2]], 0).unwrap_err();
+        assert!(error.to_string().contains("result unknown"));
+        assert!(
+            satisfy_budget(1, &[vec![1], vec![-1]], 10)
+                .unwrap()
+                .is_none()
+        );
+    }
 }

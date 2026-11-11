@@ -30,3 +30,5 @@ The built-in semantic categories use shapes/IDs/attributes: SQL tables and datab
 ## Continuous zoom
 
 `zoom(scene, layout, depth)` returns a `ZoomFrame` with interpolated geometry and opacity. `smoothstep` supplies a cubic C1 transition; boxes scale homothetically. These are animation frames for an embedding UI. The current playground exposes focus, while applications can compose the lower-level lens and zoom APIs into their own controls.
+
+When a named view hides intermediate services, projection contracts their causal paths into dashed summary connections labeled `via …`. Traversal stops at the next visible node and handles cycles; the canonical source graph stays intact.

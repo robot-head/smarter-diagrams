@@ -37,7 +37,7 @@ let system = TransitionSystem {
 let result = check(&system, &parse_invariant("count(role == Leader) <= 1")?, 12)?;
 ```
 
-`SafeThrough { horizon }` is bounded safety, not an unbounded proof. `Violation` includes exact states, events, optional edge IDs and the failing horizon. `trace_frame` produces playback frames for a UI. Budget exhaustion returns an explicit error/unknown outcome; it is never reported as safe.
+`CheckResult::label()` produces a badge such as **Safe ≤ 12 steps** or **Violation at step 1**. `SafeThrough { horizon }` is bounded safety, not an unbounded proof. `Violation` includes exact states, events, optional edge IDs and the failing horizon. `trace_frame` produces playback frames for a UI. Budget exhaustion returns an explicit error/unknown outcome; it is never reported as safe.
 
 ## Recheck on edits
 

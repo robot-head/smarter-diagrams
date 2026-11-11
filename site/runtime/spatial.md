@@ -30,7 +30,7 @@ let diff = spatial::compare(&base.scene, &proposal, &base.layout, &LayoutOptions
 let svg = spatial::diff_svg(&diff, 1.0)?;
 ```
 
-Qualified IDs match entities across snapshots. The union retains removed and added entities, locks unchanged infrastructure to the base layout, and classifies nodes/edges as unchanged, added, removed or modified. Removed entities use amber hatching; additions use green.
+Qualified IDs match entities across snapshots. The union retains removed and added entities, locks unchanged infrastructure to the base layout, and classifies nodes/edges as unchanged, added, removed or modified. Removed entities use amber hatching and a **−** badge; additions use green and **+**. Modified entities carry **~**. The exported SVG includes the same legend, and unchanged nodes keep their base coordinates throughout the morph.
 
 `morph(diff, tau, base_metrics, proposal_metrics)` interpolates geometry, opacity and caller-supplied simulation metrics for `tau` in `[0, 1]`. `0` is the base endpoint and `1` the proposal endpoint. `diff_svg` renders an animation frame.
 

@@ -9,7 +9,7 @@ struct Queue {
 }
 impl PartialEq for Queue {
     fn eq(&self, b: &Self) -> bool {
-        self.f == b.f && self.state == b.state
+        self.cmp(b) == Ordering::Equal
     }
 }
 impl Eq for Queue {}
@@ -46,9 +46,15 @@ pub fn obstacles(scene: &SceneGraph, l: &Layout, e: &Edge, margin: f64) -> Vec<R
             && n.id != e.target.node
     }) {
         let r = l.nodes[&n.id];
-        let width = crate::labels::text_width(&n.label) * 14. / 13. + 8.;
+        let width = crate::labels::text_width(&n.label) * 16. / 15. + 8.;
         bodies.push(
-            Rect::new(r.left() + 12. + width / 2., r.top() + 19., width, 28.).inflate(margin / 2.),
+            Rect::new(
+                r.left() + 12. + width / 2.,
+                r.top() + 19. + (header_height(n) - 24.) / 2.,
+                width,
+                28. + header_height(n) - 24.,
+            )
+            .inflate(margin / 2.),
         );
     }
     bodies
@@ -282,12 +288,16 @@ fn search(
     let nx = xs.len();
     let ny = ys.len();
     let point = |i: usize| Point::new(xs[i % nx], ys[i / nx]);
-    let index = |p: Point| {
-        ys.iter().position(|y| (*y - p.y).abs() < 1e-7).unwrap() * nx
-            + xs.iter().position(|x| (*x - p.x).abs() < 1e-7).unwrap()
+    let nearest = |values: &[f64], target: f64| {
+        values
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| (**a - target).abs().total_cmp(&(**b - target).abs()))
+            .map(|(i, _)| i)
+            .ok_or_else(|| Error::Layout("empty routing lattice".into()))
     };
-    let si = index(start);
-    let ti = index(target);
+    let si = nearest(&ys, start.y)? * nx + nearest(&xs, start.x)?;
+    let ti = nearest(&ys, target.y)? * nx + nearest(&xs, target.x)?;
     let mut open = BinaryHeap::new();
     let mut distance = vec![f64::INFINITY; nx * ny * 4];
     let mut parent = vec![usize::MAX; distance.len()];
@@ -335,7 +345,7 @@ fn search(
                 continue;
             }
             let mut cost =
-                p.distance(v) / o.grid * o.weights.length + turns(d, nd) * o.weights.bend;
+                p.manhattan_distance(v) / o.grid * o.weights.length + turns(d, nd) * o.weights.bend;
             if (v.x - p.x) * (target.x - start.x) + (v.y - p.y) * (target.y - start.y) < -1e-6 {
                 cost += o.weights.backward;
             }
@@ -353,7 +363,7 @@ fn search(
             if g + 1e-8 < distance[state] {
                 distance[state] = g;
                 parent[state] = q.state;
-                let heuristic = v.distance(target) / o.grid * o.weights.length
+                let heuristic = v.manhattan_distance(target) / o.grid * o.weights.length
                     + bend_lower_bound(v, target, nd, arrival) * o.weights.bend;
                 open.push(Queue {
                     f: g + heuristic,
@@ -642,6 +652,41 @@ pub fn nudge_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
                 l.routes.extend(candidates);
             } else {
                 l.diagnostics.push("A shared channel could not be separated without breaking port/obstacle clearance".into());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod ordering_tests {
+    use super::*;
+    #[test]
+    fn equality_and_heap_order_agree_for_every_tie_break() {
+        let entries = [
+            Queue {
+                f: 0.,
+                g: 1.,
+                state: 1,
+            },
+            Queue {
+                f: 0.,
+                g: 2.,
+                state: 1,
+            },
+            Queue {
+                f: -0.,
+                g: 1.,
+                state: 1,
+            },
+            Queue {
+                f: f64::NAN,
+                g: 1.,
+                state: 2,
+            },
+        ];
+        for a in entries {
+            for b in entries {
+                assert_eq!(a == b, a.cmp(&b) == Ordering::Equal);
             }
         }
     }

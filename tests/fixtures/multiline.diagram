@@ -1,0 +1,9 @@
+prod: "Region\nEurope" {
+  child: "Hello\nworld"
+}
+record: "Records\nactive" [shape: sql_table] {
+  port id: "uuid\nprimary" [side: W, pos: 1]
+  port ref: uuid [side: W, pos: 4]
+}
+prod.child -> record#id: "first\nsecond"
+zone guard "Scope\nPCI" around [prod.child]

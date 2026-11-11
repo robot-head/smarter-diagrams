@@ -34,7 +34,7 @@ assert_eq!(report.phantom.len(), 1);
 
 An unobserved connection may simply be outside the trace sample. The report describes the input evidence; it does not prove a declared connection never occurs.
 
-`hydrate` constructs a differential view, preserving pinned coordinates and marking phantom connections. `promote(source, observed_edge)` returns an explicit source patch. Review and apply that patch to make an observed connection part of the canonical declaration. `enforce_boundary` converts phantom/missing-symbol drift into a CI error for a host that has chosen that policy.
+`hydrate` constructs a differential view, preserving pinned coordinates and marking phantom connections. Render it with `DriftView::to_svg()` for compact node-corner drift counts; titles preserve the observed-only, unobserved and missing-symbol details without covering protocol captions. `promote(source, observed_edge)` returns an explicit source patch. Review and apply that patch to make an observed connection part of the canonical declaration. `enforce_boundary` converts phantom/missing-symbol drift into a CI error for a host that has chosen that policy.
 
 ## Static symbols and collection
 

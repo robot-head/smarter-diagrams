@@ -24,3 +24,6 @@ main:has(.canvas-panel){grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
 #canvas.is-dragging svg{overflow:visible}
 #canvas{scrollbar-gutter:stable both-edges;overflow-anchor:none}
 #canvas.invalid-drag{outline:2px solid var(--sd-cut,#b33336);outline-offset:2px}
+.diagram-viewport{touch-action:none}
+.editor-help{font-size:12px;color:var(--sd-muted);margin:6px 0}
+@media(pointer:coarse){.diagram-pan-hint{flex-basis:100%}}

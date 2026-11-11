@@ -7,8 +7,11 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 pub const GRID: f64 = 16.;
+pub(crate) fn header_height(node: &Node) -> f64 {
+    24. + (node.label.split('\n').count() - 1) as f64 * 20.
+}
 fn title_width(node: &Node) -> f64 {
-    crate::labels::text_width(&node.label) * 14. / 13.
+    crate::labels::text_width(&node.label) * 16. / 15.
         + 32.
         + crate::shapes::title_gutter(&node.shape)
 }
@@ -21,7 +24,12 @@ impl Point {
     pub fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
+    /// Euclidean distance in drawing units.
     pub fn distance(self, b: Self) -> f64 {
+        (self.x - b.x).hypot(self.y - b.y)
+    }
+    /// L1 distance, used by the orthogonal router's admissible heuristic.
+    pub fn manhattan_distance(self, b: Self) -> f64 {
         (self.x - b.x).abs() + (self.y - b.y).abs()
     }
     pub fn offset(self, x: f64, y: f64) -> Self {
@@ -98,7 +106,21 @@ impl Rect {
                 && a.y.min(b.y) < self.bottom() - 1e-6
                 && a.y.max(b.y) > self.top() + 1e-6
         } else {
-            true
+            let mut lo: f64 = 0.;
+            let mut hi: f64 = 1.;
+            for (start, delta, min, max) in [
+                (a.x, b.x - a.x, self.left() + 1e-6, self.right() - 1e-6),
+                (a.y, b.y - a.y, self.top() + 1e-6, self.bottom() - 1e-6),
+            ] {
+                if min >= max {
+                    return false;
+                }
+                let u = (min - start) / delta;
+                let v = (max - start) / delta;
+                lo = lo.max(u.min(v));
+                hi = hi.min(u.max(v));
+            }
+            lo <= hi
         }
     }
 }
@@ -271,11 +293,24 @@ pub fn layout(
         } else {
             (node.ports.len() as f64 + 2.) * o.grid
         };
+        h = h.max(node.label.split('\n').count() as f64 * 20. + 28.);
+        if node.shape == "sql_table" {
+            for port in node.ports.values() {
+                if let PortConstraint::FixedPos { offset_grid, .. } = port.constraint {
+                    h = h.max(
+                        offset_grid * o.grid
+                            + 8.
+                            + (port.label.split('\n').count() - 1) as f64 * 18.,
+                    );
+                }
+            }
+        }
         // Sloping sides must contain the entire text rectangle, not just its
         // center line. Keep room for ascenders/descenders at both title ends.
         if matches!(node.shape.as_str(), "diamond" | "decision") {
-            w *= 1.5;
-            h = h.max(80.);
+            let multiline = node.label.contains('\n');
+            w *= if multiline { 1.8 } else { 1.5 };
+            h = h.max(80.).max(crate::labels::text_height(&node.label) * 3.);
         }
         // Simulation nodes reserve a readable occupancy strip. An explicit
         // size lock below still wins; the viewer only paints status ink that fits.
@@ -372,7 +407,8 @@ pub fn layout(
                 .collect();
             if let Some(bounds) = children.into_iter().reduce(Rect::union) {
                 let b = bounds.inflate(o.container_padding);
-                rects[i] = Rect::new(b.x, b.y - 12., b.w, b.h + 24.);
+                let header = header_height(&scene.nodes[i]);
+                rects[i] = Rect::new(b.x, b.y - header / 2., b.w, b.h + header);
             }
         }
     }
@@ -477,12 +513,14 @@ pub fn layout(
             .collect();
         if let Some(bounds) = children.into_iter().reduce(Rect::union) {
             let x = pins[i].0.unwrap_or(bounds.x);
-            let y = pins[i].1.unwrap_or(bounds.y - 12.);
+            let y = pins[i]
+                .1
+                .unwrap_or(bounds.y - header_height(&scene.nodes[i]) / 2.);
             let required_w = 2.
                 * (x - bounds.left() + o.container_padding)
                     .max(bounds.right() + o.container_padding - x);
             let required_h = 2.
-                * (y - bounds.top() + o.container_padding + 24.)
+                * (y - bounds.top() + o.container_padding + header_height(&scene.nodes[i]))
                     .max(bounds.bottom() + o.container_padding - y);
             let lock = annotations[i]
                 .iter()
@@ -599,7 +637,10 @@ pub fn layout(
             cy.push(Constraint::separation(
                 p,
                 i,
-                -rects[p].h / 2. + o.container_padding + 24. + rects[i].h / 2.,
+                -rects[p].h / 2.
+                    + o.container_padding
+                    + header_height(&scene.nodes[p])
+                    + rects[i].h / 2.,
             ));
             cy.push(Constraint::separation(
                 i,
@@ -838,9 +879,9 @@ pub fn layout(
             {
                 rects[i] = Rect::new(
                     bounds.x,
-                    bounds.y - 12.,
+                    bounds.y - header_height(node) / 2.,
                     (bounds.w + 2. * o.container_padding).max(title_width(node)),
-                    bounds.h + 2. * o.container_padding + 24.,
+                    bounds.h + 2. * o.container_padding + header_height(node),
                 );
             }
         }
@@ -1414,12 +1455,39 @@ pub fn validate(scene: &SceneGraph, l: &Layout, o: &LayoutOptions) -> Result<(),
             return Err(Error::Layout("non-finite or empty node geometry".into()));
         }
         if matches!(a.shape.as_str(), "diamond" | "decision")
-            && (title_width(a) - 16.) / ra.w + 24. / ra.h > 1.
+            && (title_width(a) - 16.) / ra.w
+                + crate::labels::text_height(&a.label) * 16. / 15. / ra.h
+                > 1.
         {
             return Err(Error::Layout(format!(
                 "decision title does not fit the locked size of {}",
                 a.id
             )));
+        }
+        if a.shape == "sql_table" {
+            let mut fields = Vec::new();
+            for port in a
+                .ports
+                .values()
+                .filter(|p| matches!(p.constraint, PortConstraint::FixedPos { .. }))
+            {
+                let placement = &l.ports[&format!("{}#{}", a.id, port.id)];
+                let height = 15. + (port.label.split('\n').count() - 1) as f64 * 18.;
+                let width = crate::labels::text_width(&port.label) * 13. / 15.;
+                let bounds = Rect::new(
+                    ra.left() + 14. + width / 2.,
+                    placement.point.y - 7. + height / 2.,
+                    width,
+                    height,
+                );
+                if !ra.encloses(bounds) || fields.iter().any(|r: &Rect| r.intersects(bounds)) {
+                    return Err(Error::Layout(format!(
+                        "record field {}#{} overlaps another row or exceeds its locked size; increase pos spacing or record dimensions",
+                        a.id, port.id
+                    )));
+                }
+                fields.push(bounds);
+            }
         }
         if let Some(p) = &a.parent
             && !l.nodes[p].encloses(ra)
@@ -1706,7 +1774,7 @@ fn local_query(
     {
         return None;
     }
-    let mut graph = crate::views::filter(scene, &members);
+    let mut graph = crate::views::filter_exact(scene, &members);
     // Outside relational anchors need the enclosing query and cannot be solved in isolation.
     for n in &graph.nodes {
         for a in effective_annotations(scene, &n.id, &n.annotations, o.variant.as_deref())

@@ -233,6 +233,52 @@ pub struct DriftView {
     pub layout: crate::layout::Layout,
     pub report: DriftReport,
 }
+impl DriftView {
+    /// Reconciliation status lives at node corners; evidence remains in titles,
+    /// leaving protocol captions and routed edges available for the diagram.
+    pub fn to_svg(&self) -> String {
+        crate::render::svg_with_decorations(
+            &self.scene,
+            &self.layout,
+            |_| true,
+            |node, rect| {
+                let observed = self
+                    .report
+                    .phantom
+                    .iter()
+                    .filter(|e| e.source == node.id)
+                    .count();
+                let absent = self
+                    .report
+                    .unobserved
+                    .iter()
+                    .filter(|id| {
+                        self.scene
+                            .edge(id)
+                            .is_some_and(|e| e.source.node == node.id)
+                    })
+                    .count();
+                let missing = usize::from(self.report.missing_symbols.contains(&node.id));
+                let count = observed + absent + missing;
+                if count == 0 {
+                    return String::new();
+                }
+                let title = crate::render::escape(&format!(
+                    "{}: {observed} observed-only calls, {absent} unobserved calls, {missing} missing symbols",
+                    node.label
+                ));
+                format!(
+                    "<g data-drift-badge=\"{}\" aria-label=\"{title}\"><title>{title}</title><rect x=\"{}\" y=\"{}\" width=\"72\" height=\"20\" rx=\"8\" fill=\"var(--sd-bg,#ffffff)\" stroke=\"var(--sd-modified,#6276bd)\"/><text x=\"{}\" y=\"{}\" text-anchor=\"middle\" dominant-baseline=\"central\" style=\"font-size:12px\">drift: {count}</text></g>",
+                    crate::render::escape(&node.id),
+                    rect.right() - 72.,
+                    rect.top() - 24.,
+                    rect.right() - 36.,
+                    rect.top() - 14.
+                )
+            },
+        )
+    }
+}
 pub fn hydrate(
     source: &str,
     observed: &[ObservedEdge],

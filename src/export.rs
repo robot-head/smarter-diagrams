@@ -138,7 +138,7 @@ mod tests {
         let native = super::native_svg(&svg);
         assert!(native.contains(">var(--sd-fg,#233347)</text>"));
         assert!(native.contains("fill=\"#e5eef6\""));
-        assert!(native.contains("font-size:13px;fill:#233347"));
+        assert!(native.contains("font-size:15px;fill:#233347"));
         assert!(!native.contains("fill=\"var("));
         assert!(!native.contains("fill:var("));
     }

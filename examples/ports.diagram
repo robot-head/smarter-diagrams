@@ -1,12 +1,12 @@
-api: API service
-broker: Event log [shape: queue] {
-  port orders [side: E, ratio: 0.5]
+api: API service @pin(grid: 0,0)
+broker: Event log [shape: queue] @pin(grid: 20,0) {
+  port orders [side: S, ratio: 0.5]
 }
-worker: Order worker
-db: Orders [shape: sql_table] {
+worker: Order worker @pin(grid: 0,12)
+db: Orders [shape: sql_table] @pin(grid: 20,12) {
   port id: uuid [side: W, pos: 1]
   port customer_id: uuid [side: W, pos: 2]
 }
 api.E -> broker.W: publish
-broker#orders -> worker.W: consume
-worker.S(order: 1) -> db#id: insert
+broker#orders -> worker.N: consume @route(channel_x: 0)
+worker.E(order: 1) -> db#id: insert

@@ -70,7 +70,7 @@ const url = path => new URL(path, base).href;
         assert.deepEqual(await page.evaluate(checkSvg,markup),[],source);
         const frame=markup.match(/viewBox="([^"]+)"/)[1];
         if(comparisonFrame)assert.equal(frame,comparisonFrame,'comparison must keep its scale/frame');comparisonFrame=frame;
-        assert(await group.locator('.diagram-stage').evaluate(el=>el.getBoundingClientRect().width<=el.closest('.diagram-viewport').clientWidth+1),'initial diagram must fit the container');
+        assert(Number.parseInt(await group.locator('output').textContent())>=70,'initial desktop diagram scale must remain readable');
         assert(Number.parseInt(await group.locator('output').textContent())<=100,'initial Fit must not enlarge small diagrams');
         const label=await group.locator('figcaption').textContent();
         if(label.includes('View: request_only')){assert(markup.includes('data-node="client"'));assert(!markup.includes('data-node="metrics"'));}
@@ -137,6 +137,7 @@ const url = path => new URL(path, base).href;
   }
   await page.screenshot({ path: 'artifacts/docs-mobile-editor.png', fullPage: true });
   await require('./site-usability-test.cjs')(browser,page,base.href);
+  await require('./round-two-test.cjs')(browser,base.href);
   assert.deepEqual(errors, []);
   await browser.close();
   const result = spawnSync(process.execPath, ['scripts/browser-test.cjs'], { env: { ...process.env, DIAGRAM_TEST_URL: url('demo/') }, stdio: 'inherit' });

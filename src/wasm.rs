@@ -3,11 +3,11 @@ use wasm_bindgen::prelude::*;
 pub fn render_svg(source: &str) -> Result<String, JsValue> {
     crate::compile(source)
         .map(|d| d.to_svg())
-        .map_err(|e| JsValue::from_str(&e.to_string()))
+        .map_err(|e| JsValue::from_str(&e.with_source(source)))
 }
 #[wasm_bindgen]
 pub fn layout_json(source: &str) -> Result<String, JsValue> {
-    let d = crate::compile(source).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let d = crate::compile(source).map_err(|e| JsValue::from_str(&e.with_source(source)))?;
     serde_json::to_string(&d.layout).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 #[wasm_bindgen]
@@ -28,7 +28,7 @@ impl WasmDocument {
     #[wasm_bindgen(constructor)]
     pub fn new(source: &str) -> Result<WasmDocument, JsValue> {
         Ok(Self {
-            inner: crate::Document::new(source).map_err(js_error)?,
+            inner: crate::Document::new(source).map_err(|e| js_error(e.with_source(source)))?,
         })
     }
     pub fn source(&self) -> String {
@@ -69,7 +69,9 @@ impl WasmSimulation {
     pub fn new(source: &str) -> Result<WasmSimulation, JsValue> {
         let scene = crate::model::lower(&crate::syntax::parse(source));
         if !scene.diagnostics.is_empty() {
-            return Err(js_error(format!("{:?}", scene.diagnostics)));
+            return Err(js_error(
+                crate::Error::Diagnostics(scene.diagnostics).with_source(source),
+            ));
         }
         Ok(Self {
             inner: crate::simulation::Simulation::from_scene(&scene).map_err(js_error)?,
@@ -231,6 +233,8 @@ impl WasmDocument {
             crate::syntax::Span::new(prefix, old.len() - suffix),
             &source[prefix..source.len() - suffix],
         );
-        self.inner.patch(revision, &[patch]).map_err(js_error)
+        self.inner
+            .patch(revision, &[patch])
+            .map_err(|e| js_error(e.with_source(source)))
     }
 }
