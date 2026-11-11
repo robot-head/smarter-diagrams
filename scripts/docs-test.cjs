@@ -58,6 +58,39 @@ const url = path => new URL(path, base).href;
     assert(codeBlocks > 0 && await figures.count() >= codeBlocks, `missing visual examples: ${topic}`);
     await figures.locator('img').evaluateAll(images => images.forEach(image => { image.loading = 'eager'; }));
     await page.waitForFunction(() => [...document.querySelectorAll('.diagram-example img')].every(image => image.complete && image.naturalWidth > 0));
+    for (const source of await figures.locator('img').evaluateAll(images => images.map(image => image.src))) {
+      const markup = await (await page.request.get(source)).text();
+      const failures = await page.evaluate(markup => {
+        const svg = new DOMParser().parseFromString(markup, 'image/svg+xml').documentElement;
+        const holder = document.createElement('div');
+        holder.style.cssText = 'position:absolute;left:-10000px;visibility:hidden';
+        holder.append(svg); document.body.append(holder);
+        try {
+          const failures = [];
+          const close = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) < 0.02;
+          const outlines = [...svg.querySelectorAll('[data-node]')].map(node => node.querySelector('rect,path,ellipse')).filter(Boolean);
+          const attached = point => outlines.some(outline => outline.isPointInStroke(new DOMPoint(point.x, point.y)));
+          const shafts = [...svg.querySelectorAll('path.edge,path.flow')].map(path => ({
+            id: path.dataset.edge, color: getComputedStyle(path).stroke,
+            endpoints: [path.getPointAtLength(0), path.getPointAtLength(path.getTotalLength())],
+          }));
+          const heads = [...svg.querySelectorAll('[data-arrowhead]')].map(head => {
+            const n = head.getAttribute('d').match(/-?\d+(?:\.\d+)?/g).map(Number);
+            return { id: head.dataset.edge, tip: { x: n[0], y: n[1] }, base: { x: (n[2] + n[4]) / 2, y: (n[3] + n[5]) / 2 }, color: getComputedStyle(head).fill };
+          });
+          for (const port of svg.querySelectorAll('[data-port]')) if (getComputedStyle(port).fill !== 'rgba(0, 0, 0, 0)') failures.push(`visible port dot: ${port.dataset.port}`);
+          for (const head of heads) {
+            if (!attached(head.tip)) failures.push(`arrow tip detached from silhouette: ${head.id}`);
+            if (!shafts.some(shaft => shaft.id === head.id && shaft.color === head.color && shaft.endpoints.some(point => close(point, head.base)))) failures.push(`arrow/shaft gap or color mismatch: ${head.id}`);
+          }
+          for (const shaft of shafts) for (const point of shaft.endpoints) {
+            if (!attached(point) && !heads.some(head => head.id === shaft.id && close(point, head.base))) failures.push(`connector endpoint detached: ${shaft.id}`);
+          }
+          return failures;
+        } finally { holder.remove(); }
+      }, markup);
+      assert.deepEqual(failures, [], source);
+    }
     diagrams += await figures.count();
     if (topic === 'ports' || topic === 'layout') await page.screenshot({ path: `artifacts/language-${topic}.png`, fullPage: true });
     if (topic === 'layout') {
@@ -76,7 +109,7 @@ const url = path => new URL(path, base).href;
       assert(svg.includes('opacity="0.35" data-node="archive"'), 'focus must fade the outer context');
     }
   }
-  console.log(`Language: ${diagrams} decoded SVG examples across all five sections; views and layout comparisons passed.`);
+  console.log(`Language: ${diagrams} decoded SVG examples; silhouette attachments, arrow joins/colors, invisible port anchors, views and layout comparisons passed.`);
 
   await page.goto(base.href);
 

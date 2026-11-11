@@ -28,7 +28,7 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
         .unwrap_or(Rect::new(0., 0., 160., 80.))
         .inflate(32.);
     let mut s = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{} nodes and {} connections</desc><defs><marker id=\"arrow\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"4\" orient=\"auto-start-reverse\"><path d=\"M 0 0 L 8 4 L 0 8 Z\" fill=\"#53657a\"/></marker></defs><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:13px;fill:#233347}}.node-title{{font-weight:600;font-size:14px}}.port-label{{font-size:11px}}.edge{{fill:none;stroke:#53657a;stroke-width:1.7;stroke-linejoin:round}}.flow{{fill:none;stroke:#356bd9;stroke-width:3;stroke-linejoin:round}}</style>",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{} nodes and {} connections</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:13px;fill:#233347}}.node-title{{font-weight:600;font-size:14px}}.port-label{{font-size:11px}}.edge{{fill:none;stroke:#53657a;stroke-width:1.7;stroke-linejoin:round}}.flow{{fill:none;stroke:#356bd9;stroke-width:3;stroke-linejoin:round}}</style>",
         bounds.left(),
         bounds.top(),
         bounds.w,
@@ -82,16 +82,6 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
     for e in &scene.edges {
         let r = &l.routes[&e.id];
         let dashed = e.attrs.get("style").is_some_and(|v| v.text == "dashed");
-        let end = if e.kind == EdgeKind::Undirected {
-            ""
-        } else {
-            " marker-end=\"url(#arrow)\""
-        };
-        let start = if e.kind == EdgeKind::Bidirectional {
-            " marker-start=\"url(#arrow)\""
-        } else {
-            ""
-        };
         let dash = if dashed && !e.attrs.contains_key("phantom") {
             " stroke-dasharray=\"6 4\""
         } else {
@@ -99,11 +89,6 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
         };
         let phantom = if e.attrs.contains_key("phantom") {
             " stroke=\"#c345ac\" stroke-dasharray=\"5 4\""
-        } else {
-            ""
-        };
-        let bold = if e.kind == EdgeKind::Bold {
-            " stroke-width=\"3\""
         } else {
             ""
         };
@@ -121,16 +106,25 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
         } else {
             1.7
         };
+        let (shaft, heads) = connector(&r.points, e.kind, width);
         let _ = write!(
             s,
-            "<path data-edge=\"{}\" class=\"edge\" style=\"stroke:{color};stroke-width:{width}\" d=\"{}\"{start}{end}{dash}{bold}{phantom}><title>{}</title></path>",
+            "<path data-edge=\"{}\" class=\"edge\" style=\"stroke:{color};stroke-width:{width}\" d=\"{}\"{dash}{phantom}><title>{}</title></path>",
             escape(&e.id),
-            path(&r.points),
+            path(&shaft),
             escape(&format!(
                 "{} → {}: {}",
                 e.source.node, e.target.node, e.label
             ))
         );
+        for (end, points) in heads {
+            let _ = write!(
+                s,
+                "<path data-edge=\"{}\" data-arrowhead=\"{end}\" d=\"{}Z\" fill=\"{color}\"/>",
+                escape(&e.id),
+                path(&points)
+            );
+        }
     }
     // Optical crossing bridges: white under-stroke separates crossing ink without changing topology.
     let routes: Vec<_> = l.routes.values().collect();
@@ -192,56 +186,36 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
                     r.y + 10.
                 );
             }
-            "cache" => {
+            "cache" | "diamond" | "decision" => {
+                let vertices = crate::shapes::polygon(&n.shape, r).unwrap();
+                let (fill, stroke) = if n.shape == "cache" {
+                    ("#fff1d6", "#ceb98c")
+                } else {
+                    ("#fff0d8", "#cfab70")
+                };
                 let _ = write!(
                     s,
-                    "<path d=\"M {} {} L {} {} L {} {} L {} {} Z\" fill=\"#fff1d6\" stroke=\"#ceb98c\"/>",
-                    r.left() + 10.,
-                    r.top(),
-                    r.right(),
-                    r.top(),
-                    r.right() - 10.,
-                    r.bottom(),
-                    r.left(),
-                    r.bottom()
-                );
-            }
-            "diamond" | "decision" => {
-                let _ = write!(
-                    s,
-                    "<path d=\"M {} {} L {} {} L {} {} L {} {} Z\" fill=\"#fff0d8\" stroke=\"#cfab70\"/>",
-                    r.x,
-                    r.top(),
-                    r.right(),
-                    r.y,
-                    r.x,
-                    r.bottom(),
-                    r.left(),
-                    r.y
+                    "<path d=\"{}Z\" fill=\"{fill}\" stroke=\"{stroke}\"/>",
+                    path(&vertices)
                 );
             }
             "database" => {
+                let ry = crate::shapes::CYLINDER_RY.min(r.h / 2.);
                 let _ = write!(
                     s,
-                    "<path d=\"M {} {} C {} {} {} {} {} {} L {} {} C {} {} {} {} {} {} Z\" fill=\"#e1edf9\" stroke=\"#9ab6d4\"/><ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"8\" fill=\"#d1e3f5\" stroke=\"#9ab6d4\"/>",
+                    "<path d=\"M {} {} A {} {ry} 0 0 1 {} {} L {} {} A {} {ry} 0 0 1 {} {} Z\" fill=\"#e1edf9\" stroke=\"#9ab6d4\"/><ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{ry}\" fill=\"#d1e3f5\" stroke=\"#9ab6d4\"/>",
                     r.left(),
-                    r.top() + 8.,
+                    r.top() + ry,
+                    r.w / 2.,
+                    r.right(),
+                    r.top() + ry,
+                    r.right(),
+                    r.bottom() - ry,
+                    r.w / 2.,
                     r.left(),
-                    r.top() - 3.,
-                    r.right(),
-                    r.top() - 3.,
-                    r.right(),
-                    r.top() + 8.,
-                    r.right(),
-                    r.bottom() - 8.,
-                    r.right(),
-                    r.bottom() + 3.,
-                    r.left(),
-                    r.bottom() + 3.,
-                    r.left(),
-                    r.bottom() - 8.,
+                    r.bottom() - ry,
                     r.x,
-                    r.top() + 8.,
+                    r.top() + ry,
                     r.w / 2.
                 );
             }
@@ -321,9 +295,11 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
         s.push_str("</g>");
     }
     for p in l.ports.values() {
+        // Keep invisible anchors for consumers, without covering arrow tips or
+        // turning every implicit attachment into a visible junction dot.
         let _ = write!(
             s,
-            "<circle data-port=\"{}\" cx=\"{:.2}\" cy=\"{:.2}\" r=\"2.7\" fill=\"#627d98\"><title>{}</title></circle>",
+            "<circle data-port=\"{}\" cx=\"{:.2}\" cy=\"{:.2}\" r=\"4\" fill=\"transparent\"><title>{}</title></circle>",
             escape(&p.key),
             p.point.x,
             p.point.y,
@@ -334,19 +310,28 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
         for (step, id) in flow.edges.iter().enumerate() {
             if let Some(r) = l.routes.get(id) {
                 let mid = at_arc(&r.points, 0.5);
+                let (shaft, heads) = connector(&r.points, scene.edge(id).unwrap().kind, 3.);
                 let _ = write!(
                     s,
                     "<g aria-label=\"{} step {}\"><path data-edge=\"{}\" class=\"flow\" d=\"{}\"/><circle cx=\"{}\" cy=\"{}\" r=\"10\" fill=\"#356bd9\"/><text x=\"{}\" y=\"{}\" text-anchor=\"middle\" style=\"fill:white;font-size:11px\">{}</text></g>",
                     escape(&flow.label),
                     step + 1,
                     escape(id),
-                    path(&r.points),
+                    path(&shaft),
                     mid.x,
                     mid.y,
                     mid.x,
                     mid.y + 4.,
                     step + 1
                 );
+                for (end, points) in heads {
+                    let _ = write!(
+                        s,
+                        "<path data-edge=\"{}\" data-arrowhead=\"{end}\" d=\"{}Z\" fill=\"#356bd9\"/>",
+                        escape(id),
+                        path(&points)
+                    );
+                }
             }
         }
     }
@@ -363,13 +348,19 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
                 r.top()
             );
         }
+        if label.knockout && !label.callout {
+            let _ = write!(
+                s,
+                "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"5\" fill=\"white\"/>",
+                r.left() - 4.,
+                r.top() - 4.,
+                r.w + 8.,
+                r.h + 8.
+            );
+        }
         let _ = write!(
             s,
-            "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"5\" fill=\"white\"/><text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" dominant-baseline=\"central\">{}</text>",
-            r.left() - 4.,
-            r.top() - 4.,
-            r.w + 8.,
-            r.h + 8.,
+            "<text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" dominant-baseline=\"central\">{}</text>",
             r.x,
             r.y,
             escape(&label.text)
@@ -379,6 +370,59 @@ pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
     s.push_str("</svg>\n");
     s
 }
+
+type Arrowheads = Vec<(&'static str, [Point; 3])>;
+
+/// Trim the shaft to each arrow's base. Drawing the heads in user units keeps
+/// stroke width, color and the exact silhouette attachment independent of SVG
+/// marker scaling and avoids a square shaft protruding through the tip.
+fn connector(points: &[Point], kind: EdgeKind, width: f64) -> (Vec<Point>, Arrowheads) {
+    let mut shaft = points.to_vec();
+    shaft.dedup();
+    let mut heads = Vec::new();
+    if shaft.len() < 2 || kind == EdgeKind::Undirected {
+        return (shaft, heads);
+    }
+    let last = shaft.len() - 1;
+    let start_tip = shaft[0];
+    let start_neighbor = shaft[1];
+    let end_tip = shaft[last];
+    let end_neighbor = shaft[last - 1];
+    let length = 8. + width;
+    let half_width = 3. + width / 2.;
+    let mut add = |end, tip: Point, neighbor: Point, index| {
+        let available = tip.distance(neighbor);
+        let length = length.min(
+            available
+                * if last == 1 && kind == EdgeKind::Bidirectional {
+                    0.45
+                } else {
+                    0.8
+                },
+        );
+        let scale = length / (8. + width);
+        let (dx, dy) = (
+            (neighbor.x - tip.x) / available,
+            (neighbor.y - tip.y) / available,
+        );
+        let base = tip.offset(dx * length, dy * length);
+        shaft[index] = base;
+        heads.push((
+            end,
+            [
+                tip,
+                base.offset(-dy * half_width * scale, dx * half_width * scale),
+                base.offset(dy * half_width * scale, -dx * half_width * scale),
+            ],
+        ));
+    };
+    add("end", end_tip, end_neighbor, last);
+    if kind == EdgeKind::Bidirectional {
+        add("start", start_tip, start_neighbor, 0);
+    }
+    (shaft, heads)
+}
+
 pub fn path(points: &[Point]) -> String {
     let mut s = String::new();
     for (i, p) in points.iter().enumerate() {
@@ -530,4 +574,53 @@ pub fn flow_frame_svg(
         );
     }
     Ok(svg(&graph, l))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn arrow_tips_and_shafts_join_exactly_in_every_direction() {
+        for (dx, dy) in [(1., 0.), (-1., 0.), (0., 1.), (0., -1.)] {
+            for length in [4., 16., 100.] {
+                let start = Point::new(10., 20.);
+                let end = start.offset(dx * length, dy * length);
+                // Redundant route vertices must not create zero-sized heads.
+                let route = [start, start, end, end];
+                for width in [1.7, 3., 4.] {
+                    for kind in [
+                        EdgeKind::Directed,
+                        EdgeKind::Bidirectional,
+                        EdgeKind::Bold,
+                        EdgeKind::Undirected,
+                    ] {
+                        let (shaft, heads) = connector(&route, kind, width);
+                        assert!(shaft[0].distance(shaft[1]) > 0.);
+                        assert_eq!(
+                            heads.len(),
+                            match kind {
+                                EdgeKind::Undirected => 0,
+                                EdgeKind::Bidirectional => 2,
+                                _ => 1,
+                            }
+                        );
+                        for (side, triangle) in heads {
+                            let tip = if side == "start" { start } else { end };
+                            let base = if side == "start" { shaft[0] } else { shaft[1] };
+                            assert_eq!(triangle[0], tip);
+                            assert!((base.x - (triangle[1].x + triangle[2].x) / 2.).abs() < 1e-9);
+                            assert!((base.y - (triangle[1].y + triangle[2].y) / 2.).abs() < 1e-9);
+                            assert!(base.distance(tip) > 0. && base.distance(tip) <= length);
+                            assert!(
+                                (triangle[1].x - triangle[2].x).abs()
+                                    + (triangle[1].y - triangle[2].y).abs()
+                                    > 0.
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

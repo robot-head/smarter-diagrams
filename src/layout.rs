@@ -1102,7 +1102,7 @@ fn assign_ports(
     rects: &[Rect],
     out: &mut Layout,
 ) -> Result<(), Error> {
-    for (i, _) in scene.nodes.iter().enumerate() {
+    for (i, node) in scene.nodes.iter().enumerate() {
         for side in [Side::N, Side::E, Side::S, Side::W] {
             let mut ps: Vec<_> = requests
                 .iter()
@@ -1215,18 +1215,24 @@ fn assign_ports(
                 if reverse {
                     t = len - t;
                 }
-                let point = match side {
+                let box_point = match side {
                     Side::N => Point::new(r.left() + t, r.top()),
                     Side::E => Point::new(r.right(), r.top() + t),
                     Side::S => Point::new(r.left() + t, r.bottom()),
                     Side::W => Point::new(r.left(), r.top() + t),
                 };
+                let shape = if node.container && node.shape != "sql_table" {
+                    "container"
+                } else {
+                    &node.shape
+                };
+                let point = crate::shapes::attachment(shape, r, side, t);
                 let (nx, ny) = side.normal();
                 out.ports.insert(
                     p.key.clone(),
                     PortPlacement {
                         point,
-                        stub: point.offset(nx * o.stub, ny * o.stub),
+                        stub: box_point.offset(nx * o.stub, ny * o.stub),
                         side,
                         key: p.key.clone(),
                     },

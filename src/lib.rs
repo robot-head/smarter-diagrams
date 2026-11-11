@@ -24,6 +24,7 @@ pub mod mcp;
 pub mod model;
 pub mod render;
 pub mod routing;
+mod shapes;
 pub mod simulation;
 pub mod solver;
 pub mod spatial;
