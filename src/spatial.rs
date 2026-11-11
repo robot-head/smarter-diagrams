@@ -126,6 +126,67 @@ pub fn strata(scene: &SceneGraph, options: &LayoutOptions, theta: f64) -> Result
     })
 }
 
+/// A visibility path keeps via ink clear of the reserved heading bands.
+#[cfg(feature = "wasm-runtime")]
+fn heading_route(a: Point, b: Point, headings: &[Rect]) -> Result<Vec<Point>, Error> {
+    let clear = |a, b| {
+        !headings
+            .iter()
+            .any(|r| crate::labels::segment_hits(a, b, *r))
+    };
+    if clear(a, b) {
+        return Ok(vec![a, b]);
+    }
+    let mut points = vec![a, b];
+    for r in headings {
+        points.extend([
+            Point::new(r.left(), r.top()),
+            Point::new(r.right(), r.top()),
+            Point::new(r.right(), r.bottom()),
+            Point::new(r.left(), r.bottom()),
+        ]);
+    }
+    let mut distance = vec![f64::INFINITY; points.len()];
+    let mut previous = vec![None; points.len()];
+    let mut visited = vec![false; points.len()];
+    distance[0] = 0.;
+    for _ in 0..points.len() {
+        let Some(i) = (0..points.len())
+            .filter(|&i| !visited[i])
+            .min_by(|&i, &j| distance[i].total_cmp(&distance[j]))
+        else {
+            break;
+        };
+        if !distance[i].is_finite() {
+            break;
+        }
+        if i == 1 {
+            break;
+        }
+        visited[i] = true;
+        for j in 0..points.len() {
+            if !visited[j] && clear(points[i], points[j]) {
+                let next = distance[i] + points[i].distance(points[j]);
+                if next < distance[j] {
+                    distance[j] = next;
+                    previous[j] = Some(i);
+                }
+            }
+        }
+    }
+    if !distance[1].is_finite() {
+        return Err(Error::Layout("no via path outside stratum headings".into()));
+    }
+    let mut route = vec![b];
+    let mut i = 1;
+    while let Some(parent) = previous[i] {
+        route.push(points[parent]);
+        i = parent;
+    }
+    route.reverse();
+    Ok(route)
+}
+
 /// Presentation keeps the core renderer's silhouettes, directions, and labels
 /// in both the SVG fallback and the WebGPU fill/text composition.
 #[cfg(feature = "wasm-runtime")]
@@ -140,11 +201,29 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
         layout.labels.extend(plane.layout.labels.clone());
         layout.zones.extend(plane.layout.zones.clone());
         let keep = plane.layout.nodes.keys().cloned().collect();
-        surfaces.push((
-            plane.id.clone(),
-            crate::render::bounds(&views::filter(scene, &keep), &plane.layout),
-        ));
+        let mut frame = crate::render::bounds(&views::filter(scene, &keep), &plane.layout);
+        let width = crate::labels::text_width(&format!("Stratum: {}", plane.id)) * 12. / 13. + 16.;
+        if frame.w < width + 16. {
+            frame = Rect::new(
+                frame.left() + (width + 16.) / 2.,
+                frame.y,
+                width + 16.,
+                frame.h,
+            );
+        }
+        let heading = Rect::new(
+            frame.left() + 8. + width / 2.,
+            frame.top() + 12.,
+            width,
+            24.,
+        );
+        surfaces.push((plane.id.clone(), frame, heading));
     }
+    // Padding also keeps arrowhead bases clear of the text, not just shafts.
+    let headings: Vec<_> = surfaces
+        .iter()
+        .map(|(_, _, h)| Rect::new(h.x, h.y, h.w + 32., h.h + 14.))
+        .collect();
     for via in &stack.vias {
         let edge = drawing
             .edges
@@ -155,21 +234,29 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
         let target = scene.node(&edge.target.node).unwrap();
         let sr = layout.nodes[&source.id];
         let tr = layout.nodes[&target.id];
-        let a = layout
-            .ports
-            .get(&crate::layout::port_key(edge, true))
+        let fixed_a = layout.ports.get(&crate::layout::port_key(edge, true));
+        let fixed_b = layout.ports.get(&crate::layout::port_key(edge, false));
+        let mut a = fixed_a
             .map(|p| p.point)
             .unwrap_or_else(|| crate::shapes::ray_attachment(&source.shape, sr, tr.center()));
-        let b = layout
-            .ports
-            .get(&crate::layout::port_key(edge, false))
+        let mut b = fixed_b
             .map(|p| p.point)
             .unwrap_or_else(|| crate::shapes::ray_attachment(&target.shape, tr, sr.center()));
+        let mut points = heading_route(a, b, &headings)?;
+        for _ in 0..2 {
+            if fixed_a.is_none() {
+                a = crate::shapes::ray_attachment(&source.shape, sr, points[1]);
+            }
+            if fixed_b.is_none() {
+                b = crate::shapes::ray_attachment(&target.shape, tr, points[points.len() - 2]);
+            }
+            points = heading_route(a, b, &headings)?;
+        }
         layout.routes.insert(
             edge.id.clone(),
             Route {
                 edge: edge.id.clone(),
-                points: vec![a, b],
+                points,
             },
         );
         edge.attrs.insert(
@@ -186,29 +273,46 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
                 .map(|v| v.text.replace('_', " "))
                 .unwrap_or_else(|| "cross-plane".into());
         }
+    }
+    // Every via route is known before assigning any captions.
+    for via in &stack.vias {
+        let edge = drawing.edge(&via.edge).unwrap();
+        let points = &layout.routes[&edge.id].points;
         let w = crate::labels::text_width(&edge.label) + 16.;
-        let length = (b.x - a.x).hypot(b.y - a.y).max(1.);
-        let (nx, ny) = (-(b.y - a.y) / length, (b.x - a.x) / length);
-        let distance = nx.abs() * w / 2. + ny.abs() * 12. + 8.;
         let mut placed = None;
         'positions: for extra in [0., 24., 48., 96., 160.] {
-            for t in [0.5, 0.3, 0.7] {
+            for t in [0.5_f64, 0.3, 0.7] {
+                let anchor = crate::render::at_arc(points, t);
+                let before = crate::render::at_arc(points, t - 0.01);
+                let after = crate::render::at_arc(points, t + 0.01);
+                let length = before.distance(after).max(1.);
+                let (nx, ny) = (
+                    -(after.y - before.y) / length,
+                    (after.x - before.x) / length,
+                );
+                let distance = nx.abs() * w / 2. + ny.abs() * 12. + 8.;
                 for side in [-1., 1.] {
-                    let anchor = Point::new(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
                     let center = anchor.offset(
                         nx * (distance + extra) * side,
                         ny * (distance + extra) * side,
                     );
                     let bounds = Rect::new(center.x, center.y, w, 24.);
+                    let padded = bounds.inflate(2.);
                     if scene
                         .nodes
                         .iter()
                         .filter(|n| !n.container)
-                        .any(|n| bounds.inflate(2.).intersects(layout.nodes[&n.id]))
+                        .any(|n| padded.intersects(layout.nodes[&n.id]))
                         || layout
                             .labels
                             .iter()
-                            .any(|l| bounds.inflate(2.).intersects(l.bounds.inflate(2.)))
+                            .any(|l| padded.intersects(l.bounds.inflate(2.)))
+                        || headings.iter().any(|h| padded.intersects(*h))
+                        || layout.routes.values().any(|r| {
+                            r.points
+                                .windows(2)
+                                .any(|p| crate::labels::segment_hits(p[0], p[1], padded))
+                        })
                     {
                         continue;
                     }
@@ -233,18 +337,19 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
     let mut svg = crate::render::svg(&drawing, &layout);
     let mut backdrops = String::new();
     let mut bounds = crate::render::bounds(&drawing, &layout);
-    for (name, r) in &surfaces {
+    for (name, r, heading) in &surfaces {
         use std::fmt::Write;
         bounds = bounds.union(r.inflate(4.));
         let _ = write!(
             backdrops,
-            "<rect data-plane-background=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"12\" fill=\"#edf3fa\" fill-opacity=\"0.45\" stroke=\"#73869b\"/><text x=\"{}\" y=\"{}\" style=\"font-size:12px;font-weight:600\">Stratum: {}</text>",
+            "<rect data-plane-background=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"12\" fill=\"#edf3fa\" fill-opacity=\"0.45\" stroke=\"#73869b\"/><text data-plane-label=\"{}\" x=\"{}\" y=\"{}\" style=\"font-size:12px;font-weight:600\">Stratum: {}</text>",
             crate::render::escape(name),
             r.left(),
             r.top(),
             r.w,
             r.h,
-            r.left() + 8.,
+            crate::render::escape(name),
+            heading.left(),
             r.top() + 16.,
             crate::render::escape(name)
         );
@@ -265,6 +370,7 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
     result["description"] = serde_json::json!(crate::render::description(&drawing));
     Ok(result)
 }
+
 fn graph_ids_missing(
     _scene: &SceneGraph,
     ownership: &BTreeMap<String, String>,
@@ -507,14 +613,72 @@ pub fn diff_svg(diff: &SpatialDiff, tau: f64) -> Result<String, Error> {
             }
         }
     }
-    let mut svg = crate::render::svg(&scene, &layout);
+    let mut svg = crate::render::svg_with_decorations(
+        &scene,
+        &layout,
+        |id| match diff.edge_changes.get(id) {
+            Some(Change::Added) => tau > 0.,
+            Some(Change::Removed) => tau < 1.,
+            _ => true,
+        },
+        |node, rect| {
+            let Some(change) = diff.changes.get(&node.id) else {
+                return String::new();
+            };
+            let color = match change {
+                Change::Unchanged => return String::new(),
+                Change::Added => "#29966f",
+                Change::Removed => "#c58b22",
+                Change::Modified => "#6276bd",
+            };
+            let outline = crate::shapes::outline(&node.shape, rect);
+            let dash = if *change == Change::Removed {
+                " stroke-dasharray=\"4 3\""
+            } else {
+                ""
+            };
+            let hatch = if *change == Change::Removed {
+                format!(
+                    "<path data-change-hatch=\"true\" d=\"{outline}\" fill=\"url(#removed-hatch)\"/>"
+                )
+            } else {
+                String::new()
+            };
+            format!(
+                "<g data-change=\"{}\" data-change-kind=\"{change:?}\"><title>{change:?}: {}</title><path data-change-outline=\"true\" d=\"{outline}\" fill=\"{color}\" fill-opacity=\"0.12\" stroke=\"{color}\" stroke-width=\"2.5\"{dash}/>{hatch}</g>",
+                crate::render::escape(&node.id),
+                crate::render::escape(&node.label)
+            )
+        },
+    );
+    if diff
+        .changes
+        .values()
+        .any(|change| *change == Change::Removed)
+    {
+        svg = svg.replacen("</style>", "</style><style>.removed-node text{paint-order:stroke;stroke:#fff7e6;stroke-width:3;stroke-linejoin:round}</style><defs><pattern id=\"removed-hatch\" width=\"8\" height=\"8\" patternUnits=\"userSpaceOnUse\"><path d=\"M 0 8 L 8 0\" stroke=\"#c58b22\" stroke-width=\"1\"/></pattern></defs>", 1);
+    }
     for (id, change) in &diff.changes {
         let opacity = frame.opacity[id];
         if *change != Change::Unchanged {
+            for tag in ["data-label", "data-owner-node"] {
+                svg = svg.replace(
+                    &format!("{tag}=\"{}\"", crate::render::escape(id)),
+                    &format!(
+                        "opacity=\"{opacity}\" {tag}=\"{}\"",
+                        crate::render::escape(id)
+                    ),
+                );
+            }
+            let class = if *change == Change::Removed {
+                " class=\"removed-node\""
+            } else {
+                ""
+            };
             svg = svg.replace(
                 &format!("<g data-node=\"{}\"", crate::render::escape(id)),
                 &format!(
-                    "<g opacity=\"{opacity}\" data-node=\"{}\"",
+                    "<g opacity=\"{opacity}\"{class} data-node=\"{}\"",
                     crate::render::escape(id)
                 ),
             );
@@ -561,48 +725,6 @@ pub fn diff_svg(diff: &SpatialDiff, tau: f64) -> Result<String, Error> {
             );
         }
     }
-    svg=svg.replacen("</defs>","<pattern id=\"removed-hatch\" width=\"8\" height=\"8\" patternUnits=\"userSpaceOnUse\"><path d=\"M 0 8 L 8 0\" stroke=\"#c58b22\" stroke-width=\"1\"/></pattern></defs>",1);
-    let mut overlay = String::new();
-    use std::fmt::Write;
-    for (id, status) in &diff.changes {
-        if *status == Change::Unchanged {
-            continue;
-        }
-        let r = frame.nodes[id];
-        let color = match status {
-            Change::Added => "#29966f",
-            Change::Removed => "#c58b22",
-            _ => "#6276bd",
-        };
-        if *status == Change::Removed {
-            let _ = write!(
-                overlay,
-                "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"url(#removed-hatch)\" opacity=\"{}\"/>",
-                r.left(),
-                r.top(),
-                r.w,
-                r.h,
-                frame.opacity[id]
-            );
-        }
-        let _ = write!(
-            overlay,
-            "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"8\" fill=\"{color}\" fill-opacity=\"{}\" stroke=\"{color}\" stroke-dasharray=\"{}\"><title>{:?}: {}</title></rect>",
-            r.left() - 4.,
-            r.top() - 4.,
-            r.w + 8.,
-            r.h + 8.,
-            0.12 * frame.opacity[id],
-            if *status == Change::Removed {
-                "4 3"
-            } else {
-                "none"
-            },
-            status,
-            crate::render::escape(id)
-        );
-    }
-    svg = svg.replace("</svg>", &format!("{overlay}</svg>"));
     Ok(svg)
 }
 

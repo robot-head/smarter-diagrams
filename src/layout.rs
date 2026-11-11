@@ -272,9 +272,13 @@ pub fn layout(
             (node.ports.len() as f64 + 2.) * o.grid
         };
         // Simulation nodes reserve a readable occupancy strip. An explicit
-        // size lock below still wins; the viewer then uses only the thin bar.
+        // size lock below still wins; the viewer only paints status ink that fits.
         let h = if node.shape != "sql_table" && node.annotations.iter().any(|a| a.name == "sim") {
-            h.max(64.)
+            h.max(if matches!(node.shape.as_str(), "diamond" | "decision") {
+                96.
+            } else {
+                80.
+            })
         } else {
             h
         };

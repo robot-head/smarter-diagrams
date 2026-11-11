@@ -7,7 +7,7 @@ title: Playground
 
 # Try Smarter Diagrams
 
-Edit the text or drag a node. **Undo** restores the source; **Download SVG** exports the result. **Next step** plays the declared request flow. Run the simulation and shift-click a connector to explore a cut.
+Edit the text or drag a node. On a touchscreen, swipe to pan and enable **Move nodes** when you want to reposition a node. **Undo** restores the source; **Download SVG** exports the result. **Next step** plays the declared request flow. Run the simulation and shift-click a connector to explore a cut.
 
 <Playground />
 
