@@ -5,5 +5,11 @@ export function standaloneSvg(original){
   const background=document.createElementNS(svg.namespaceURI,'rect');
   for(const [name,value]of Object.entries({x:box.x,y:box.y,width:box.width,height:box.height,fill:style.getPropertyValue('--sd-bg').trim()||'#ffffff'}))background.setAttribute(name,String(value));
   background.dataset.exportBackground='true';svg.prepend(background);
-  return new XMLSerializer().serializeToString(svg).replace(/var\((--sd-[\w-]+),\s*([^)]*)\)/g,(_,name,fallback)=>style.getPropertyValue(name).trim()||fallback);
+  const resolve=value=>value.replace(/var\((--sd-[\w-]+),\s*([^)]*)\)/g,(_,name,fallback)=>style.getPropertyValue(name).trim()||fallback);
+  const paints=new Set(['style','fill','stroke','color','stop-color','flood-color','lighting-color']);
+  for(const element of [svg,...svg.querySelectorAll('*')]){
+    for(const attribute of [...element.attributes])if(paints.has(attribute.name))element.setAttribute(attribute.name,resolve(attribute.value));
+    if(element.localName==='style')element.textContent=resolve(element.textContent);
+  }
+  return new XMLSerializer().serializeToString(svg);
 }

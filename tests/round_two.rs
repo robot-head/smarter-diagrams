@@ -1,6 +1,16 @@
 use smarter_diagrams::{edit::*, layout::*, solver::*, *};
 
 #[test]
+fn svg_namespaces_preserve_literal_reference_text_and_accessible_names() {
+    let label = "url(#diagram-title) var(--sd-bg,#ffffff)";
+    let d = compile(&format!("a: \"{label}\"\n")).unwrap();
+    let svg = d.to_svg();
+    assert!(svg.contains(&format!("aria-label=\"{label}\"")));
+    assert!(svg.contains(&format!(">{label}</text>")));
+    assert!(svg.contains("aria-labelledby=\"sd-"));
+}
+
+#[test]
 fn diagonal_collision_and_distance_have_geometric_meaning() {
     let r = Rect::new(0., 0., 10., 10.);
     assert!(!r.blocks(Point::new(10., 10.), Point::new(20., 20.)));
