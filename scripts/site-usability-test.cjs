@@ -17,6 +17,17 @@ module.exports=async function siteUsability(browser,page,base){
         assert(await frame.locator('#canvas').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'initial embedded editor must fit');
         assert.equal(await frame.locator('#canvas-controls button').count(),5,'one percentage control, minus, plus, Fit and Move nodes');
         if(theme==='dark')assert.notEqual(await frame.locator('#canvas').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 255, 255)');
+        if(theme==='light'){
+          const original=await frame.locator('#source').inputValue(),node=frame.locator('[data-node="gateway"]');
+          const box=await node.boundingBox(),scale=await node.evaluate(el=>el.ownerSVGElement.getScreenCTM().a);
+          await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();
+          await page.mouse.move(box.x+box.width/2,box.y+box.height/2+64*scale,{steps:5});
+          await frame.waitForFunction(()=>{const b=document.querySelector('[data-node="gateway"] [data-silhouette]').getBBox();return b.y+b.height/2>40});
+          assert.equal(await frame.locator('#source').inputValue(),original,'embedded preview must not commit before release');
+          assert.equal(await frame.evaluate(()=>getSelection().toString()),'','embedded drag must not select canvas text');
+          await page.mouse.up();assert.notEqual(await frame.locator('#source').inputValue(),original);
+          await frame.click('#undo');assert.equal(await frame.locator('#source').inputValue(),original,'embedded drop is one undo step');
+        }
       } else {
         for(const image of await page.locator('.diagram-example img').all()){
           await image.evaluate(el=>el.loading='eager');await image.evaluate(el=>el.decode());

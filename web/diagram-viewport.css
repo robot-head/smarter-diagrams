@@ -16,3 +16,10 @@ button[aria-pressed=true]{background:var(--sd-status);border-color:var(--sd-stat
 button[aria-pressed] span[aria-hidden]{margin-right:4px}
 main:has(.canvas-panel){grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
 @media(max-width:767px){main{display:flex;flex-direction:column}main>section{width:100%;box-sizing:border-box}textarea{height:300px}body{margin:16px}.demo-links{align-items:center}}
+
+#canvas,#canvas *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.diagram-dragging,.diagram-dragging *{-webkit-user-select:none!important;user-select:none!important}
+#canvas.is-dragging,#canvas.is-dragging *{cursor:grabbing}
+#canvas.is-dragging{min-height:min(480px,60vh)!important}
+#canvas.is-dragging svg{overflow:visible}
+#canvas.invalid-drag{outline:2px solid var(--sd-cut,#b33336);outline-offset:2px}
