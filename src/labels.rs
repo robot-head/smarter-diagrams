@@ -38,6 +38,13 @@ impl RTreeObject for Indexed {
 fn envelope(r: Rect) -> AABB<[f64; 2]> {
     AABB::from_corners([r.left(), r.top()], [r.right(), r.bottom()])
 }
+fn clearance(label: &LabelPlacement) -> Rect {
+    label.bounds.inflate(if label.knockout && !label.callout {
+        5.
+    } else {
+        2.
+    })
+}
 #[derive(Clone)]
 struct Feature {
     id: String,
@@ -164,7 +171,7 @@ pub fn place(
             .enumerate()
             .map(|(id, c)| Indexed {
                 id,
-                bounds: c.label.bounds.inflate(2.),
+                bounds: clearance(&c.label),
             })
             .collect(),
     );
@@ -177,12 +184,9 @@ pub fn place(
     }
     let mut neighbors = vec![BTreeSet::new(); features.len()];
     for (i, c) in all.iter().enumerate() {
-        for hit in index.locate_in_envelope_intersecting(&envelope(c.label.bounds.inflate(2.))) {
+        for hit in index.locate_in_envelope_intersecting(&envelope(clearance(&c.label))) {
             if owner[i] != owner[hit.id]
-                && c.label
-                    .bounds
-                    .inflate(2.)
-                    .intersects(all[hit.id].label.bounds.inflate(2.))
+                && clearance(&c.label).intersects(clearance(&all[hit.id].label))
             {
                 conflicts[i].insert(hit.id);
                 neighbors[owner[i]].insert(owner[hit.id]);
@@ -280,7 +284,18 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
                     .unwrap_or(0.)
                     + o.weights.centeredness * centered
                     + if side > 0. { 1. } else { 0. }
-                    + if side == 0. { o.weights.pill } else { 0. };
+                    // Automatic cutouts are a last resort after nearby external
+                    // callouts. An explicitly requested inline slot keeps its cost.
+                    + if side == 0. {
+                        o.weights.pill
+                            + if f.slot.as_deref() == Some("inline") {
+                                0.
+                            } else {
+                                1000.
+                            }
+                    } else {
+                        0.
+                    };
                 out.push(Candidate {
                     label: LabelPlacement {
                         feature: f.id.clone(),
@@ -298,29 +313,32 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
         }
         arc += len;
     }
-    // Four external quadrant slots for short port stubs.
+    // External quadrants at several distances let port captions yield space
+    // to an edge label instead of forcing a cutout through the connection.
     if f.id.contains('#') && f.route.len() == 2 {
         let anchor = f.route[1];
-        for (dx, dy, cost) in [(1., -1., 0.), (-1., -1., 1.), (1., 1., 2.), (-1., 1., 3.)] {
-            let bounds = Rect::new(
-                anchor.x + dx * (w / 2. + 6.),
-                anchor.y + dy * (h / 2. + 6.),
-                w,
-                h,
-            );
-            out.push(Candidate {
-                label: LabelPlacement {
-                    feature: f.id.clone(),
-                    text: f.text.clone(),
-                    bounds,
-                    anchor,
-                    knockout: false,
-                    callout: false,
-                    horizontal: true,
-                    slide: 0.5,
-                },
-                cost,
-            });
+        for extra in [0., 12., 28.] {
+            for (dx, dy, cost) in [(1., -1., 0.), (-1., -1., 1.), (1., 1., 2.), (-1., 1., 3.)] {
+                let bounds = Rect::new(
+                    anchor.x + dx * (w / 2. + 6.),
+                    anchor.y + dy * (h / 2. + 6. + extra),
+                    w,
+                    h,
+                );
+                out.push(Candidate {
+                    label: LabelPlacement {
+                        feature: f.id.clone(),
+                        text: f.text.clone(),
+                        bounds,
+                        anchor,
+                        knockout: false,
+                        callout: false,
+                        horizontal: true,
+                        slide: 0.5,
+                    },
+                    cost: cost + extra / 3.,
+                });
+            }
         }
     }
     // Keep exceptional callouts close to the connection before using the
@@ -354,7 +372,7 @@ fn valid(
     l: &Layout,
     index: &RTree<Indexed>,
 ) -> bool {
-    let r = label.bounds.inflate(2.);
+    let r = clearance(label);
     for hit in index.locate_in_envelope_intersecting(&envelope(r)) {
         let n = &scene.nodes[hit.id];
         if !f.ignore.contains(&n.id) && r.intersects(hit.bounds) {
@@ -378,7 +396,7 @@ fn valid(
         }
     }
     for route in l.routes.values() {
-        if label.knockout && route.edge == f.id {
+        if label.knockout && !label.callout && route.edge == f.id {
             continue;
         }
         if route.points.windows(2).any(|s| r.blocks(s[0], s[1])) {
@@ -569,13 +587,10 @@ fn polish(labels: &mut [LabelPlacement], scene: &SceneGraph, l: &Layout, o: &Lay
             slide: None,
         };
         if valid(&candidate, &f, scene, l, &index)
-            && labels.iter().enumerate().all(|(j, b)| {
-                i == j
-                    || !candidate
-                        .bounds
-                        .inflate(2.)
-                        .intersects(b.bounds.inflate(2.))
-            })
+            && labels
+                .iter()
+                .enumerate()
+                .all(|(j, b)| i == j || !clearance(&candidate).intersects(clearance(b)))
         {
             labels[i] = candidate;
         }
@@ -699,13 +714,13 @@ pub fn polish_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
     }
     for label in &candidate.labels {
         for route in candidate.routes.values() {
-            if label.knockout && label.feature == route.edge {
+            if label.knockout && !label.callout && label.feature == route.edge {
                 continue;
             }
             if route
                 .points
                 .windows(2)
-                .any(|p| label.bounds.inflate(2.).blocks(p[0], p[1]))
+                .any(|p| clearance(label).blocks(p[0], p[1]))
             {
                 return;
             }
