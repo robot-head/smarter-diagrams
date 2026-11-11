@@ -1,0 +1,7 @@
+case,nodes,initial_ms,incremental_median_ms,reparse_median_ms
+chain,10,0.221,0.030,0.001
+chain,30,0.482,0.102,0.002
+chain,100,2.435,0.308,0.014
+chain,500,67.437,1.797,0.061
+container-local,550,70.472,2.821,n/a
+document-local,550,69.984,2.085,n/a

@@ -1,0 +1,11 @@
+{
+  "name": "smarter-diagrams-browser-checks",
+  "private": true,
+  "scripts": {
+    "test:browser": "node scripts/browser-test.cjs",
+    "bench:browser": "node scripts/browser-benchmark.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

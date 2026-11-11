@@ -1,0 +1,32 @@
+# A canonical architecture, with shared security scope and a numbered trace.
+client: Web client
+prod: Production {
+  gateway: API gateway
+  auth: Identity service
+  worker: Order worker
+  broker: Event log [shape: queue] {
+    port orders [side: E, ratio: 0.5]
+  }
+  postgres: Ledger [shape: sql_table] {
+    port id: uuid [side: W, pos: 1]
+    port org_id: uuid [side: W, pos: 2]
+  }
+  gateway.E -> auth.W: JWT
+  gateway.S -> broker.W: publish
+  broker#orders -> worker.W: consume
+  auth.S -> postgres#id: identity
+  worker.S -> postgres#org_id: write
+}
+client.E -> prod.gateway.W: HTTPS
+kms: Key service
+zone pci "PCI scope" around [prod.auth, prod.postgres, kms] {
+  padding: 1.5g
+  tint: oklch(0.78 0.08 170 / 0.16)
+}
+flow request "Request path" {
+  client -> prod.gateway -> prod.auth -> prod.postgres#id
+}
+view request_only {
+  include client -> prod.gateway -> prod.auth -> prod.postgres
+}
+@story [client -> prod.gateway -> prod.auth -> prod.postgres]
