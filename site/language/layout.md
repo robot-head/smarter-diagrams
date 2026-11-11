@@ -14,6 +14,17 @@ api.E -> cache.W
 
 Use `@pin(x: 15g)` or `@pin(y: 6g)` for an axis-only coordinate constraint. `PinExpr::AxisLock` exposes the corresponding typed edit, where `Axis::Row` locks y and `Axis::Col` locks x.
 
+### Single-axis locks
+
+Here the API and worker share `y = 0`, while the database is on `y = 8g`. Their x coordinates remain available to the solver.
+
+```diagram
+api: API @pin(y: 0g)
+worker: Worker @pin(y: 0g)
+db: Database @pin(y: 8g)
+api -> worker -> db
+```
+
 ## Relative anchors and size locks
 
 ```diagram
@@ -26,6 +37,16 @@ Relative expressions use scoped IDs, cardinal edges or center axes, and a grid o
 
 An optional size lock uses `lock: [w: 12g, h: 5g]` on the pin. `PinNode::size_lock` takes positive integer grid dimensions. If children, ports or text require more room than an explicit lock permits, compilation fails instead of silently expanding it.
 
+### Locked dimensions
+
+The API box is locked to 192 × 80 pixels at the default grid; the database uses its automatically determined size.
+
+```diagram
+api: API @pin(grid: 0, 0, lock: [w: 12g, h: 5g])
+db: Database @pin(grid: 20, 0)
+api.E -> db.W
+```
+
 ## Alignment and distribution
 
 ```diagram
@@ -36,19 +57,32 @@ distribute row [api, worker, db] [gap: 8g]
 
 `align row` shares y; `align col` shares x. `distribute row` spaces along x and `distribute col` along y, honoring an optional grid gap. Membership is relational, so these operations do not reparent entities.
 
-## Layout blocks and variants
+### Column alignment
+
+The same services can share a column, with north/south ports keeping the flow vertical.
 
 ```diagram
+api.S -> worker.N
+worker.S -> db.N
+align col [api, worker, db]
+distribute col [api, worker, db] [gap: 4g]
+```
+
+## Layout blocks and variants
+
+```diagram variants=compact
 api -> db
 @layout {
   api @pin(grid: 0, 0)
 }
 @layout(compact) {
-  db @pin(grid: 15, 0)
+  db @pin(grid: 0, 10)
 }
 ```
 
 The unnamed block applies by default. Select a named variant with `LayoutOptions { variant: Some("compact".into()), ..Default::default() }`. Effective source layout rules override inline annotations of the same kind. Keep one canonical graph while retaining several presentation arrangements.
+
+The two renders above use the same source: one with default options, and one with `variant: Some("compact")`.
 
 ## Connectors and labels
 
@@ -56,6 +90,34 @@ The `NudgeRouteChannel` edit stores the segment index and lane coordinate in a r
 
 Prefer those typed operations over composing edge IDs and annotation text manually. The label optimizer uses candidate boxes, knockout pills and nearby callouts when a direct slot is unavailable. Postchecks preserve hard geometry after continuous polish.
 
+### A connector channel
+
+A hand-authored `channel_x` fixes the vertical channel at `10g`; the editor's typed nudge stores an internal segment and its lane instead.
+
+```diagram
+api: API @pin(grid: 0, 0)
+db: Database @pin(grid: 20, 8)
+api.E -> db.W: request @route(channel_x: 10g)
+```
+
+### Label placement
+
+This label is placed above the connection, halfway along its route.
+
+```diagram
+api: API @pin(grid: 0, 0)
+db: Database @pin(grid: 20, 0)
+api.E -> db.W: request @label(slot: above, slide: 0.5)
+```
+
 ## Constraint failures
 
 Two fixed boxes cannot occupy the same space. Exact ports need perimeter and corner clearance. A pinned child can enlarge an unlocked parent, but a locked parent cannot grow. When a new edit is infeasible, `Document` rejects the transaction and keeps the last good snapshot. See [troubleshooting](/reference/errors).
+
+The configuration below is feasible because the fixed boxes have room between them. Pinning both at `(0, 0)` would be rejected; the compiler does not produce an overlapping “successful” diagram.
+
+```diagram
+left: Left service @pin(grid: 0, 0)
+right: Right service @pin(grid: 20, 0)
+left -> right
+```

@@ -1,6 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { createHash } = require('node:crypto');
+const { samples, key } = require('../site/.vitepress/diagram-samples.cjs');
 const root = path.resolve(__dirname, '..');
 const publicDir = path.join(root, 'site/public');
 const release = process.argv.includes('--release');
@@ -27,6 +29,13 @@ for (const file of ['architecture', 'performance', 'verification']) {
   });
   fs.writeFileSync(path.join(root, 'site/reference', `${file}.md`), `---\neditLink: false\n---\n\n${text}`);
 }
+const languageSamples = new Map();
+for (const file of fs.readdirSync(path.join(root, 'site/language')).filter(file => file.endsWith('.md'))) {
+  const text = fs.readFileSync(path.join(root, 'site/language', file), 'utf8');
+  for (const match of text.matchAll(/^```(diagram[^\n]*)\n([\s\S]*?)^```/gm)) {
+    for (const sample of samples(match[2], match[1])) languageSamples.set(key(sample), { ...sample, label: `${file}: ${sample.label}` });
+  }
+}
 for (const file of fs.readdirSync(path.join(root, 'examples')).filter(file => file.endsWith('.diagram'))) {
   copy(path.join(root, 'examples', file), path.join(publicDir, 'examples', file));
   copy(path.join(root, 'examples', file), path.join(publicDir, 'demo/examples', file));
@@ -34,5 +43,20 @@ for (const file of fs.readdirSync(path.join(root, 'examples')).filter(file => fi
   if (result.status !== 0) throw Error(`Cannot render ${file}: ${result.stderr || result.error}`);
   const output = path.join(publicDir, 'generated', file.replace(/\.diagram$/, '.svg'));
   fs.mkdirSync(path.dirname(output), { recursive: true }); fs.writeFileSync(output, result.stdout);
+  // Imported example fences use exactly the same rendering path as inline code.
+  const sample = samples(fs.readFileSync(path.join(root, 'examples', file), 'utf8'))[0];
+  languageSamples.set(key(sample), { ...sample, label: file });
 }
-console.log('Prepared documentation, compiled examples, Wasm demos and Rust API.');
+const build = spawnSync('cargo', ['build', '--locked', '--all-features', '--example', 'render_docs'], { cwd: root, encoding: 'utf8' });
+if (build.status !== 0) throw Error(build.stderr || build.error);
+const requests = [...languageSamples.values()];
+const rendered = spawnSync(path.join(root, 'target/debug/examples/render_docs'), [], { input: JSON.stringify(requests), encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+if (rendered.status !== 0) throw Error(rendered.stderr || rendered.error);
+const manifest = {}, images = JSON.parse(rendered.stdout);
+const destination = path.join(publicDir, 'generated/language'); fs.mkdirSync(destination, { recursive: true });
+for (let i = 0; i < requests.length; i++) {
+  const file = `${createHash('sha256').update(images[i]).digest('hex')}.svg`;
+  fs.writeFileSync(path.join(destination, file), images[i]); manifest[key(requests[i])] = file;
+}
+fs.writeFileSync(path.join(destination, 'manifest.json'), JSON.stringify(manifest));
+console.log(`Prepared documentation, examples, Wasm, Rust API and ${requests.length} language diagram renders.`);

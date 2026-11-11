@@ -1,4 +1,7 @@
 import { defineConfig } from 'vitepress'
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+const diagramSamples = createRequire(import.meta.url)('./diagram-samples.cjs')
 
 // These are downloadable assets, not routes with an implicit .html suffix.
 process.env.VITE_EXTRA_EXTENSIONS = 'diagram,wasm'
@@ -37,6 +40,27 @@ export default defineConfig({
   head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/smarter-diagrams/logo.svg' }]],
   markdown: {
     config(md) {
+      const fence = md.renderer.rules.fence!
+      const manifestPath = new URL('../public/generated/language/manifest.json', import.meta.url)
+      md.renderer.rules.fence = (tokens, index, options, env, renderer) => {
+        const code = fence(tokens, index, options, env, renderer)
+        const token = tokens[index]
+        if (!env.relativePath?.startsWith('language/') || !/^diagram(?:\s|$)/.test(token.info)) return code
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+        let heading = 'Language example'
+        for (let i = index - 1; i >= 0; i--) {
+          if (tokens[i].type === 'heading_open') { heading = tokens[i + 1].content; break }
+        }
+        const escape = md.utils.escapeHtml
+        const figures = diagramSamples.samples(token.content, token.info).map(sample => {
+          const file = manifest[diagramSamples.key(sample)]
+          if (!file) throw new Error(`Missing rendered language example in ${env.relativePath}; run npm run docs:build`)
+          const href = `$withBase('/generated/language/${file}')`
+          const description = escape(`${heading} — ${sample.label}`)
+          return `<figure class="diagram-example"><a :href="${href}" target="_blank" rel="noopener" aria-label="Open SVG: ${description}"><img :src="${href}" loading="lazy" alt="${description} diagram"></a><figcaption>${escape(sample.label)} · <a :href="${href}" target="_blank" rel="noopener">Open SVG ↗</a></figcaption></figure>`
+        }).join('')
+        return `${code}<div class="diagram-examples">${figures}</div>`
+      }
       const open = md.renderer.rules.link_open!
       md.renderer.rules.link_open = (tokens, index, ...args) => {
         // Demo HTML is served as a static application, outside the docs router.

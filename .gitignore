@@ -5,6 +5,7 @@
 /node_modules/
 /site/.vitepress/cache/
 /site/.vitepress/dist/
+/site/.vitepress/.temp/
 /site/public/generated/
 /site/public/demo/
 /site/public/api/

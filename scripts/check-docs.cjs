@@ -13,8 +13,8 @@ function checkDiagram(source, label) {
 const output = path.join(root, 'target/docs-snippets'); fs.mkdirSync(output, { recursive: true });
 for (const file of files(path.join(root, 'site')).filter(file => file.endsWith('.md'))) {
   const text = fs.readFileSync(file, 'utf8');
-  for (const match of text.matchAll(/^```(diagram|rust|toml|json)\s*\n([\s\S]*?)^```/gm)) {
-    const source = match[2], label = `${path.relative(root, file)}:${text.slice(0, match.index).split('\n').length}`;
+  for (const match of text.matchAll(/^```(diagram|rust|toml|json)([^\n]*)\n([\s\S]*?)^```/gm)) {
+    const source = match[3], label = `${path.relative(root, file)}:${text.slice(0, match.index).split('\n').length}`;
     if (match[1] === 'diagram') { checkDiagram(source, label); continue; }
     if (match[1] === 'toml') {
       const result = spawnSync('python3', ['-c', 'import sys,tomllib; tomllib.loads(sys.stdin.read())'], { input: source, encoding: 'utf8' });

@@ -2,6 +2,8 @@
 
 The language is progressive: topology first, then labels, ports and constraints as needed. Source is UTF-8; comments, whitespace and CRLF are retained in the syntax tree.
 
+Each source example below is followed by its actual compiler output. Open an SVG to inspect a larger version.
+
 ## Nodes and labels
 
 ```diagram

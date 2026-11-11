@@ -31,7 +31,7 @@ A flow resolves an ordered sequence of existing nodes and connections. It does n
 
 ## Canonical views
 
-```diagram
+```diagram views=request_only,downstream
 client -> api -> db
 api -> metrics
 view request_only {
@@ -46,11 +46,17 @@ view downstream {
 
 Use `views::project(&scene, name)` or `--view name` in the CLI. A view chooses graph membership; an `@layout(name)` variant chooses constraints. They solve different authoring needs.
 
+Compare the three renders above: the full graph, the request path without `metrics`, and the downstream view without `client`.
+
 ## Story and causal focus
 
-```diagram
+```diagram focus=api
 client -> api -> db
+api -> metrics
+metrics -> archive
 @story [client -> api -> db]
 ```
 
 The story marks a static path for saliency. `views::causal_cone` and `views::attention` calculate k-hop focus from incoming, outgoing or both directions. The browser uses `focus_svg(node, hops)` for hover emphasis while retaining context.
+
+The first render shows the story in its full context. The second applies one-hop focus to `api`: `archive` remains in place but fades because it is two hops away.
