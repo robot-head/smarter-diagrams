@@ -38,9 +38,9 @@ npm run docs:build
 npm run docs:preview
 ```
 
-Open `http://127.0.0.1:4173/smarter-diagrams/`. The project base path is deliberate: local previews test the same subdirectory hosting used by GitHub Pages.
+Open `http://127.0.0.1:4173/smarter-diagrams/`. The project base path is deliberate: local previews test the same subdirectory hosting used by GitHub Pages. Site checks also use Python 3.11+ and its standard-library TOML parser.
 
-`docs:check` compiles every `diagram` code fence and complete example, and typechecks the standalone Rust snippets. `docs:build` prepares generated assets, builds a local search index and refuses missing Wasm/API artifacts. `docs:dev` prepares available assets and starts VitePress for editing; build the packages first if you need its demos/API locally.
+`docs:check` compiles every `diagram` code fence and complete example, typechecks the standalone Rust snippets, and parses TOML/JSON configuration blocks. `docs:build` prepares generated assets, builds a local search index and refuses missing Wasm/API artifacts. `docs:dev` prepares available assets and starts VitePress for editing; build the packages first if you need its demos/API locally.
 
 Architecture, performance and verification pages are generated from their canonical `docs/` files. Edit those originals rather than the generated site copies. Generated SVGs, rustdoc and Wasm bundles are ignored in Git and included in the deployment artifact.
 

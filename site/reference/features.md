@@ -11,12 +11,10 @@ The default feature set is empty. The compiler, SVG renderer, source editing and
 | `wasm-runtime` | `wasm` + `verification`, and extra browser simulation/safety/spatial exports |
 
 ```toml
-[dependencies]
-smarter-diagrams = {
-  git = "https://github.com/robot-head/smarter-diagrams",
-  branch = "main",
-  features = ["export", "code-bindings", "verification"]
-}
+[dependencies.smarter-diagrams]
+git = "https://github.com/robot-head/smarter-diagrams"
+branch = "main"
+features = ["export", "code-bindings", "verification"]
 ```
 
 Use the `scripts/build-wasm.sh` presets for browser builds. They intentionally exclude native font/raster/PDF and Tree-sitter dependencies. Do not use `--all-features` as a browser bundle-size preset; all-feature native builds are useful for API documentation and validation.
