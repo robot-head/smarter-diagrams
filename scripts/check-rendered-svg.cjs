@@ -12,6 +12,13 @@ module.exports = function checkRenderedSvg(markup) {
     const luminance=color=>color.map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
     const contrast=(a,b)=>{const x=luminance(a),y=luminance(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
     const outlines=[...svg.querySelectorAll('[data-silhouette]')];
+    svg.style.color='var(--sd-bg,#ffffff)';
+    const background=rgb(getComputedStyle(svg).color),view=svg.viewBox.baseVal;
+    for(const ink of svg.querySelectorAll('path,rect,circle,ellipse,text')){
+      if(ink.closest('defs,mask,clipPath,pattern'))continue;
+      const b=ink.getBBox();
+      if(b.x<view.x-1||b.y<view.y-1||b.x+b.width>view.x+view.width+1||b.y+b.height>view.y+view.height+1)failures.push('painted feature outside viewBox');
+    }
     const attached=point=>outlines.some(outline=>outline.isPointInStroke(new DOMPoint(point.x,point.y)));
     const shafts=[...svg.querySelectorAll('path.edge,path.flow')].map(path=>({path,id:path.dataset.edge,color:getComputedStyle(path).stroke,endpoints:[path.getPointAtLength(0),path.getPointAtLength(path.getTotalLength())]}));
     const heads=[...svg.querySelectorAll('[data-arrowhead]')].map(head=>{const n=head.getAttribute('d').match(/-?\d+(?:\.\d+)?/g).map(Number);return{id:head.dataset.edge,tip:{x:n[0],y:n[1]},base:{x:(n[2]+n[4])/2,y:(n[3]+n[5])/2},color:getComputedStyle(head).fill};});
@@ -31,6 +38,9 @@ module.exports = function checkRenderedSvg(markup) {
     for(const label of labels){
       if(label.dataset.knockout==='true')continue;
       const text=label.querySelector('text');if(!text)continue;const box=rect(text.getBBox());
+      for(const plane of svg.querySelectorAll('[data-plane-background]')){
+        const length=plane.getTotalLength();for(let n=0;n<=length;n+=1)if(inside(plane.getPointAtLength(n),box)){failures.push(`plane border crosses label: ${label.dataset.label}`);break;}
+      }
       for(const shaft of shafts){const length=shaft.path.getTotalLength();for(let i=0;i<=length;i+=2)if(inside(shaft.path.getPointAtLength(i),box)){failures.push(`connector enters label: ${label.dataset.label}`);break;}}
     }
     for(const heading of svg.querySelectorAll('[data-plane-label]')){
@@ -40,11 +50,15 @@ module.exports = function checkRenderedSvg(markup) {
     }
     for(const node of svg.querySelectorAll('[data-node]')){
       const body=node.querySelector('[data-silhouette]'),text=node.querySelector('text.node-title');if(!body)continue;
+      if(text){const b=text.getBBox();if(![b.x,b.x+b.width].every(x=>[b.y,b.y+b.height].every(y=>body.isPointInFill(new DOMPoint(x,y)))))failures.push(`node title outside silhouette: ${node.dataset.node}`);}
+      if(node.dataset.shape!=='container')for(const shaft of shafts){
+        const length=shaft.path.getTotalLength();for(let n=1;n<length-1;n+=2)if(body.isPointInFill(shaft.path.getPointAtLength(n))){failures.push(`connector enters node silhouette: ${node.dataset.node}`);break;}
+      }
       if(node.dataset.shape==='queue'&&text){const box=body.getBBox();if(text.getBBox().x<box.x+36)failures.push(`queue title overlaps decoration: ${node.dataset.node}`);}
       const story=node.querySelector('[data-story-outline]');if(story){const length=story.getTotalLength();for(let i=0;i<=length;i+=Math.max(1,length/80))if(!body.isPointInStroke(story.getPointAtLength(i))){failures.push(`story silhouette differs: ${node.dataset.node}`);break;}}
       const style=getComputedStyle(body);
       if(!node.classList.contains('context-node')&&contrast(rgb(style.stroke),rgb(style.fill))<2.99)failures.push(`node outline contrast below 3:1: ${node.dataset.node}`);
-      if(node.classList.contains('context-node')&&text&&contrast(rgb(getComputedStyle(text).fill),[255,255,255])<4.5)failures.push(`faded text contrast below 4.5:1: ${node.dataset.node}`);
+      if(text&&contrast(rgb(getComputedStyle(text).fill),node.classList.contains('context-node')?background:rgb(style.fill))<4.5)failures.push(`node text contrast below 4.5:1: ${node.dataset.node}`);
     }
     if(!svg.querySelector('desc')?.textContent.includes('Connections:'))failures.push('structured SVG description missing');
     return [...new Set(failures)];

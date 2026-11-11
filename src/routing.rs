@@ -30,12 +30,28 @@ pub fn obstacles(scene: &SceneGraph, l: &Layout, e: &Edge, margin: f64) -> Vec<R
     exclude.extend(ancestors(scene, &e.target.node));
     exclude.insert(e.source.node.clone());
     exclude.insert(e.target.node.clone());
-    scene
+    let mut bodies: Vec<_> = scene
         .nodes
         .iter()
         .filter(|n| !exclude.contains(&n.id))
         .map(|n| l.nodes[&n.id].inflate(margin))
-        .collect()
+        .collect();
+    // Routes may cross an owning frame, but its title still needs a reserved
+    // channel. Excluding the whole ancestor used to let peer loops strike it.
+    for n in scene.nodes.iter().filter(|n| {
+        n.container
+            && n.shape != "sql_table"
+            && exclude.contains(&n.id)
+            && n.id != e.source.node
+            && n.id != e.target.node
+    }) {
+        let r = l.nodes[&n.id];
+        let width = crate::labels::text_width(&n.label) * 14. / 13. + 8.;
+        bodies.push(
+            Rect::new(r.left() + 12. + width / 2., r.top() + 19., width, 28.).inflate(margin / 2.),
+        );
+    }
+    bodies
 }
 pub fn route_all(
     scene: &SceneGraph,

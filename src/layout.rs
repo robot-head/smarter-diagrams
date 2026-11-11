@@ -259,18 +259,24 @@ pub fn layout(
     let mut rects = Vec::new();
     for (i, node) in scene.nodes.iter().enumerate() {
         let row = rows.entry(ranks[i]).or_insert(0);
-        let w = title_width(node).max(112.).max(
+        let mut w = title_width(node).max(112.).max(
             node.ports
                 .values()
                 .map(|p| crate::labels::text_width(&p.label) + 32.)
                 .reduce(f64::max)
                 .unwrap_or(0.),
         );
-        let h = if node.ports.is_empty() {
+        let mut h = if node.ports.is_empty() {
             48.
         } else {
             (node.ports.len() as f64 + 2.) * o.grid
         };
+        // Sloping sides must contain the entire text rectangle, not just its
+        // center line. Keep room for ascenders/descenders at both title ends.
+        if matches!(node.shape.as_str(), "diamond" | "decision") {
+            w *= 1.5;
+            h = h.max(80.);
+        }
         // Simulation nodes reserve a readable occupancy strip. An explicit
         // size lock below still wins; the viewer only paints status ink that fits.
         let h = if node.shape != "sql_table" && node.annotations.iter().any(|a| a.name == "sim") {
@@ -1406,6 +1412,14 @@ pub fn validate(scene: &SceneGraph, l: &Layout, o: &LayoutOptions) -> Result<(),
         let ra = l.nodes[&a.id];
         if [ra.x, ra.y, ra.w, ra.h].iter().any(|x| !x.is_finite()) || ra.w <= 0. || ra.h <= 0. {
             return Err(Error::Layout("non-finite or empty node geometry".into()));
+        }
+        if matches!(a.shape.as_str(), "diamond" | "decision")
+            && (title_width(a) - 16.) / ra.w + 24. / ra.h > 1.
+        {
+            return Err(Error::Layout(format!(
+                "decision title does not fit the locked size of {}",
+                a.id
+            )));
         }
         if let Some(p) = &a.parent
             && !l.nodes[p].encloses(ra)

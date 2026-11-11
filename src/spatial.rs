@@ -126,7 +126,7 @@ pub fn strata(scene: &SceneGraph, options: &LayoutOptions, theta: f64) -> Result
     })
 }
 
-/// A visibility path keeps via ink clear of the reserved heading bands.
+/// A visibility path keeps via ink clear of headings and unrelated node bodies.
 #[cfg(feature = "wasm-runtime")]
 fn heading_route(a: Point, b: Point, headings: &[Rect]) -> Result<Vec<Point>, Error> {
     let clear = |a, b| {
@@ -242,7 +242,15 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
         let mut b = fixed_b
             .map(|p| p.point)
             .unwrap_or_else(|| crate::shapes::ray_attachment(&target.shape, tr, sr.center()));
-        let mut points = heading_route(a, b, &headings)?;
+        let mut obstacles = headings.clone();
+        obstacles.extend(
+            scene
+                .nodes
+                .iter()
+                .filter(|n| !n.container && n.id != source.id && n.id != target.id)
+                .map(|n| layout.nodes[&n.id].inflate(8.)),
+        );
+        let mut points = heading_route(a, b, &obstacles)?;
         for _ in 0..2 {
             if fixed_a.is_none() {
                 a = crate::shapes::ray_attachment(&source.shape, sr, points[1]);
@@ -250,7 +258,7 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
             if fixed_b.is_none() {
                 b = crate::shapes::ray_attachment(&target.shape, tr, points[points.len() - 2]);
             }
-            points = heading_route(a, b, &headings)?;
+            points = heading_route(a, b, &obstacles)?;
         }
         layout.routes.insert(
             edge.id.clone(),
@@ -308,6 +316,18 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
                             .iter()
                             .any(|l| padded.intersects(l.bounds.inflate(2.)))
                         || headings.iter().any(|h| padded.intersects(*h))
+                        || surfaces.iter().any(|(_, r, _)| {
+                            let corners = [
+                                Point::new(r.left(), r.top()),
+                                Point::new(r.right(), r.top()),
+                                Point::new(r.right(), r.bottom()),
+                                Point::new(r.left(), r.bottom()),
+                                Point::new(r.left(), r.top()),
+                            ];
+                            corners
+                                .windows(2)
+                                .any(|p| crate::labels::segment_hits(p[0], p[1], padded))
+                        })
                         || layout.routes.values().any(|r| {
                             r.points
                                 .windows(2)
@@ -342,7 +362,7 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
         bounds = bounds.union(r.inflate(4.));
         let _ = write!(
             backdrops,
-            "<rect data-plane-background=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"12\" fill=\"#edf3fa\" fill-opacity=\"0.45\" stroke=\"#73869b\"/><text data-plane-label=\"{}\" x=\"{}\" y=\"{}\" style=\"font-size:12px;font-weight:600\">Stratum: {}</text>",
+            "<rect data-plane-background=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"12\" fill=\"var(--sd-plane,#edf3fa)\" fill-opacity=\"0.45\" stroke=\"var(--sd-muted,#73869b)\"/><text data-plane-label=\"{}\" x=\"{}\" y=\"{}\" style=\"font-size:12px;font-weight:600\">Stratum: {}</text>",
             crate::render::escape(name),
             r.left(),
             r.top(),
@@ -561,14 +581,61 @@ pub fn diff_svg(diff: &SpatialDiff, tau: f64) -> Result<String, Error> {
     if tau < 0.5 {
         for n in &mut scene.nodes {
             if let Some(old) = diff.base_scene.node(&n.id) {
-                n.label = old.label.clone();
-                n.shape = old.shape.clone();
+                *n = old.clone();
+            }
+        }
+        for e in &mut scene.edges {
+            if let Some(old) = diff.base_scene.edge(&e.id) {
+                *e = old.clone();
+            }
+        }
+        // Record titles and named ports can exist in only one snapshot. They
+        // must follow the chosen shape instead of leaking out of the union.
+        layout.labels.retain(|label| {
+            scene.node(&label.feature).is_none()
+                || diff.changes.get(&label.feature) == Some(&Change::Added)
+        });
+        for label in &diff.base_layout.labels {
+            if scene.node(&label.feature).is_some() {
+                let mut label = label.clone();
+                let from = diff.base_layout.nodes[&label.feature];
+                let to = layout.nodes[&label.feature];
+                label.bounds.x += to.x - from.x;
+                label.bounds.y += to.y - from.y;
+                layout.labels.push(label);
+            }
+        }
+        layout.ports.retain(|key, _| {
+            key.rsplit_once('#')
+                .is_none_or(|(node, _)| diff.changes.get(node) == Some(&Change::Added))
+        });
+        for (key, port) in &diff.base_layout.ports {
+            if let Some((node, _)) = key.rsplit_once('#') {
+                let mut port = port.clone();
+                let from = diff.base_layout.nodes[node];
+                let to = layout.nodes[node];
+                let horizontal = matches!(port.side, Side::E | Side::W);
+                let offset = if horizontal {
+                    (port.point.y - from.top()) / from.h * to.h
+                } else {
+                    (port.point.x - from.left()) / from.w * to.w
+                };
+                port.point = crate::shapes::attachment(
+                    &scene.node(node).unwrap().shape,
+                    to,
+                    port.side,
+                    offset,
+                );
+                layout.ports.insert(key.clone(), port);
             }
         }
     }
     let interpolate =
         |a: Point, b: Point| Point::new(a.x + (b.x - a.x) * tau, a.y + (b.y - a.y) * tau);
     for (key, p) in &mut layout.ports {
+        if tau < 0.5 && key.contains('#') {
+            continue;
+        }
         if let Some(old) = diff.base_layout.ports.get(key) {
             p.point = interpolate(old.point, p.point);
             p.stub = interpolate(old.stub, p.stub);
@@ -594,6 +661,9 @@ pub fn diff_svg(diff: &SpatialDiff, tau: f64) -> Result<String, Error> {
         }
     }
     for label in &mut layout.labels {
+        if tau < 0.5 && scene.node(&label.feature).is_some() {
+            continue;
+        }
         if let Some(old) = diff
             .base_layout
             .labels
@@ -613,6 +683,25 @@ pub fn diff_svg(diff: &SpatialDiff, tau: f64) -> Result<String, Error> {
             }
         }
     }
+    // Interpolated rectangles and discrete shape changes still need exact
+    // attachment points. Retarget modified endpoints to the current outline.
+    for edge in &scene.edges {
+        for (source, endpoint) in [(true, &edge.source), (false, &edge.target)] {
+            if diff.changes.get(&endpoint.node) != Some(&Change::Modified) {
+                continue;
+            }
+            let key = crate::layout::port_key(edge, source);
+            if let Some(port) = layout.ports.get_mut(&key) {
+                let node = scene.node(&endpoint.node).unwrap();
+                port.point =
+                    crate::shapes::ray_attachment(&node.shape, layout.nodes[&node.id], port.point);
+                if let Some(route) = layout.routes.get_mut(&edge.id) {
+                    let index = if source { 0 } else { route.points.len() - 1 };
+                    route.points[index] = port.point;
+                }
+            }
+        }
+    }
     let mut svg = crate::render::svg_with_decorations(
         &scene,
         &layout,
@@ -627,9 +716,9 @@ pub fn diff_svg(diff: &SpatialDiff, tau: f64) -> Result<String, Error> {
             };
             let color = match change {
                 Change::Unchanged => return String::new(),
-                Change::Added => "#29966f",
-                Change::Removed => "#c58b22",
-                Change::Modified => "#6276bd",
+                Change::Added => "var(--sd-added,#29966f)",
+                Change::Removed => "var(--sd-removed,#c58b22)",
+                Change::Modified => "var(--sd-modified,#6276bd)",
             };
             let outline = crate::shapes::outline(&node.shape, rect);
             let dash = if *change == Change::Removed {
@@ -656,7 +745,7 @@ pub fn diff_svg(diff: &SpatialDiff, tau: f64) -> Result<String, Error> {
         .values()
         .any(|change| *change == Change::Removed)
     {
-        svg = svg.replacen("</style>", "</style><style>.removed-node text{paint-order:stroke;stroke:#fff7e6;stroke-width:3;stroke-linejoin:round}</style><defs><pattern id=\"removed-hatch\" width=\"8\" height=\"8\" patternUnits=\"userSpaceOnUse\"><path d=\"M 0 8 L 8 0\" stroke=\"#c58b22\" stroke-width=\"1\"/></pattern></defs>", 1);
+        svg = svg.replacen("</style>", "</style><style>.removed-node text{paint-order:stroke;stroke:var(--sd-bg,#fff7e6);stroke-width:3;stroke-linejoin:round}</style><defs><pattern id=\"removed-hatch\" width=\"8\" height=\"8\" patternUnits=\"userSpaceOnUse\"><path d=\"M 0 8 L 8 0\" stroke=\"var(--sd-removed,#c58b22)\" stroke-width=\"1\"/></pattern></defs>", 1);
     }
     for (id, change) in &diff.changes {
         let opacity = frame.opacity[id];
@@ -722,6 +811,32 @@ pub fn diff_svg(diff: &SpatialDiff, tau: f64) -> Result<String, Error> {
                     "opacity=\"{opacity}\" {tag}=\"{}\"",
                     crate::render::escape(key)
                 ),
+            );
+        }
+    }
+    if tau == 0. || tau == 1. {
+        let keep = frame
+            .opacity
+            .iter()
+            .filter(|(_, opacity)| **opacity > 0.)
+            .map(|(id, _)| id.clone())
+            .collect();
+        let mut visible = views::filter(&scene, &keep);
+        visible
+            .edges
+            .retain(|edge| match diff.edge_changes.get(&edge.id) {
+                Some(Change::Added) => tau > 0.,
+                Some(Change::Removed) => tau < 1.,
+                _ => true,
+            });
+        if let (Some(start), Some(end)) = (
+            svg.find("<desc id=\"diagram-description\">"),
+            svg.find("</desc>"),
+        ) {
+            let start = start + "<desc id=\"diagram-description\">".len();
+            svg.replace_range(
+                start..end,
+                &crate::render::escape(&crate::render::description(&visible)),
             );
         }
     }

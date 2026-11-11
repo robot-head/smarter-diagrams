@@ -40,7 +40,7 @@ jobs:
       - run: scripts/build-wasm.sh core && scripts/build-wasm.sh runtime
       - run: cargo doc --locked --all-features --no-deps
         env:
-          RUSTDOCFLAGS: -D warnings
+          RUSTDOCFLAGS: -D warnings --html-in-header docs/rustdoc-header.html
       - run: npm run docs:check && npm run docs:build
       - name: Select the runner's browser
         run: |

@@ -44,9 +44,13 @@ module.exports=async function visualRegressions(browser,page,base){
 
   await page.goto(url('advanced.html'));await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('ready'));
   const checkSvg=require('./check-rendered-svg.cjs');
+  const longDecision=await page.evaluate(async()=>{const{default:init,render_svg}=await import(new URL('./pkg/smarter_diagrams.js',location.href));await init();return render_svg('node: "Approve international payment request?" [shape: diamond]\n')});
+  assert.deepEqual(await page.evaluate(checkSvg,longDecision),[],'long decision title clearance');
   for(const angle of [0,.4,Math.PI/4]){
     const markup=await page.evaluate(async angle=>{const{stack_json}=await import(new URL('./pkg-runtime/smarter_diagrams.js',location.href));return JSON.parse(stack_json(document.querySelector('#strata').value,angle)).svg;},angle);
     assert.deepEqual(await page.evaluate(checkSvg,markup),[],`spatial heading/connector clearance at ${angle}`);
+    const obstacle=await page.evaluate(async angle=>{const{stack_json}=await import(new URL('./pkg-runtime/smarter_diagrams.js',location.href));return JSON.parse(stack_json('strata [app, middleware, hardware]\nclient [stratum: app] @pin(grid: 15,0)\nleft [stratum: middleware] @pin(grid: 0,0)\nobstacle: Unrelated service [stratum: middleware] @pin(grid: 15,0)\nhost [stratum: hardware] @pin(grid: 15,0)\nclient -> host [relation: runs_on]\n',angle)).svg;},angle);
+    assert.deepEqual(await page.evaluate(checkSvg,obstacle),[],`three-plane node/connector clearance at ${angle}`);
   }
   await page.locator('#stack-controls').getByRole('button',{name:'Fit diagram',exact:true}).click();
   assert(await page.locator('#stack').evaluate(el=>el.scrollHeight<=el.clientHeight+1),'Fit must contain the whole stage');
@@ -73,11 +77,26 @@ module.exports=async function visualRegressions(browser,page,base){
     await page.locator('#diff').evaluate((el,markup)=>el.innerHTML=markup,example.svg);
     assert.deepEqual(await page.locator('#diff svg').evaluate(checkChangeInk),[],`${example.shape} change ink at ${example.tau}`);
   }
+  const modified=await page.evaluate(async()=>{
+    const{branch_diff_svg}=await import(new URL('./pkg-runtime/smarter_diagrams.js',location.href));
+    const a='client -> db\ndb: Ledger [shape: database]\n',b='client -> db\ndb: Accounts [shape: sql_table] { port id: uuid [side: W, pos: 1] }\n';
+    return [[a,b],[b,a]].flatMap(([base,proposal])=>[0,.25,.5,.75,1].map(tau=>({tau,expected:tau<.5?base:proposal,svg:branch_diff_svg(base,proposal,tau)})));
+  });
+  for(const frame of modified){
+    await page.locator('#diff').evaluate((el,markup)=>el.innerHTML=markup,frame.svg);
+    const record=frame.expected.includes('sql_table');
+    assert.equal(await page.locator('#diff [data-label="db"]').count(),record?1:0,'external title belongs to the endpoint shape');
+    assert.equal(await page.locator('#diff [data-port="db#id"]').count(),record?1:0,'named port belongs to the endpoint snapshot');
+    assert.equal((await page.locator('#diff desc').textContent()).includes('ports id:'),record,'description must match snapshot ports');
+    assert.deepEqual(await page.locator('#diff svg').evaluate(checkChangeInk),[],'modified shape outline');
+    assert.deepEqual(await page.evaluate(checkSvg,frame.svg),[],`modified shape attachments and labels at ${frame.tau}`);
+  }
   // Touch gestures run in a touch-capable context; mouse-wheel scrolling would
   // not catch a touch-action:none regression.
   const context=await browser.newContext({viewport:{width:375,height:812},isMobile:true,hasTouch:true});
   const mobile=await context.newPage();await mobile.goto(base);await mobile.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('revision'));
   const canvas=mobile.locator('#canvas'),source=await mobile.locator('#source').inputValue();await canvas.scrollIntoViewIfNeeded();
+  await mobile.getByRole('button',{name:'Actual size (100%)',exact:true}).click();
   const cdp=await context.newCDPSession(mobile);
   async function swipe(x,y,dx,dy){
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});

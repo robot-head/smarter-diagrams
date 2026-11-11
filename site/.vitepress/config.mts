@@ -37,7 +37,11 @@ export default defineConfig({
   cleanUrls: false,
   lastUpdated: true,
   sitemap: { hostname: 'https://robot-head.github.io/smarter-diagrams/' },
-  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/smarter-diagrams/logo.svg' }]],
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/smarter-diagrams/logo.svg' }],
+    ['link', { rel: 'alternate icon', href: '/smarter-diagrams/favicon.ico' }],
+    ['script', { src: '/smarter-diagrams/demo/theme.js' }],
+  ],
   markdown: {
     config(md) {
       const fence = md.renderer.rules.fence!
@@ -45,7 +49,7 @@ export default defineConfig({
       md.renderer.rules.fence = (tokens, index, options, env, renderer) => {
         const code = fence(tokens, index, options, env, renderer)
         const token = tokens[index]
-        if (!(env.relativePath?.startsWith('language/') || env.relativePath === 'examples.md') || !/^diagram(?:\s|$)/.test(token.info)) return code
+        if (!(env.relativePath?.startsWith('language/') || env.relativePath?.startsWith('guide/') || env.relativePath === 'index.md' || env.relativePath === 'examples.md') || !/^diagram(?:\s|$)/.test(token.info)) return code
         const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
         let heading = 'Language example'
         for (let i = index - 1; i >= 0; i--) {
@@ -90,7 +94,7 @@ export default defineConfig({
       { text: 'Guide', link: '/guide/getting-started', activeMatch: '/guide/' },
       { text: 'Language', link: '/language/basics', activeMatch: '/language/' },
       { text: 'Playground', link: '/playground' },
-      { text: 'Rust API', link: 'https://robot-head.github.io/smarter-diagrams/api/smarter_diagrams/index.html' },
+      { text: 'Rust API', link: 'https://robot-head.github.io/smarter-diagrams/api/smarter_diagrams/index.html', target: '_blank', rel: 'noopener' },
     ],
     sidebar: [
       { text: 'Start here', items: [{ text: 'Overview', link: '/' }, { text: 'Playground', link: '/playground' }, { text: 'Examples', link: '/examples' }] },
@@ -101,7 +105,7 @@ export default defineConfig({
       { text: 'Project', items: [{ text: 'Contributing and publishing', link: '/contributing' }] },
     ],
     search: { provider: 'local' },
-    socialLinks: [{ icon: 'github', link: 'https://github.com/robot-head/smarter-diagrams' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/robot-head/smarter-diagrams', ariaLabel: 'GitHub repository' }],
     editLink: { pattern: 'https://github.com/robot-head/smarter-diagrams/edit/main/site/:path', text: 'Edit this page on GitHub' },
     outline: [2, 3],
     footer: { message: 'Rust · WebAssembly · MIT licensed', copyright: 'Smarter Diagrams contributors' },

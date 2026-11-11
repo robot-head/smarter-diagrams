@@ -1,0 +1,11 @@
+<style>
+#sd-docs-return{position:fixed;z-index:10000;top:0;left:0;right:0;min-height:36px;box-sizing:border-box;padding:8px 18px;background:var(--main-background-color,#fff);color:var(--main-color,#233347);border-bottom:1px solid var(--table-border-color,#91abc7);font:13px/20px system-ui,sans-serif}#sd-docs-return a{color:inherit;text-decoration:underline}body{padding-top:44px}.sidebar{top:44px;height:calc(100vh - 44px)}
+@media(max-width:480px){#sd-docs-return span{display:none}}
+</style>
+<script>
+(()=>{try{const saved=localStorage.getItem('vitepress-theme-appearance');if(saved==='dark'||saved==='light'){localStorage.setItem('rustdoc-theme',saved);localStorage.setItem('rustdoc-use-system-theme','false');document.documentElement.dataset.theme=saved}}catch{}
+const base=location.pathname.split('/api/')[0]+'/';
+const icon=document.createElement('link');icon.rel='icon';icon.type='image/svg+xml';icon.href=base+'logo.svg';document.head.append(icon);
+addEventListener('DOMContentLoaded',()=>{const nav=document.createElement('nav');nav.id='sd-docs-return';nav.setAttribute('aria-label','Documentation navigation');const link=document.createElement('a');link.href=base;link.textContent='← Smarter Diagrams documentation';const label=document.createElement('span');label.textContent=' · Rust API';nav.append(link,label);document.body.prepend(nav);
+new MutationObserver(()=>{const theme=document.documentElement.dataset.theme;if(theme==='dark'||theme==='light'){try{localStorage.setItem('vitepress-theme-appearance',theme)}catch{}}}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});});})();
+</script>

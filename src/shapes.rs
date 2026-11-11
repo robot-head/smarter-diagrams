@@ -10,7 +10,6 @@ pub(crate) fn title_gutter(shape: &str) -> f64 {
         _ => 0.,
     }
 }
-#[cfg(feature = "wasm-runtime")]
 pub(crate) fn ray_attachment(shape: &str, r: Rect, toward: Point) -> Point {
     let (dx, dy) = (toward.x - r.x, toward.y - r.y);
     let length = dx.hypot(dy);

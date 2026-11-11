@@ -167,10 +167,16 @@ fn gap_mask(id: &str, gaps: &BTreeMap<String, Vec<Point>>) -> String {
 }
 /// Bounds of every painted feature, including external record and zone titles.
 pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
-    l.nodes
+    let ink = l
+        .nodes
         .values()
         .copied()
-        .chain(l.labels.iter().map(|a| a.bounds))
+        .chain(l.labels.iter().map(|a| a.bounds.inflate(4.)))
+        .chain(
+            l.ports
+                .values()
+                .map(|p| Rect::new(p.point.x, p.point.y, 8., 8.)),
+        )
         .chain(
             l.routes
                 .values()
@@ -182,9 +188,21 @@ pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
                 .flat_map(|z| z.iter().map(|p| Rect::new(p.x, p.y, 1., 1.))),
         )
         .chain(scene.zones.iter().filter_map(|z| zone_label(z, l)))
+        .chain(
+            scene
+                .flows
+                .iter()
+                .flat_map(|flow| flow.edges.iter())
+                .filter_map(|id| {
+                    l.routes.get(id).map(|route| {
+                        let p = at_arc(&route.points, 0.5);
+                        Rect::new(p.x, p.y, 22., 22.)
+                    })
+                }),
+        )
         .reduce(Rect::union)
-        .unwrap_or(Rect::new(0., 0., 160., 80.))
-        .inflate(32.)
+        .unwrap_or(Rect::new(0., 0., 160., 80.));
+    Rect::new(ink.x, ink.y, ink.w + 96., ink.h + 64.)
 }
 
 pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
@@ -201,7 +219,7 @@ pub(crate) fn svg_with_decorations(
     let bounds = bounds(scene, l);
     let gaps = crossing_gaps(l, edge_visible);
     let mut s = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:13px;fill:#233347}}.node-title{{font-weight:600;font-size:14px}}.port-label{{font-size:11px}}.edge{{fill:none;stroke:#53657a;stroke-width:1.7;stroke-linejoin:round}}.flow{{fill:none;stroke:#356bd9;stroke-width:3;stroke-linejoin:round}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:#53657a}}</style>",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:13px;fill:var(--sd-fg,#233347)}}.node-title{{font-weight:600;font-size:14px}}.port-label{{font-size:11px}}.edge{{fill:none;stroke:var(--sd-edge,#53657a);stroke-width:1.7;stroke-linejoin:round}}.flow{{fill:none;stroke:#356bd9;stroke-width:3;stroke-linejoin:round}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:var(--sd-edge,#53657a)}}</style>",
         bounds.left(),
         bounds.top(),
         bounds.w,
@@ -240,7 +258,7 @@ pub(crate) fn svg_with_decorations(
         let r = l.nodes[&n.id];
         let _ = write!(
             s,
-            "<g data-node=\"{}\" data-shape=\"container\" aria-label=\"{}\"><rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"12\" fill=\"#f0f4f9\" stroke=\"#73869b\"/>",
+            "<g data-node=\"{}\" data-shape=\"container\" aria-label=\"{}\"><rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"12\" fill=\"var(--sd-container,#f0f4f9)\" stroke=\"var(--sd-muted,#73869b)\"/>",
             escape(&n.id),
             escape(&n.label),
             r.left(),
@@ -287,7 +305,7 @@ pub(crate) fn svg_with_decorations(
         } else if e.attrs.contains_key("phantom") {
             "#c345ac"
         } else {
-            "#53657a"
+            "var(--sd-edge,#53657a)"
         };
         let width = if e.attrs.contains_key("active") {
             4.0
@@ -335,7 +353,7 @@ pub(crate) fn svg_with_decorations(
             "actor" => {
                 let _ = write!(
                     s,
-                    "<rect data-silhouette=\"true\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"18\" fill=\"#e4f2ea\" stroke=\"#608b75\"/><circle cx=\"{}\" cy=\"{}\" r=\"5\" fill=\"none\" stroke=\"#608b75\"/><path d=\"M {} {} Q {} {} {} {}\" fill=\"none\" stroke=\"#608b75\"/>",
+                    "<rect data-silhouette=\"true\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"18\" fill=\"var(--sd-actor,#e4f2ea)\" stroke=\"var(--sd-actor-border,#608b75)\"/><circle cx=\"{}\" cy=\"{}\" r=\"5\" fill=\"none\" stroke=\"var(--sd-actor-border,#608b75)\"/><path d=\"M {} {} Q {} {} {} {}\" fill=\"none\" stroke=\"var(--sd-actor-border,#608b75)\"/>",
                     r.left(),
                     r.top(),
                     r.w,
@@ -353,9 +371,12 @@ pub(crate) fn svg_with_decorations(
             "cache" | "diamond" | "decision" => {
                 let vertices = crate::shapes::polygon(&n.shape, r).unwrap();
                 let (fill, stroke) = if n.shape == "cache" {
-                    ("#fff1d6", "#95723b")
+                    ("var(--sd-cache,#fff1d6)", "var(--sd-cache-border,#95723b)")
                 } else {
-                    ("#fff0d8", "#98702e")
+                    (
+                        "var(--sd-decision,#fff0d8)",
+                        "var(--sd-decision-border,#98702e)",
+                    )
                 };
                 let _ = write!(
                     s,
@@ -367,7 +388,7 @@ pub(crate) fn svg_with_decorations(
                 let ry = crate::shapes::CYLINDER_RY.min(r.h / 2.);
                 let _ = write!(
                     s,
-                    "<path data-silhouette=\"true\" d=\"M {} {} A {} {ry} 0 0 1 {} {} L {} {} A {} {ry} 0 0 1 {} {} Z\" fill=\"#e1edf9\" stroke=\"#6483a2\"/><ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{ry}\" fill=\"#d1e3f5\" stroke=\"#6483a2\"/>",
+                    "<path data-silhouette=\"true\" d=\"M {} {} A {} {ry} 0 0 1 {} {} L {} {} A {} {ry} 0 0 1 {} {} Z\" fill=\"var(--sd-database,#e1edf9)\" stroke=\"var(--sd-database-border,#6483a2)\"/><ellipse cx=\"{}\" cy=\"{}\" rx=\"{}\" ry=\"{ry}\" fill=\"var(--sd-cap,#d1e3f5)\" stroke=\"var(--sd-database-border,#6483a2)\"/>",
                     r.left(),
                     r.top() + ry,
                     r.w / 2.,
@@ -385,13 +406,13 @@ pub(crate) fn svg_with_decorations(
             }
             _ => {
                 let fill = match n.shape.as_str() {
-                    "queue" => "#e7e0fa",
-                    "sql_table" => "#e1edf9",
-                    _ => "#e5eef6",
+                    "queue" => "var(--sd-queue,#e7e0fa)",
+                    "sql_table" => "var(--sd-database,#e1edf9)",
+                    _ => "var(--sd-node,#e5eef6)",
                 };
                 let _ = write!(
                     s,
-                    "<rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"{}\" fill=\"{fill}\" stroke=\"#6b8198\"/>",
+                    "<rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"{}\" fill=\"{fill}\" stroke=\"var(--sd-border,#6b8198)\"/>",
                     r.left(),
                     r.top(),
                     r.w,
@@ -403,7 +424,7 @@ pub(crate) fn svg_with_decorations(
                         let x = r.left() + k as f64 * 10.;
                         let _ = write!(
                             s,
-                            "<path d=\"M {x} {} V {}\" stroke=\"#b4a5d4\"/>",
+                            "<path d=\"M {x} {} V {}\" stroke=\"var(--sd-queue-line,#b4a5d4)\"/>",
                             r.top() + 8.,
                             r.bottom() - 8.
                         );
@@ -415,7 +436,7 @@ pub(crate) fn svg_with_decorations(
         if let Some(index) = scene.story.iter().position(|id| id == &n.id) {
             let _ = write!(
                 s,
-                "<path data-story-outline=\"{}\" d=\"{}\" fill=\"none\" stroke=\"#3f6dc5\" stroke-width=\"2.5\"><title>Story step {}</title></path>",
+                "<path data-story-outline=\"{}\" d=\"{}\" fill=\"none\" stroke=\"var(--sd-story,#3f6dc5)\" stroke-width=\"2.5\"><title>Story step {}</title></path>",
                 escape(&n.id),
                 crate::shapes::outline(&n.shape, r),
                 index + 1
@@ -463,7 +484,7 @@ pub(crate) fn svg_with_decorations(
         let (radius, paint) = if unused {
             (
                 2.5,
-                "data-unused-port=\"true\" fill=\"white\" stroke=\"#53657a\" stroke-width=\"1.5\"",
+                "data-unused-port=\"true\" fill=\"var(--sd-bg,#ffffff)\" stroke=\"var(--sd-edge,#53657a)\" stroke-width=\"1.5\"",
             )
         } else {
             (4., "fill=\"transparent\"")
@@ -483,7 +504,7 @@ pub(crate) fn svg_with_decorations(
         if let Some((a, b)) = crate::labels::leader(label) {
             let _ = write!(
                 s,
-                "<path data-callout=\"true\" d=\"M {} {} L {} {}\" stroke=\"#73869b\" fill=\"none\"/>",
+                "<path data-callout=\"true\" d=\"M {} {} L {} {}\" stroke=\"var(--sd-muted,#73869b)\" fill=\"none\"/>",
                 a.x, a.y, b.x, b.y
             );
         }
@@ -549,7 +570,7 @@ pub(crate) fn svg_with_decorations(
         if label.knockout && !label.callout {
             let _ = write!(
                 s,
-                "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"5\" fill=\"white\"/>",
+                "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"5\" fill=\"var(--sd-bg,#ffffff)\"/>",
                 r.left() - 4.,
                 r.top() - 4.,
                 r.w + 8.,
@@ -569,7 +590,7 @@ pub(crate) fn svg_with_decorations(
         if let Some(r) = zone_label(z, l) {
             let _ = write!(
                 s,
-                "<text data-zone-label=\"{}\" x=\"{}\" y=\"{}\" style=\"font-weight:600;fill:#29493f;paint-order:stroke;stroke:white;stroke-width:3;stroke-linejoin:round\">{}</text>",
+                "<text data-zone-label=\"{}\" x=\"{}\" y=\"{}\" style=\"font-weight:600;fill:var(--sd-zone-text,#29493f);paint-order:stroke;stroke:var(--sd-bg,#ffffff);stroke-width:3;stroke-linejoin:round\">{}</text>",
                 escape(&z.id),
                 r.left(),
                 r.y + 4.,

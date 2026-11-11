@@ -234,7 +234,7 @@ fn fresh_unpinned_containers_fit_their_children() {
 #[test]
 fn arrowheads_match_active_phantom_and_flow_colors_and_inline_is_explicit() {
     for (attrs, color) in [
-        ("", "#53657a"),
+        ("", "var(--sd-edge,#53657a)"),
         ("[active: true]", "#356bd9"),
         ("[phantom: true]", "#c345ac"),
     ] {
@@ -265,5 +265,21 @@ fn arrowheads_match_active_phantom_and_flow_colors_and_inline_is_explicit() {
             .nth(1)
             .unwrap()
             .contains("<rect")
+    );
+}
+
+#[test]
+fn long_decisions_reserve_an_interior_title_rectangle() {
+    let source = "node: \"Approve international payment request?\" [shape: diamond]\n";
+    let diagram = compile(source).unwrap();
+    let r = diagram.layout.nodes["node"];
+    let width = smarter_diagrams::labels::text_width(&diagram.scene.nodes[0].label) * 14. / 13.;
+    assert!((width + 16.) / r.w + 24. / r.h <= 1.);
+    let locked = format!("{} @pin(grid: 0,0, lock: [w: 8g, h: 3g])\n", source.trim());
+    assert!(
+        compile(&locked)
+            .unwrap_err()
+            .to_string()
+            .contains("decision title")
     );
 }

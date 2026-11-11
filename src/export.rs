@@ -1,6 +1,60 @@
 //! Native PNG/PDF export, optional so font/raster dependencies stay out of the core Wasm bundle.
 use crate::Error;
 
+fn color_fallbacks(value: &str) -> String {
+    let mut value = value.to_owned();
+    while let Some(start) = value.find("var(--sd-") {
+        let Some(end) = value[start..].find(')').map(|n| start + n) else {
+            break;
+        };
+        let Some((_, fallback)) = value[start..end].split_once(',') else {
+            break;
+        };
+        let fallback = fallback.trim().to_owned();
+        value.replace_range(start..=end, &fallback);
+    }
+    value
+}
+
+// Resolve only paint attributes and style declarations. A diagram caption can
+// itself contain CSS syntax, which must remain literal text in native exports.
+fn native_svg(svg: &str) -> String {
+    let mut output = String::with_capacity(svg.len());
+    let mut cursor = 0;
+    while let Some(open) = svg[cursor..].find('<').map(|n| cursor + n) {
+        output.push_str(&svg[cursor..open]);
+        let Some(end) = svg[open..].find('>').map(|n| open + n + 1) else {
+            cursor = open;
+            break;
+        };
+        let mut tag = svg[open..end].to_owned();
+        for attribute in [" fill=\"", " stroke=\"", " style=\""] {
+            let mut offset = 0;
+            while let Some(start) = tag[offset..]
+                .find(attribute)
+                .map(|n| offset + n + attribute.len())
+            {
+                let Some(end) = tag[start..].find('"').map(|n| start + n) else {
+                    break;
+                };
+                let fallback = color_fallbacks(&tag[start..end]);
+                tag.replace_range(start..end, &fallback);
+                offset = start + fallback.len() + 1;
+            }
+        }
+        output.push_str(&tag);
+        cursor = end;
+        if tag.starts_with("<style")
+            && let Some(end) = svg[cursor..].find("</style>").map(|n| cursor + n)
+        {
+            output.push_str(&color_fallbacks(&svg[cursor..end]));
+            cursor = end;
+        }
+    }
+    output.push_str(&svg[cursor..]);
+    output
+}
+
 fn tree(svg: &str) -> Result<resvg::usvg::Tree, Error> {
     use resvg::usvg::{Options, fontdb};
     let mut options = Options::default();
@@ -36,7 +90,10 @@ fn tree(svg: &str) -> Result<resvg::usvg::Tree, Error> {
     })?;
     fonts.set_sans_serif_family(family.clone());
     options.font_family = family;
-    resvg::usvg::Tree::from_str(svg, &options).map_err(|e| Error::Layout(e.to_string()))
+    // Native exporters do not implement browser custom properties. Resolve our
+    // explicit light fallbacks while preserving arbitrary user colors.
+    let native = native_svg(svg);
+    resvg::usvg::Tree::from_str(&native, &options).map_err(|e| Error::Layout(e.to_string()))
 }
 
 pub fn png(svg: &str, scale: f32) -> Result<Vec<u8>, Error> {
@@ -69,4 +126,20 @@ pub fn pdf(svg: &str) -> Result<Vec<u8>, Error> {
         svg2pdf::PageOptions::default(),
     )
     .map_err(|e| Error::Layout(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn native_paints_resolve_without_rewriting_literal_captions() {
+        let svg = crate::compile("node: \"var(--sd-fg,#233347)\"\n")
+            .unwrap()
+            .to_svg();
+        let native = super::native_svg(&svg);
+        assert!(native.contains(">var(--sd-fg,#233347)</text>"));
+        assert!(native.contains("fill=\"#e5eef6\""));
+        assert!(native.contains("font-size:13px;fill:#233347"));
+        assert!(!native.contains("fill=\"var("));
+        assert!(!native.contains("fill:var("));
+    }
 }
