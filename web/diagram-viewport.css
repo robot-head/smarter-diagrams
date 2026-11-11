@@ -1,3 +1,18 @@
-.diagram-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px}.diagram-controls button{font:inherit;font-size:13px;min-height:34px;padding:6px 10px}.diagram-controls output{font-size:13px;min-width:44px;text-align:center}.diagram-pan-hint,.stack-legend{font-size:12px;color:#465c72}.diagram-viewport{overflow:auto;max-height:480px;min-height:120px!important;background:white;overscroll-behavior:contain;border:1px solid #b6c5d5;border-radius:8px;padding:8px!important}.diagram-viewport:focus-visible{outline:3px solid #168c7b;outline-offset:3px}.source-panel{margin-bottom:12px}.source-panel summary{cursor:pointer;font-weight:600;padding:8px 0}.source-panel textarea{display:block}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}#metrics{white-space:pre-wrap;overflow-wrap:anywhere}#simulation-legend{font-size:13px;color:#6d3522}.canvas-panel{min-width:0}.stack-legend{max-width:60ch;line-height:1.5}button:focus-visible,summary:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #168c7b;outline-offset:3px}@media(max-width:760px){.diagram-controls{gap:6px}.diagram-viewport{max-height:60vh}}
+.diagram-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px}.diagram-controls button{font:inherit;font-size:13px;min-height:34px;padding:6px 10px}.diagram-controls output{font-size:13px;min-width:44px;text-align:center}.diagram-pan-hint,.stack-legend{font-size:12px;color:var(--sd-muted,#465c72)}.diagram-viewport{overflow:auto;max-height:480px;min-height:120px!important;background:var(--sd-bg,#ffffff);overscroll-behavior:auto;border:1px solid #b6c5d5;border-radius:8px;padding:8px!important}.diagram-viewport:focus-visible{outline:3px solid #168c7b;outline-offset:3px}.source-panel{margin-bottom:12px}.source-panel summary{cursor:pointer;font-weight:600;padding:8px 0}.source-panel textarea{display:block}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}#metrics{white-space:pre-wrap;overflow-wrap:anywhere}#simulation-legend{font-size:13px;color:var(--sd-overload,#6d3522)}.canvas-panel{min-width:0}.stack-legend{max-width:60ch;line-height:1.5}button:focus-visible,summary:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #168c7b;outline-offset:3px}@media(max-width:760px){.diagram-controls{gap:6px}.diagram-viewport{max-height:60vh}}
 
 main>section{min-width:0}.diagram-viewport{max-width:100%;box-sizing:border-box}
+
+/* Shared surfaces override the standalone examples' original light defaults. */
+:root,body{color:var(--sd-fg);background:var(--sd-surface)}
+button,select,textarea,main>section,#canvas,.diagram-viewport{color:var(--sd-fg);background:var(--sd-bg);border-color:var(--sd-border)}
+.diagram-viewport{overscroll-behavior:auto}
+.diagram-pan-hint,.stack-legend{color:var(--sd-muted)}
+a{color:var(--sd-status)}
+#simulation-legend{color:var(--sd-overload)}
+.toolbar-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;max-width:100%}
+nav{flex-wrap:wrap;min-width:0}
+nav button,nav select{min-height:38px}
+button[aria-pressed=true]{background:var(--sd-status);border-color:var(--sd-status);color:var(--sd-bg);font-weight:700;box-shadow:0 0 0 2px var(--sd-bg),0 0 0 3px var(--sd-status)}
+button[aria-pressed] span[aria-hidden]{margin-right:4px}
+main:has(.canvas-panel){grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
+@media(max-width:767px){main{display:flex;flex-direction:column}main>section{width:100%;box-sizing:border-box}textarea{height:300px}body{margin:16px}.demo-links{align-items:center}}

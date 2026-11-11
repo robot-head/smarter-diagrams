@@ -43,3 +43,5 @@ The command reads source from stdin, applies a typed operation array, validates 
 With `export`, call `export::png(&svg, scale)` or `export::pdf(&svg)`. PNG scale must be finite and in `(0, 8]`; output is capped at 100 megapixels. SVG remains useful when a large diagram would exceed the raster cap.
 
 Native text export loads installed fonts and chooses an available sans-serif family. Install a TrueType/OpenType font if the machine has none. Exact glyph metrics can differ between machines; the layout uses conservative text-width estimates. Keep a consistent font environment for reproducible raster/PDF output.
+
+Browser SVG colors use CSS custom properties such as `--sd-fg`, `--sd-edge`, `--sd-bg`, and `--sd-database`, with light-mode color fallbacks. Inline SVG inherits these properties from its host; an SVG used as an image needs the palette embedded in the file. Native PNG/PDF exports resolve the emitted fallbacks so browser theming does not remove fills or text.

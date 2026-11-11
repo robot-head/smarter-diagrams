@@ -5,7 +5,8 @@ hero:
   text: Text in. Diagrams out.
   tagline: A Rust library for diagrams you can author in text, refine on a canvas, and keep in version control.
   image:
-    src: /generated/hello.svg
+    light: /generated/hello.svg
+    dark: /generated/hello-dark.svg
     alt: A web client connected to an API and Postgres
   actions:
     - theme: brand

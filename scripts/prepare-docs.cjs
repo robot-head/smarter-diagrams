@@ -5,6 +5,10 @@ const { createHash } = require('node:crypto');
 const { samples, key } = require('../site/.vitepress/diagram-samples.cjs');
 const root = path.resolve(__dirname, '..');
 const publicDir = path.join(root, 'site/public');
+const palette = fs.readFileSync(path.join(root,'web/diagram-palette.css'),'utf8');
+const lightPalette = palette.match(/:root\{([^}]+)\}/)[1];
+const darkPalette = lightPalette + ';' + palette.match(/:root\[data-theme=dark\]\{([^}]+)\}/)[1];
+const themed = (svg,dark=false) => svg.replace('<svg ',`<svg style="${dark?darkPalette:lightPalette}" `).replace(/width="[^"]+" height="[^"]+" role="img"/, 'width="100%" height="auto" role="img"');
 const release = process.argv.includes('--release');
 const copy = (from, to) => { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.cpSync(from, to, { recursive: true }); };
 const required = ['web/pkg/smarter_diagrams_bg.wasm', 'web/pkg-runtime/smarter_diagrams_bg.wasm', 'target/doc/smarter_diagrams/index.html'];
@@ -31,8 +35,9 @@ for (const file of ['architecture', 'performance', 'verification']) {
 }
 const languageSamples = new Map();
 const comparisons = [];
-for (const file of fs.readdirSync(path.join(root, 'site/language')).filter(file => file.endsWith('.md'))) {
-  const text = fs.readFileSync(path.join(root, 'site/language', file), 'utf8');
+const samplePages=['site/index.md',...['language','guide'].flatMap(dir=>fs.readdirSync(path.join(root,'site',dir)).filter(f=>f.endsWith('.md')).map(f=>`site/${dir}/${f}`))];
+for (const file of samplePages) {
+  const text = fs.readFileSync(path.join(root, file), 'utf8');
   for (const match of text.matchAll(/^```(diagram[^\n]*)\n([\s\S]*?)^```/gm)) {
     const group=samples(match[2],match[1]);
     for (const sample of group) languageSamples.set(key(sample), { ...sample, label: `${file}: ${sample.label}` });
@@ -45,7 +50,8 @@ for (const file of fs.readdirSync(path.join(root, 'examples')).filter(file => fi
   const result = spawnSync(path.join(root, 'target/debug/smarter-diagrams'), [path.join(root, 'examples', file)], { encoding: 'utf8' });
   if (result.status !== 0) throw Error(`Cannot render ${file}: ${result.stderr || result.error}`);
   const output = path.join(publicDir, 'generated', file.replace(/\.diagram$/, '.svg'));
-  fs.mkdirSync(path.dirname(output), { recursive: true }); fs.writeFileSync(output, result.stdout);
+  fs.mkdirSync(path.dirname(output), { recursive: true }); fs.writeFileSync(output, themed(result.stdout));
+  fs.writeFileSync(output.replace(/\.svg$/,'-dark.svg'),themed(result.stdout,true));
   // Imported example fences use exactly the same rendering path as inline code.
   const sample = samples(fs.readFileSync(path.join(root, 'examples', file), 'utf8'))[0];
   languageSamples.set(key(sample), { ...sample, label: file });
@@ -68,8 +74,10 @@ for (let i = 0; i < requests.length; i++) {
   const result=images[i];
   if(result.diagnostic){manifest[key(requests[i])]=result;continue;}
   const {svg,...metadata}=result;
-  const file = `${createHash('sha256').update(svg).digest('hex')}.svg`;
-  fs.writeFileSync(path.join(destination, file), svg); manifest[key(requests[i])] = {file,...metadata};
+  const file = `${createHash('sha256').update(svg).update(palette).digest('hex')}.svg`;
+  manifest[key(requests[i])] = {file,...metadata};
+  fs.writeFileSync(path.join(destination,file),themed(svg));
+  const darkFile=file.replace(/\.svg$/,'-dark.svg');fs.writeFileSync(path.join(destination,darkFile),themed(svg,true));manifest[key(requests[i])].darkFile=darkFile;
 }
 fs.writeFileSync(path.join(destination, 'manifest.json'), JSON.stringify(manifest));
 console.log(`Prepared documentation, examples, Wasm, Rust API and ${requests.length} language diagram renders.`);

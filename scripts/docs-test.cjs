@@ -70,7 +70,8 @@ const url = path => new URL(path, base).href;
         assert.deepEqual(await page.evaluate(checkSvg,markup),[],source);
         const frame=markup.match(/viewBox="([^"]+)"/)[1];
         if(comparisonFrame)assert.equal(frame,comparisonFrame,'comparison must keep its scale/frame');comparisonFrame=frame;
-        assert.equal(await group.locator('output').textContent(),'100%','readable native size must be the default');
+        assert(await group.locator('.diagram-stage').evaluate(el=>el.getBoundingClientRect().width<=el.closest('.diagram-viewport').clientWidth+1),'initial diagram must fit the container');
+        assert(Number.parseInt(await group.locator('output').textContent())<=100,'initial Fit must not enlarge small diagrams');
         const label=await group.locator('figcaption').textContent();
         if(label.includes('View: request_only')){assert(markup.includes('data-node="client"'));assert(!markup.includes('data-node="metrics"'));}
         if(label.includes('View: downstream')){assert(markup.includes('data-node="metrics"'));assert(!markup.includes('data-node="client"'));}
@@ -89,6 +90,7 @@ const url = path => new URL(path, base).href;
   await page.goto(url('language/reference.html'));
   const dense=page.locator('.diagram-examples').last();
   await page.setViewportSize({width:375,height:812});
+  await dense.getByRole('button',{name:'Actual size (100%)',exact:true}).click();
   const pan=dense.locator('.diagram-viewport');await pan.focus();await pan.press('ArrowRight');
   await page.waitForFunction(()=>[...document.querySelectorAll('.diagram-viewport')].some(el=>el.scrollLeft>0));
   await dense.getByRole('button',{name:'Zoom in',exact:true}).click();assert.equal(await dense.locator('output').textContent(),'125%');
@@ -134,6 +136,7 @@ const url = path => new URL(path, base).href;
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `horizontal overflow: ${path}`);
   }
   await page.screenshot({ path: 'artifacts/docs-mobile-editor.png', fullPage: true });
+  await require('./site-usability-test.cjs')(browser,page,base.href);
   assert.deepEqual(errors, []);
   await browser.close();
   const result = spawnSync(process.execPath, ['scripts/browser-test.cjs'], { env: { ...process.env, DIAGRAM_TEST_URL: url('demo/') }, stdio: 'inherit' });

@@ -2,7 +2,7 @@
 
 The language is progressive: topology first, then labels, ports and constraints as needed. Source is UTF-8; comments, whitespace and CRLF are retained in the syntax tree.
 
-Each source example below is followed by its actual compiler output. Use the viewing controls to zoom, choose **Fit** for an overview, or scroll to pan. Expand **Diagram description** for a text listing of nodes and connections.
+Each source example below is followed by its actual compiler output. Diagrams start fitted to the available space. Use the percentage button for **100%** text scale, choose **Fit** to show the whole diagram again, or use **Ctrl/⌘ + scroll** to zoom. At larger scales, swipe or use arrow keys to pan. Expand **Diagram description** for a text listing of nodes and connections.
 
 ## Nodes and labels
 

@@ -21,9 +21,9 @@ export function paintQueueState(svg,state){
   const element=name=>document.createElementNS(svg.namespaceURI,name);
   for(const node of svg.querySelectorAll('[data-node]')){
     const q=state?.nodes[node.dataset.node],shape=node.querySelector('[data-silhouette]');if(!q||!shape)continue;
-    const box=shape.getBBox(),full=q.saturation>=.95,color=full?'#a53b24':'#176e62';
+    const box=shape.getBBox(),full=q.saturation>=.95,color=full?'var(--sd-overload,#a53b24)':'var(--sd-status,#176e62)';
     node.dataset.saturation=String(Math.round(q.saturation*100));node.setAttribute('aria-label',`${node.dataset.node}: queue ${q.queued.toFixed(1)}, ${Math.round(q.saturation*100)}% full, ${q.dropped.toFixed(1)} dropped`);
-    shape.style.stroke=full?color:'';shape.style.strokeWidth=full?'2.5':'';shape.style.fill=full?'#fff0e6':'';
+    shape.style.stroke=full?color:'';shape.style.strokeWidth=full?'2.5':'';shape.style.fill=full?'var(--sd-overload-fill,#fff0e6)':'';
     const textBoxes=[...node.querySelectorAll('text')].map(text=>text.getBBox());
     const group=element('g');group.dataset.simulationOverlay='true';group.style.opacity='1';node.append(group);
     const barBox=statusBar(shape,box);

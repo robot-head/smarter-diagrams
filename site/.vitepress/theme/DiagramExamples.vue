@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, useId } from 'vue'
-import { withBase } from 'vitepress'
+import { withBase, useData } from 'vitepress'
 
 type NodeRow = { id: string; label: string; shape: string; parent: string | null; bounds: { x:number; y:number; w:number; h:number }; ports: { id:string; label:string; constraint:unknown }[] }
-type Example = { file:string; label:string; description:string; viewBox:number[]; grid:number; nodes:NodeRow[]; edges:{ id:string; source:string; target:string; label:string; kind:string }[]; zones:{label:string;members:string[]}[]; flows:{label:string;steps:string[]}[] }
+type Example = { file:string; darkFile:string; label:string; description:string; viewBox:number[]; grid:number; nodes:NodeRow[]; edges:{ id:string; source:string; target:string; label:string; kind:string }[]; zones:{label:string;members:string[]}[]; flows:{label:string;steps:string[]}[] }
 const props = defineProps<{ examples:Example[]; title:string; guides?:boolean }>()
+const { isDark } = useData()
+const fitted = ref(true)
 const active = ref(0), zoom = ref(1), showGrid = ref(false), viewport = ref<HTMLElement>(), viewportWidth = ref(640)
 const id = useId(), current = computed(() => props.examples[active.value])
 const bounds = computed(() => current.value.viewBox)
 const imageStyle = computed(() => ({ width:`${bounds.value[2]*zoom.value}px`, height:`${bounds.value[3]*zoom.value}px` }))
-const fitScale = computed(() => Math.min(viewportWidth.value / bounds.value[2], 440 / bounds.value[3]))
+const fitScale = computed(() => Math.min(1, viewportWidth.value / bounds.value[2], 440 / bounds.value[3]))
 const percent = computed(() => `${Math.round(zoom.value*100)}%`)
 const gridLines = computed(() => {
   const [x,y,w,h]=bounds.value, grid=current.value.grid
@@ -19,10 +21,12 @@ const gridLines = computed(() => {
   return {xs,ys}
 })
 let observer:ResizeObserver | undefined
-onMounted(() => { if(viewport.value){viewportWidth.value=viewport.value.clientWidth;observer=new ResizeObserver(entries=>viewportWidth.value=entries[0].contentRect.width);observer.observe(viewport.value)} })
+onMounted(() => { if(viewport.value){viewportWidth.value=viewport.value.clientWidth;zoom.value=fitScale.value;observer=new ResizeObserver(entries=>{viewportWidth.value=entries[0].contentRect.width;if(fitted.value)zoom.value=fitScale.value});observer.observe(viewport.value)} })
 onUnmounted(() => observer?.disconnect())
-function setZoom(value:number){ zoom.value=Math.max(0.05,Math.min(4,value)) }
-async function choose(index:number){ active.value=index;await nextTick() }
+function setZoom(value:number){ fitted.value=false;zoom.value=Math.max(0.05,Math.min(4,value)) }
+function fit(){fitted.value=true;zoom.value=fitScale.value}
+function wheel(event:WheelEvent){if(!event.ctrlKey&&!event.metaKey)return;event.preventDefault();setZoom(zoom.value*Math.exp(-Math.max(-100,Math.min(100,event.deltaY))*.005))}
+async function choose(index:number){ active.value=index;await nextTick();if(fitted.value)fit() }
 function tabs(event:KeyboardEvent,index:number){
   const keys=['ArrowLeft','ArrowRight','Home','End'];if(!keys.includes(event.key))return
   event.preventDefault();const n=props.examples.length
@@ -40,16 +44,15 @@ const units = (value:number) => Number((value/current.value.grid).toFixed(2))
     <figure :id="`${id}-panel`" class="diagram-example" :role="examples.length>1?'tabpanel':undefined" :aria-labelledby="examples.length>1?`${id}-tab-${active}`:undefined">
       <div class="diagram-controls" role="group" :aria-label="`${title} viewing controls`">
         <button aria-label="Zoom out" @click="setZoom(zoom/1.25)">−</button>
-        <output aria-live="polite" aria-label="Diagram scale">{{ percent }}</output>
+        <button aria-label="Actual size (100%)" @click="setZoom(1)"><output aria-live="polite" aria-label="Diagram scale">{{ percent }}</output></button>
         <button aria-label="Zoom in" @click="setZoom(zoom*1.25)">+</button>
-        <button aria-label="Actual size (100%)" @click="setZoom(1)">100%</button>
-        <button @click="setZoom(fitScale)">Fit</button>
+        <button @click="fit">Fit</button>
         <label v-if="guides"><input v-model="showGrid" type="checkbox"> Show grid</label>
-        <span class="diagram-pan-hint">Scroll to pan</span>
+        <span class="diagram-pan-hint">Ctrl/⌘ + scroll to zoom · swipe to pan</span>
       </div>
-      <div ref="viewport" class="diagram-viewport" tabindex="0" :aria-label="`${title} diagram. Scroll to pan; use the zoom controls to change scale.`">
+      <div ref="viewport" class="diagram-viewport" @wheel="wheel" tabindex="0" :aria-label="`${title} diagram. Ctrl or Command plus scroll to zoom; swipe or use arrow keys to pan.`">
         <div class="diagram-stage" :style="imageStyle">
-          <img :src="withBase(`/generated/language/${current.file}`)" loading="lazy" :alt="`${title} — ${current.label}. ${current.nodes.length} nodes and ${current.edges.length} connections. Details follow in Diagram description.`" :aria-describedby="`${id}-description`">
+          <img :src="withBase(`/generated/language/${isDark ? current.darkFile : current.file}`)" loading="lazy" :alt="`${title} — ${current.label}. ${current.nodes.length} nodes and ${current.edges.length} connections. Details follow in Diagram description.`" :aria-describedby="`${id}-description`">
           <svg v-if="showGrid" class="diagram-grid" :viewBox="bounds.join(' ')" aria-hidden="true">
             <g stroke="#147467" stroke-opacity=".2" stroke-width=".6">
               <line v-for="x in gridLines.xs" :key="`x${x}`" :x1="x" :x2="x" :y1="bounds[1]" :y2="bounds[1]+bounds[3]"/>
@@ -59,7 +62,7 @@ const units = (value:number) => Number((value/current.value.grid).toFixed(2))
           </svg>
         </div>
       </div>
-      <figcaption>{{ current.label }} · <a :href="withBase(`/generated/language/${current.file}`)" target="_blank" rel="noopener" :aria-label="`Open SVG: ${title} — ${current.label}`">Open SVG ↗</a><span v-if="examples.length>1"> · Comparisons keep the same scale and frame.</span></figcaption>
+      <figcaption>{{ current.label }} · <a :href="withBase(`/generated/language/${isDark ? current.darkFile : current.file}`)" target="_blank" rel="noopener" :aria-label="`Open SVG: ${title} — ${current.label}`">Open SVG ↗</a><span v-if="examples.length>1"> · Comparisons keep the same scale and frame.</span></figcaption>
       <details :id="`${id}-description`" class="diagram-description">
         <summary>Diagram description · {{ current.nodes.length }} nodes, {{ current.edges.length }} connections</summary>
         <p>{{ current.description }}</p>
