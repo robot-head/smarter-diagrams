@@ -9,35 +9,71 @@ pub fn escape(s: &str) -> String {
         .replace('\'', "&apos;")
 }
 /// Deterministic per-drawing IDs keep masks, hatches and accessible titles local.
-pub(crate) fn namespace_svg(mut svg: String) -> String {
+pub(crate) fn namespace_svg(svg: String) -> String {
     let hash = svg.bytes().fold(0xcbf29ce484222325u64, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x100000001b3)
     });
     let prefix = format!("sd-{hash:016x}");
-    let ids: Vec<String> = svg
+    let ids: BTreeMap<_, _> = svg
         .split(" id=\"")
         .skip(1)
-        .filter_map(|s| s.split('"').next().map(str::to_owned))
+        .filter_map(|s| s.split('"').next())
+        .map(|id| (id.to_owned(), format!("{prefix}-{id}")))
         .collect();
-    for id in ids {
-        let new = format!("{prefix}-{id}");
-        svg = svg
-            .replace(&format!(" id=\"{id}\""), &format!(" id=\"{new}\""))
-            .replace(&format!("url(#{id})"), &format!("url(#{new})"));
-        if let Some(start) = svg.find("aria-labelledby=\"") {
-            let start = start + "aria-labelledby=\"".len();
-            if let Some(end) = svg[start..].find('"') {
-                let end = start + end;
-                let value = svg[start..end]
+    // The emitter quotes attributes and escapes user strings. Rewrite only
+    // reference attributes, preserving captions, descriptions and aria-labels.
+    let mut output = String::with_capacity(svg.len());
+    let mut cursor = 0;
+    while let Some(open) = svg[cursor..].find('<') {
+        let start = cursor + open;
+        output.push_str(&svg[cursor..start]);
+        let Some(close) = svg[start..].find('>') else {
+            output.push_str(&svg[start..]);
+            return output;
+        };
+        let end = start + close + 1;
+        let tag = &svg[start..end];
+        let mut at = 0;
+        while let Some(equal) = tag[at..].find("=\"") {
+            let equal = at + equal;
+            let begin = equal + 2;
+            let Some(close) = tag[begin..].find('"') else {
+                break;
+            };
+            let finish = begin + close;
+            let name = tag[..equal].split_whitespace().next_back().unwrap_or("");
+            let value = &tag[begin..finish];
+            output.push_str(&tag[at..begin]);
+            let value = match name {
+                "id" => ids.get(value).cloned().unwrap_or_else(|| value.to_owned()),
+                "aria-labelledby" => value
                     .split_whitespace()
-                    .map(|v| if v == id { new.as_str() } else { v })
+                    .map(|id| ids.get(id).map(String::as_str).unwrap_or(id))
                     .collect::<Vec<_>>()
-                    .join(" ");
-                svg.replace_range(start..end, &value);
-            }
+                    .join(" "),
+                "href" | "xlink:href" => value
+                    .strip_prefix('#')
+                    .and_then(|id| ids.get(id))
+                    .map(|id| format!("#{id}"))
+                    .unwrap_or_else(|| value.to_owned()),
+                "mask" | "clip-path" | "filter" | "fill" | "stroke" | "style" | "marker-start"
+                | "marker-mid" | "marker-end" => {
+                    let mut value = value.to_owned();
+                    for (old, new) in &ids {
+                        value = value.replace(&format!("url(#{old})"), &format!("url(#{new})"));
+                    }
+                    value
+                }
+                _ => value.to_owned(),
+            };
+            output.push_str(&value);
+            at = finish;
         }
+        output.push_str(&tag[at..]);
+        cursor = end;
     }
-    svg
+    output.push_str(&svg[cursor..]);
+    output
 }
 pub(crate) fn flow_caption(scene: &SceneGraph, edge: &Edge) -> Option<String> {
     let steps = scene
