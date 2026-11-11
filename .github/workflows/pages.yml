@@ -15,6 +15,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,7 +42,17 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
       - run: npm run docs:check && npm run docs:build
-      - run: npx playwright install --with-deps chromium
+      - name: Select the runner's browser
+        run: |
+          if command -v google-chrome > /dev/null; then
+            echo "CHROMIUM_PATH=$(command -v google-chrome)" >> "$GITHUB_ENV"
+            google-chrome --version
+          elif command -v chromium > /dev/null; then
+            echo "CHROMIUM_PATH=$(command -v chromium)" >> "$GITHUB_ENV"
+            chromium --version
+          else
+            npx playwright install --with-deps chromium
+          fi
       - name: Test the complete site under its Pages base path
         run: |
           npm run docs:preview -- --port 4173 > /tmp/diagram-docs-preview.log 2>&1 &
