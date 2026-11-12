@@ -38,6 +38,16 @@ module.exports=async function dropContinuity(browser,base){
   await move(grab,305.3,137.4);assert.equal(await page.locator('#canvas.invalid-drag').count(),0,'the same gesture recovers without resetting');await page.mouse.up();assert.deepEqual(await read(),good);await page.click('#undo');
   grab=await begin();await move(grab,480,0);await page.mouse.up();assert.equal(await source(),original,'an invalid drop must not save source or poison history');assert.match(await page.locator('#status').textContent(),/Move canceled/);assert.deepEqual((await read()).nodes,baseline.nodes);assert.equal(await page.locator('.is-dragging,.diagram-dragging,.invalid-drag').count(),0);
 
+  // Reproduce Client elbow/blue caption flicker with repeated subpixel jitter.
+  grab=await begin('client');await move(grab,48,96);const stableClient=await read();
+  for(let i=0;i<24;i++){
+    await move(grab,48+(i%2)*.1,96+(i%2)*.1);const current=await read();
+    const before=stableClient.labels.find(l=>l[0]==='client->gateway'),after=current.labels.find(l=>l[0]==='client->gateway');
+    assert(before&&after);assert(Math.abs(before[2]-after[2])<1&&Math.abs(before[3]-after[3])<1,'Client caption must not alternate rails during tiny pointer motion');
+  }
+  await page.locator('#canvas').screenshot({path:'artifacts/drop-continuity/client-jitter-held.png'});
+  const clientHeld=await read();await page.mouse.up();assert.deepEqual(await read(),clientHeld);await page.click('#undo');
+
   const history=await page.evaluate(async()=>{
     const{WasmDocument}=await import(new URL('./pkg/smarter_diagrams.js',location.href));const d=new WasmDocument(document.querySelector('#source').value),preview=d.begin_drag(),initial=preview.svg();
     for(const position of [{x:304,y:96},{x:100,y:200},{x:700,y:-100},{x:272,y:64},{x:240,y:0}])preview.update(JSON.stringify([{node:'gateway',position}]));

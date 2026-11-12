@@ -115,6 +115,43 @@ pub fn route_all(
             && distance > 0.
             && ((b.point.x - a.point.x) * ny - (b.point.y - a.point.y) * nx).abs() < 1e-6
             && distance <= a.point.distance(a.stub) + b.point.distance(b.stub) + 1e-6;
+        // A facing pair has a continuous, balanced corridor. Visibility-grid
+        // tie breaking must not move its elbow between unrelated lattice lines.
+        let balanced = if channel.is_none()
+            && !annotations.iter().any(|a| a.name == "route")
+            && dir(a.side) == opposite(dir(b.side))
+            && distance > a.point.distance(a.stub) + b.point.distance(b.stub)
+        {
+            let mid = Point::new((a.stub.x + b.stub.x) / 2., (a.stub.y + b.stub.y) / 2.);
+            let mut points = if nx.abs() > 0. {
+                vec![
+                    a.point,
+                    a.stub,
+                    Point::new(mid.x, a.stub.y),
+                    Point::new(mid.x, b.stub.y),
+                    b.stub,
+                    b.point,
+                ]
+            } else {
+                vec![
+                    a.point,
+                    a.stub,
+                    Point::new(a.stub.x, mid.y),
+                    Point::new(b.stub.x, mid.y),
+                    b.stub,
+                    b.point,
+                ]
+            };
+            dedup_points(&mut points);
+            let proposed = Route {
+                edge: e.id.clone(),
+                points,
+            };
+            route_is_valid(scene, l, e, &proposed, o.margin)
+                .then(|| proposed.points[1..proposed.points.len() - 1].to_vec())
+        } else {
+            None
+        };
         let route = if tight_straight {
             // Facing stubs can overlap on a short straight connection. Order
             // their vertices along the shaft instead of drawing a hairpin.
@@ -123,6 +160,8 @@ pub fn route_all(
                 ((p.x - a.point.x) * nx + (p.y - a.point.y) * ny)
                     .total_cmp(&((q.x - a.point.x) * nx + (q.y - a.point.y) * ny))
             });
+            points
+        } else if let Some(points) = balanced {
             points
         } else if let Some(x) = channel {
             let p = Point::new(x, a.stub.y);

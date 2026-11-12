@@ -252,3 +252,55 @@ fn locked_channels_join_with_their_actual_vertical_direction() {
         );
     }
 }
+
+#[test]
+fn client_micro_motion_keeps_the_same_elbow_and_caption_rail() {
+    let doc = simulation();
+    let mut gesture = doc.begin_drag().unwrap();
+    let mut checked = 0;
+    for x in [0., 24., 48., 72.] {
+        for y in [-120., -96., -72., -48., 48., 72., 96., 120.] {
+            if gesture.update(&[at("client", x, y)]).is_err() {
+                continue;
+            }
+            let first = gesture.snapshot();
+            if gesture.update(&[at("client", x + 0.1, y + 0.1)]).is_err() {
+                continue;
+            }
+            let next = gesture.snapshot();
+            let a = &first.layout.routes["client->gateway"].points;
+            let edge = first.scene.edge("client->gateway").unwrap();
+            let source = &first.layout.ports[&port_key(edge, true)];
+            let target = &first.layout.ports[&port_key(edge, false)];
+            let channel = (source.stub.x + target.stub.x) / 2.;
+            assert!(
+                a.windows(2).any(|p| (p[0].x - channel).abs() < 1e-6
+                    && (p[1].x - channel).abs() < 1e-6
+                    && (p[0].y - p[1].y).abs() > 1.),
+                "Client must use the continuous midpoint corridor at {x},{y}"
+            );
+
+            let b = &next.layout.routes["client->gateway"].points;
+            assert_eq!(a.len(), b.len(), "elbow topology changed at {x},{y}");
+            for (a, b) in a.iter().zip(b) {
+                assert!(a.distance(*b) < 1., "elbow jumped at {x},{y}");
+            }
+            let label = |d: &Diagram| {
+                d.layout
+                    .labels
+                    .iter()
+                    .find(|l| l.feature == "client->gateway")
+                    .unwrap()
+                    .clone()
+            };
+            let (a, b) = (label(&first), label(&next));
+            assert_eq!((a.callout, a.knockout), (b.callout, b.knockout));
+            assert!(
+                a.bounds.center().distance(b.bounds.center()) < 1.,
+                "caption jumped at {x},{y}: {a:?} -> {b:?}"
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked >= 24);
+}
