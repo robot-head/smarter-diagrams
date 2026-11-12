@@ -156,8 +156,8 @@ impl DragSession {
         // pointer history; stationary connections then prefer their baseline.
         let mut candidate = compile_with(&source, &self.options, None)?;
         // Prefer the immutable gesture baseline for stationary connections.
-        // Never reuse the last pointer frame: reversals must not accumulate
-        // detours, and a moving obstacle must still invalidate an old path.
+        // Moving obstacles must still invalidate an old path. Stateful detour
+        // retention below has separate validity and excess-length bounds.
         let mut stable = candidate.layout.clone();
         let mut changed = false;
         for edge in &candidate.scene.edges {
@@ -179,11 +179,83 @@ impl DragSession {
                 changed = true;
             }
         }
+        let mut retained = std::collections::BTreeSet::new();
+        for edge in &candidate.scene.edges {
+            if effective_annotations(
+                &candidate.scene,
+                &edge.id,
+                &edge.annotations,
+                self.options.variant.as_deref(),
+            )
+            .iter()
+            .any(|a| a.name == "route")
+            {
+                continue;
+            }
+            if let Some(route) = crate::routing::retain_detour(
+                &candidate.scene,
+                &stable,
+                edge,
+                &self.prepared.layout,
+                self.options.margin,
+            ) {
+                stable.routes.insert(edge.id.clone(), route);
+                retained.insert(edge.id.clone());
+                changed = true;
+            }
+        }
         if changed {
             // Refit captions to the retained paths. If that cannot be done
             // safely, the fully validated canonical candidate remains available.
             if let Ok(labels) = crate::labels::place(&candidate.scene, &self.options, &stable) {
                 stable.labels = labels;
+                // Keep a detour caption's slot until it is actually obstructed,
+                // instead of reranking equally good slots every pointer frame.
+                for old in &self.prepared.layout.labels {
+                    if !retained.contains(&old.feature) {
+                        continue;
+                    }
+                    if let Some(edge) = candidate.scene.edge(&old.feature)
+                        && effective_annotations(
+                            &candidate.scene,
+                            &edge.id,
+                            &edge.annotations,
+                            self.options.variant.as_deref(),
+                        )
+                        .iter()
+                        .any(|a| a.name == "label")
+                    {
+                        continue;
+                    }
+
+                    let Some(index) = stable.labels.iter().position(|l| l.feature == old.feature)
+                    else {
+                        continue;
+                    };
+                    let route = &stable.routes[&old.feature];
+                    let anchor = route
+                        .points
+                        .windows(2)
+                        .map(|p| {
+                            let dx = p[1].x - p[0].x;
+                            let dy = p[1].y - p[0].y;
+                            let t = (((old.anchor.x - p[0].x) * dx + (old.anchor.y - p[0].y) * dy)
+                                / (dx * dx + dy * dy))
+                                .clamp(0., 1.);
+                            Point::new(p[0].x + t * dx, p[0].y + t * dy)
+                        })
+                        .min_by(|a, b| a.distance(old.anchor).total_cmp(&b.distance(old.anchor)))
+                        .unwrap();
+                    let mut label = old.clone();
+                    label.bounds.x += anchor.x - old.anchor.x;
+                    label.bounds.y += anchor.y - old.anchor.y;
+                    label.anchor = anchor;
+                    let fresh = std::mem::replace(&mut stable.labels[index], label);
+                    if !crate::labels::placements_clear(&candidate.scene, &stable) {
+                        stable.labels[index] = fresh;
+                    }
+                }
+
                 if crate::layout::validate(&candidate.scene, &stable, &self.options).is_ok()
                     && crate::labels::placements_clear(&candidate.scene, &stable)
                 {

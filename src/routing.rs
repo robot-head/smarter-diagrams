@@ -852,3 +852,120 @@ mod ordering_tests {
         }
     }
 }
+
+/// Preserve a detour's corridor while moving only its terminal legs. Revalidate
+/// the entire path, and bound its excess length so detours cannot grow forever.
+pub(crate) fn retain_detour(
+    scene: &SceneGraph,
+    l: &Layout,
+    edge: &Edge,
+    prior: &Layout,
+    margin: f64,
+) -> Option<Route> {
+    let old = prior.routes.get(&edge.id)?;
+    let fresh = l.routes.get(&edge.id)?;
+    let mut points = coalesced(&old.points);
+    if points.len() <= 4 && coalesced(&fresh.points).len() <= 4 {
+        return None;
+    }
+    if points.len() < 4 {
+        return None;
+    }
+    let a = l.ports.get(&port_key(edge, true))?;
+    let b = l.ports.get(&port_key(edge, false))?;
+    if prior.ports.get(&a.key)?.side != a.side || prior.ports.get(&b.key)?.side != b.side {
+        return None;
+    }
+    let last = points.len() - 1;
+    if (points[0].y - points[1].y).abs() < 1e-6 {
+        points[1].y = a.point.y;
+    } else {
+        points[1].x = a.point.x;
+    }
+    if (points[last].y - points[last - 1].y).abs() < 1e-6 {
+        points[last - 1].y = b.point.y;
+    } else {
+        points[last - 1].x = b.point.x;
+    }
+    points[0] = a.point;
+    points[last] = b.point;
+    points.insert(1, a.stub);
+    points.insert(points.len() - 1, b.stub);
+    dedup_points(&mut points);
+    let route = Route {
+        edge: edge.id.clone(),
+        points,
+    };
+    let length = |r: &Route| {
+        r.points
+            .windows(2)
+            .map(|p| p[0].distance(p[1]))
+            .sum::<f64>()
+    };
+    (length(&route) <= length(fresh) * 1.25 + 32. && route_is_valid(scene, l, edge, &route, margin))
+        .then_some(route)
+}
+
+#[cfg(test)]
+mod detour_tests {
+    use super::*;
+    fn path(l: &Layout, e: &Edge, y: f64) -> Route {
+        let a = &l.ports[&port_key(e, true)];
+        let b = &l.ports[&port_key(e, false)];
+        Route {
+            edge: e.id.clone(),
+            points: vec![
+                a.point,
+                a.stub,
+                Point::new(a.stub.x, y),
+                Point::new(b.stub.x, y),
+                b.stub,
+                b.point,
+            ],
+        }
+    }
+    #[test]
+    fn equal_cost_obstacle_detours_do_not_oscillate_but_obstructions_and_excess_do_release() {
+        let d = crate::compile(
+            "a @pin(grid: 0,0)\nb @pin(grid: 20,0)\nblock @pin(grid: 10,0)\na.E -> b.W\n",
+        )
+        .unwrap();
+        let e = &d.scene.edges[0];
+        let mut prior = d.layout.clone();
+        prior.routes.insert(e.id.clone(), path(&prior, e, -64.));
+        assert!(route_is_valid(
+            &d.scene,
+            &prior,
+            e,
+            &prior.routes[&e.id],
+            8.
+        ));
+        for i in 0..100 {
+            let mut next = d.layout.clone();
+            let delta = if i % 2 == 0 { 0.1 } else { -0.1 };
+            next.nodes.get_mut("a").unwrap().y += delta;
+            let port = next.ports.get_mut(&port_key(e, true)).unwrap();
+            port.point.y += delta;
+            port.stub.y += delta;
+            next.routes.insert(
+                e.id.clone(),
+                path(&next, e, if i % 2 == 0 { 64. } else { -64. }),
+            );
+            let kept = retain_detour(&d.scene, &next, e, &prior, 8.).unwrap();
+            assert!(kept.points.iter().any(|p| p.y == -64.));
+            assert!(!kept.points.iter().any(|p| p.y == 64.));
+            assert!(
+                kept.points.len() <= 6,
+                "retention must not accumulate bends"
+            );
+            next.routes.insert(e.id.clone(), kept);
+            prior = next;
+        }
+        let mut blocked = d.layout.clone();
+        blocked.nodes.get_mut("block").unwrap().y = -64.;
+        blocked.routes.insert(e.id.clone(), path(&blocked, e, 64.));
+        assert!(retain_detour(&d.scene, &blocked, e, &prior, 8.).is_none());
+        prior.routes.insert(e.id.clone(), path(&prior, e, -1000.));
+        assert!(retain_detour(&d.scene, &d.layout, e, &prior, 8.).is_none());
+    }
+}
