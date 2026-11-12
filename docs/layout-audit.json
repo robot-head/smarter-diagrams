@@ -27,7 +27,6 @@
     "Open artifacts/layout-audit/index.html and results.json"
   ],
   "knownDiagnostics": {
-    "03-fan-out": "infeasible layout: no feasible label position for bus->c2",
     "fuzz-cycle-7": "infeasible layout: no feasible label position for n1->n2",
     "fuzz-pinned-3": "infeasible layout: n3 and n4 overlap or leave less than 8 px body clearance",
     "fuzz-pinned-4": "infeasible layout: n0 and n1 overlap or leave less than 8 px body clearance",
@@ -539,5 +538,38 @@
       "change": "Add align col for c0–c4 and distribute col with an 8g gap",
       "result": "Renders with all captions retained; the tall layout and close vertical lanes remain visually suboptimal."
     }
-  ]
+  ],
+  "followUp": {
+    "summary": "Fixed the four reported presentations in the engine while preserving their unconstrained input sources. Original measurements and reviews above describe baseline 38f8245.",
+    "rendered": 59,
+    "remainingDiagnostics": 5,
+    "currentCases": {
+      "02-long-pipeline": {
+        "status": "rendered",
+        "aspectRatio": 1.79,
+        "minimumFittedTextPx": 14.3
+      },
+      "03-fan-out": {
+        "status": "rendered",
+        "aspectRatio": 1.1,
+        "minimumFittedTextPx": 11.2
+      },
+      "04-fan-in": {
+        "status": "rendered",
+        "aspectRatio": 1.1,
+        "minimumFittedTextPx": 11.2
+      },
+      "09-parallel": {
+        "status": "rendered",
+        "aspectRatio": 2.49,
+        "minimumFittedTextPx": 15
+      }
+    },
+    "changes": [
+      "Long simple paths fold into a compact sequence when unconstrained.",
+      "Simple fans group leaves in a column and put captions on the horizontal leaf branches.",
+      "Parallel protocols keep matching lane order and reserve caption clearance, including during dragging and reopening saved pins."
+    ],
+    "verification": "Full 64-case audit and five controls pass their painted-geometry, overlap and repeatability checks with five explicit known diagnostics. Three Rust regression tests also cover alignment overrides, exact branch labels, straight protocol lanes and drag/reopen clearance."
+  }
 }

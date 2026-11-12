@@ -403,6 +403,14 @@ pub(crate) fn place_with_prior(
     let mut fallback_y = bottom;
     for f in &features {
         let mut candidates = generate(f, o, l, scene);
+        if prior.is_none()
+            && f.position.is_none()
+            && f.slot.is_none()
+            && f.slide.is_none()
+            && let Some(candidate) = fan_caption(f, scene, l)
+        {
+            candidates.push(candidate);
+        }
         // Facing horizontal ports use one stable caption rail above the pair.
         // Segment length and A* tie breaks must not toggle inline/callout slots.
         if f.position.is_none()
@@ -766,6 +774,75 @@ pub(crate) fn place_with_prior(
         }
     }
     Ok(labels)
+}
+// In a simple fan, a caption belongs to the independent leaf's horizontal
+// branch. Prefer the same offset from that leaf instead of a random elbow.
+fn fan_caption(f: &Feature, scene: &SceneGraph, l: &Layout) -> Option<Candidate> {
+    if scene.nodes.len() < 4 || scene.edges.len() + 1 != scene.nodes.len() {
+        return None;
+    }
+    let edge = scene.edge(&f.id)?;
+    let fan_out = scene
+        .edges
+        .iter()
+        .all(|e| e.source.node == edge.source.node);
+    let fan_in = scene
+        .edges
+        .iter()
+        .all(|e| e.target.node == edge.target.node);
+    if !fan_out && !fan_in {
+        return None;
+    }
+    let leaf = if fan_out {
+        &edge.target.node
+    } else {
+        &edge.source.node
+    };
+    let body = l.nodes[leaf];
+    let w = feature_width(f, scene);
+    let h = text_height(&f.text);
+    for (segment, pair) in f.route.windows(2).enumerate() {
+        if (pair[0].y - body.y).abs() > 0.01 || (pair[1].y - body.y).abs() > 0.01 {
+            continue;
+        }
+        let left = pair[0].x.min(pair[1].x) + w / 2. + 8.;
+        let right = pair[0].x.max(pair[1].x) - w / 2. - 8.;
+        if left > right {
+            continue;
+        }
+        let x = if fan_out {
+            body.left() - w / 2. - 20.
+        } else {
+            body.right() + w / 2. + 20.
+        };
+        let anchor = Point::new(x.clamp(left, right), body.y);
+        return Some(Candidate {
+            cost: -1000.,
+            label: LabelPlacement {
+                feature: f.id.clone(),
+                text: f.text.clone(),
+                bounds: Rect::new(anchor.x, anchor.y - h / 2. - 6., w, h),
+                anchor,
+                knockout: false,
+                callout: false,
+                orthogonal_leader: false,
+                horizontal: true,
+                slide: (f
+                    .route
+                    .windows(2)
+                    .take(segment)
+                    .map(|p| p[0].distance(p[1]))
+                    .sum::<f64>()
+                    + pair[0].distance(anchor))
+                    / f.route
+                        .windows(2)
+                        .map(|p| p[0].distance(p[1]))
+                        .sum::<f64>()
+                        .max(1.),
+            },
+        });
+    }
+    None
 }
 fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> Vec<Candidate> {
     let w = feature_width(f, scene);
