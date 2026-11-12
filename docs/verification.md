@@ -39,7 +39,7 @@ npm run test:layout-quality
 node scripts/check-layout-review.cjs
 ```
 
-The last command checks manually recorded beauty and clarity ratings against the SVG hashes from all five completed rounds. It rejects missing ratings, stale engine fingerprints and any score below 5. Identical baseline SVG bytes share one visual review; each fresh image needs its own review. Diagnostic controls remain unscored. A successful bounded corpus is evidence for those examples, not a guarantee that every possible graph or every full-fit thumbnail will be ideal.
+The last command checks manually recorded beauty and clarity ratings against the SVG hashes from all five completed rounds. It rejects missing ratings, stale engine fingerprints and any score below 5. After discovery, every distinct source is recompiled in five confirmation passes and must match its inspected SVG byte for byte. Identical SVG bytes share one visual review; each fresh image needs its own review. Diagnostic controls remain unscored. A successful bounded corpus is evidence for those examples, not a guarantee that every possible graph or every full-fit thumbnail will be ideal.
 
 The historical [baseline audit](layout-audit.json), [mixed-feature exploration](layout-exploration.json), and [current image review](layout-quality-review.json) preserve the findings and reproduction commands. Generated SVGs, sources, contact sheets and measurements are saved under `artifacts/layout-quality/final/` by the five-round command.
 

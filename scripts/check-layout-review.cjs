@@ -28,4 +28,10 @@ for(const round of manifest.rounds){
  streak++;
 }
 assert.equal(streak,5);
+assert.equal(manifest.confirmationPasses?.length,5,'Confirm every discovered image in all five passes');
+for(const pass of manifest.confirmationPasses){
+ assert.equal(pass.engineFingerprint,review.engineFingerprint);
+ assert.equal(pass.images,distinct.size);
+ assert.deepEqual([...pass.matchedSvgHashes].sort(),[...distinct].sort(),'Confirmation must cover every inspected image');
+}
 console.log(`Visual review: ${distinct.size} distinct SVGs, ${occurrences} example occurrences, five consecutive reviewed rounds. Ratings are subjective and bounded to this corpus.`);

@@ -3,7 +3,7 @@
   "reviewer": "Codex visual inspection",
   "reviewedAt": "2026-11-12",
   "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
-  "method": "Inspect every distinct SVG on Chromium contact sheets; reopen dense or ambiguous examples at native size. Reuse a review only when SVG SHA-256 bytes match. Scores are subjective visual judgments, separate from semantic and geometry assertions.",
+  "method": "Inspect every distinct SVG on Chromium contact sheets; reopen dense or ambiguous examples at native size. Reuse a review only when SVG SHA-256 bytes match. Scores are subjective visual judgments, separate from semantic and geometry assertions. After discovery, every one of the 220 distinct sources was recompiled in each of five complete confirmation passes; every SVG byte hash matched its inspected image.",
   "rubric": {
     "beauty": "5: no observed material spacing, alignment, shape, clipping or connector defect at readable/native zoom; 4 or below: a concrete visual improvement remains.",
     "clarity": "5: the stated concept, directions, ownership, captions and attachments are unambiguous at readable/native zoom; 4 or below: a concrete communication problem remains."
@@ -1848,5 +1848,37 @@
   ],
   "completedAt": "2026-11-12T11:06:23.796Z",
   "distinctImages": 220,
-  "consecutiveVisualPasses": 5
+  "consecutiveVisualPasses": 5,
+  "confirmationPasses": [
+    {
+      "pass": 1,
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "images": 220,
+      "elapsedMs": 11298
+    },
+    {
+      "pass": 2,
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "images": 220,
+      "elapsedMs": 11964
+    },
+    {
+      "pass": 3,
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "images": 220,
+      "elapsedMs": 11230
+    },
+    {
+      "pass": 4,
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "images": 220,
+      "elapsedMs": 11560
+    },
+    {
+      "pass": 5,
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "images": 220,
+      "elapsedMs": 11649
+    }
+  ]
 }

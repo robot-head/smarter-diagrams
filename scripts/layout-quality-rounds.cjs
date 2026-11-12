@@ -23,4 +23,5 @@ for(const[round,seedset]of seeds.entries()){
  }
 }
 manifest.completedAt=new Date().toISOString();fs.writeFileSync(path.join(out,'manifest.json'),JSON.stringify(manifest,null,2));
+require('./layout-quality-confirm.cjs')();
 console.log('Five mechanical rounds complete. Inspect every distinct image and record the separate beauty/clarity review before calling this a visual pass.');
