@@ -96,6 +96,13 @@ pub enum DiagramEditOp {
         segment_idx: usize,
         lane_grid: f64,
     },
+    ResetLabel {
+        edge: EdgeId,
+    },
+    MoveLabel {
+        edge: EdgeId,
+        position: Point,
+    },
     SlideLabel {
         edge: EdgeId,
         slot: LabelSlot,
@@ -442,6 +449,65 @@ fn patches_for(source: &str, op: &DiagramEditOp, separate: bool) -> Result<Vec<T
                 ("lane".into(), format!("{lane_grid}g")),
             ]);
             upsert_layout(source, &scene, edge, "route", attrs)
+        }
+        DiagramEditOp::ResetLabel { edge } => {
+            let e = scene
+                .edge(edge)
+                .ok_or_else(|| Error::Edit(format!("unknown edge {edge}")))?;
+            let mut patches = Vec::new();
+            for a in e.annotations.iter().filter(|a| {
+                a.name == "label" && (a.attrs.contains_key("x") || a.attrs.contains_key("y"))
+            }) {
+                if a.attrs.keys().all(|k| k == "x" || k == "y") {
+                    patches.push(remove_preserving_comments(source, a.span));
+                } else {
+                    patches.extend(update_annotation(source, a, &BTreeMap::new(), &["x", "y"])?);
+                }
+            }
+            for rule in scene
+                .layout_rules
+                .iter()
+                .filter(|r| r.target == *edge && r.variant.is_none())
+            {
+                for a in rule.annotations.iter().filter(|a| {
+                    a.name == "label" && (a.attrs.contains_key("x") || a.attrs.contains_key("y"))
+                }) {
+                    if a.attrs.keys().all(|k| k == "x" || k == "y") {
+                        let span = if rule.annotations.len() == 1 {
+                            whole_line(source, rule.span)
+                        } else {
+                            a.span
+                        };
+                        patches.push(remove_preserving_comments(source, span));
+                    } else {
+                        patches.extend(update_annotation(
+                            source,
+                            a,
+                            &BTreeMap::new(),
+                            &["x", "y"],
+                        )?);
+                    }
+                }
+            }
+            Ok(patches)
+        }
+        DiagramEditOp::MoveLabel { edge, position } => {
+            if !position.x.is_finite() || !position.y.is_finite() {
+                return Err(Error::Edit("label coordinates must be finite".into()));
+            }
+            if scene.edge(edge).is_none() {
+                return Err(Error::Edit(format!("unknown edge {edge}")));
+            }
+            upsert_layout(
+                source,
+                &scene,
+                edge,
+                "label",
+                BTreeMap::from([
+                    ("x".into(), position.x.to_string()),
+                    ("y".into(), position.y.to_string()),
+                ]),
+            )
         }
         DiagramEditOp::SlideLabel { edge, slot, t_arc } => {
             if !t_arc.is_finite() || !(0. ..=1.).contains(t_arc) {

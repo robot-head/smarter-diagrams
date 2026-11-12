@@ -55,7 +55,7 @@ story         = "@story", "[", path, "]" ;
 | Port | `side`, `order`, `ratio`, `pos` |
 | Pin | `grid`, `x`, `y`, `lock` |
 | Route | `segment`, `lane`, `channel_x` |
-| Label | `slot`, `slide` |
+| Label | `slot`, `slide`, manual pixel center `x`, `y` |
 | Distribution | `gap` |
 | Zone | `padding`, `tint`; `state:name`, `invariant:name` from body entries |
 | Simulation | `rate`, `workers`, `service_rate`, `service`, `queue_cap`, `timeout`, `retry`, `retry_fraction`, `retry_backoff` |

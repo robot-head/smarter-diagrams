@@ -148,7 +148,9 @@ fn container_children_ports_and_comments_survive_one_transaction() {
     assert_eq!(after.layout.nodes["other"], before.layout.nodes["other"]);
     doc.commit_drag(&drag).unwrap();
     assert!(doc.source().starts_with("# keep 😀\r\nprod {\r\n"));
-    assert_eq!(compile(doc.source()).unwrap().to_svg(), after.to_svg());
+    let reopened = compile(doc.source()).unwrap();
+    assert_eq!(reopened.layout.nodes, after.layout.nodes);
+    layout::validate(&reopened.scene, &reopened.layout, &LayoutOptions::default()).unwrap();
 }
 
 #[test]
@@ -502,4 +504,155 @@ fn retained_caption_leader_segments_clear_the_nodes_and_old_json_still_loads() {
     json.as_object_mut().unwrap().remove("orthogonal_leader");
     let restored: labels::LabelPlacement = serde_json::from_value(json).unwrap();
     assert!(!restored.orthogonal_leader);
+}
+
+#[test]
+fn labels_can_move_precisely_back_and_forth_with_one_history_entry_and_reopen() {
+    let mut doc = recorded_playground();
+    let before = doc.snapshot();
+    let original = doc.source().to_owned();
+    let mut drag = doc.begin_drag().unwrap();
+    let label = before
+        .layout
+        .labels
+        .iter()
+        .find(|l| l.feature == "client->gateway")
+        .unwrap();
+    let home = label.bounds.center();
+    for position in [
+        home.offset(0., -40.25),
+        home.offset(0., -80.5),
+        home.offset(0., -20.125),
+    ] {
+        drag.update_label("client->gateway", position).unwrap();
+        let d = drag.snapshot();
+        assert_eq!(d.layout.nodes, before.layout.nodes);
+        assert_eq!(d.layout.routes, before.layout.routes);
+        assert!(
+            d.layout
+                .labels
+                .iter()
+                .find(|l| l.feature == "client->gateway")
+                .unwrap()
+                .bounds
+                .center()
+                .distance(position)
+                < 1e-6
+        );
+    }
+    let shown = drag.snapshot().to_svg();
+    doc.commit_drag(&drag).unwrap();
+    assert_eq!(doc.snapshot().to_svg(), shown);
+    assert_eq!(doc.revision(), 1);
+    let reopened = compile(doc.source()).unwrap();
+    let p = reopened
+        .layout
+        .labels
+        .iter()
+        .find(|l| l.feature == "client->gateway")
+        .unwrap()
+        .bounds
+        .center();
+    assert!(p.distance(home.offset(0., -20.125)) < 1e-6);
+    assert!(doc.undo());
+    assert_eq!(doc.source(), original);
+    assert!(doc.redo());
+    assert_eq!(doc.snapshot().to_svg(), shown);
+    let mut cancel = doc.begin_drag().unwrap();
+    assert!(
+        cancel
+            .update_label("client->gateway", Point::new(f64::NAN, 0.))
+            .is_err()
+    );
+    assert!(doc.commit_drag(&cancel).is_err());
+    let mut reset = doc.begin_drag().unwrap();
+    reset.reset_label("client->gateway").unwrap();
+    doc.commit_drag(&reset).unwrap();
+    assert!(!doc.source().contains("y: -96.125"));
+    assert!(
+        doc.snapshot()
+            .layout
+            .labels
+            .iter()
+            .find(|l| l.feature == "client->gateway")
+            .unwrap()
+            .bounds
+            .center()
+            .distance(home)
+            < 1e-6
+    );
+    assert_eq!(doc.snapshot().layout.nodes, before.layout.nodes);
+    let mut direct = Document::new(&original).unwrap();
+    direct
+        .edit(
+            direct.revision(),
+            &[edit::DiagramEditOp::MoveLabel {
+                edge: "client->gateway".into(),
+                position: home.offset(0., -30.),
+            }],
+            edit::Placement::Layout,
+        )
+        .unwrap();
+    assert!(
+        direct
+            .snapshot()
+            .layout
+            .labels
+            .iter()
+            .find(|l| l.feature == "client->gateway")
+            .unwrap()
+            .bounds
+            .center()
+            .distance(home.offset(0., -30.))
+            < 1e-6
+    );
+}
+
+#[test]
+fn manual_caption_overrides_and_reset_preserves_an_explicit_slot() {
+    let mut doc =
+        Document::new("# keep\na.E -> b.W: payload @label(slot: above, slide: 0.25)\n").unwrap();
+    let old = doc.snapshot();
+    let position = old.layout.labels[0].bounds.center().offset(0., -40.25);
+    let mut gesture = doc.begin_drag().unwrap();
+    gesture.update_label("a->b", position).unwrap();
+    doc.commit_drag(&gesture).unwrap();
+    assert!(
+        doc.snapshot().layout.labels[0]
+            .bounds
+            .center()
+            .distance(position)
+            < 1e-6
+    );
+    assert!(doc.source().starts_with("# keep\n"));
+    let mut reset = doc.begin_drag().unwrap();
+    reset.reset_label("a->b").unwrap();
+    doc.commit_drag(&reset).unwrap();
+    assert!(doc.source().contains("slot: above"));
+    assert!(doc.source().contains("slide: 0.25"));
+    assert_eq!(
+        doc.snapshot().layout.labels[0].bounds,
+        old.layout.labels[0].bounds,
+        "reset restores the original explicit slot and slide"
+    );
+    assert_eq!(doc.snapshot().layout.nodes, old.layout.nodes);
+}
+
+#[test]
+fn a_manual_caption_can_move_onto_its_own_connection_and_back() {
+    let mut doc = Document::new("a.E -> b.W: payload\n").unwrap();
+    let old = doc.snapshot();
+    let mut drag = doc.begin_drag().unwrap();
+    drag.update_label("a->b", Point::new(120., 0.)).unwrap();
+    assert!(drag.snapshot().layout.labels[0].knockout);
+    doc.commit_drag(&drag).unwrap();
+    assert_eq!(doc.snapshot().layout.routes, old.layout.routes);
+    let mut back = doc.begin_drag().unwrap();
+    back.update_label("a->b", old.layout.labels[0].bounds.center())
+        .unwrap();
+    doc.commit_drag(&back).unwrap();
+    assert_eq!(
+        doc.snapshot().layout.labels[0].bounds,
+        old.layout.labels[0].bounds
+    );
 }

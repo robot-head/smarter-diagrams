@@ -157,14 +157,6 @@ impl DragSession {
         let mut candidate = compile_with(&source, &self.options, Some(&self.prepared.layout))?;
         // Evaluate an attachment change as a complete route/caption candidate.
         // A side-pair estimate alone must not cause a costly visual transition.
-        if let Ok(labels) = crate::labels::place_with_prior(
-            &candidate.scene,
-            &self.options,
-            &candidate.layout,
-            Some(&self.prepared.layout),
-        ) {
-            candidate.layout.labels = labels;
-        }
         let fresh_layout = candidate.layout.clone();
         let attachment_changed = candidate.layout.ports.iter().any(|(key, p)| {
             self.prepared
@@ -174,6 +166,14 @@ impl DragSession {
                 .is_some_and(|old| old.side != p.side)
         });
         if attachment_changed {
+            if let Ok(labels) = crate::labels::place_with_prior(
+                &candidate.scene,
+                &self.options,
+                &candidate.layout,
+                Some(&self.prepared.layout),
+            ) {
+                candidate.layout.labels = labels;
+            }
             for mask in [3, 1, 2] {
                 let mut locked = candidate.scene.clone();
                 let mut changed = false;
@@ -337,6 +337,96 @@ impl DragSession {
             ));
         }
         Ok(Arc::new(candidate))
+    }
+    /// Reposition an edge caption without changing node or route geometry.
+    pub fn update_label(&mut self, feature: &str, position: Point) -> Result<(), Error> {
+        self.valid = false;
+        let result = (|| {
+            let old = self
+                .baseline
+                .layout
+                .labels
+                .iter()
+                .find(|l| l.feature == feature)
+                .ok_or_else(|| Error::Edit(format!("unknown label {feature}")))?;
+            if !position.x.is_finite() || !position.y.is_finite() {
+                return Err(Error::Edit("label coordinates must be finite".into()));
+            }
+            if old.bounds.center().distance(position) < 1e-7 {
+                return Ok(self.baseline.clone());
+            }
+            let source = edit::apply_ops(
+                &self.anchors,
+                &[DiagramEditOp::MoveLabel {
+                    edge: feature.into(),
+                    position,
+                }],
+                Placement::Layout,
+            )?
+            .source;
+            let mut next = (*self.baseline).clone();
+            next.parse = crate::syntax::parse(&source);
+            next.scene = crate::model::lower(&next.parse);
+            next.layout.labels = crate::labels::place_with_prior(
+                &next.scene,
+                &self.options,
+                &next.layout,
+                Some(&self.prepared.layout),
+            )?;
+            crate::layout::validate(&next.scene, &next.layout, &self.options)?;
+            if !crate::labels::placements_clear(&next.scene, &next.layout) {
+                return Err(Error::Layout("label placement is obstructed".into()));
+            }
+            Ok(Arc::new(next))
+        })();
+        if let Ok(next) = result {
+            self.last.clear();
+            self.prepared = next;
+            self.valid = true;
+            Ok(())
+        } else {
+            result.map(|_| ())
+        }
+    }
+    /// Restore automatic caption placement while preserving node/route geometry.
+    pub fn reset_label(&mut self, feature: &str) -> Result<(), Error> {
+        self.valid = false;
+        let result = (|| {
+            let source = edit::apply_ops(
+                &self.baseline.parse.source,
+                &[DiagramEditOp::ResetLabel {
+                    edge: feature.into(),
+                }],
+                Placement::Layout,
+            )?
+            .source;
+            let mut next = (*self.baseline).clone();
+            next.parse = crate::syntax::parse(&source);
+            next.scene = crate::model::lower(&next.parse);
+            let mut prior = self.baseline.layout.clone();
+            prior.labels.retain(|l| l.feature != feature);
+            next.layout.labels = crate::labels::place_with_prior(
+                &next.scene,
+                &self.options,
+                &next.layout,
+                Some(&prior),
+            )?;
+            crate::layout::validate(&next.scene, &next.layout, &self.options)?;
+            if !crate::labels::placements_clear(&next.scene, &next.layout) {
+                return Err(Error::Layout(
+                    "automatic label placement is obstructed".into(),
+                ));
+            }
+            Ok(Arc::new(next))
+        })();
+        if let Ok(next) = result {
+            self.last.clear();
+            self.prepared = next;
+            self.valid = true;
+            Ok(())
+        } else {
+            result.map(|_| ())
+        }
     }
     /// Validate without changing routes. Kept for hosts using the preview API.
     pub fn settle(&self) -> Result<(), Error> {

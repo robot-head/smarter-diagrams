@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict');
+module.exports=async(browser,base)=>{
+ const p=await browser.newPage({viewport:{width:1360,height:1000}});await p.goto(base);await p.waitForFunction(()=>document.querySelector('#status').textContent.includes('revision'));
+ const source=()=>p.locator('#source').inputValue(),label=p.locator('[data-label="client->gateway"]');const original=await source();
+ const read=()=>label.evaluate(el=>({x:Number(el.dataset.labelX),y:Number(el.dataset.labelY)}));const home=await read();
+ await p.evaluate(()=>{window.keptSvg=document.querySelector('#canvas svg');window.keptClient=document.querySelector('[data-node="client"]')});
+ async function move(dx,dy){const grab=await label.evaluate(el=>{const m=el.ownerSVGElement.getScreenCTM(),q=new DOMPoint(Number(el.dataset.labelX)+8,Number(el.dataset.labelY)+2).matrixTransform(m);return{x:q.x,y:q.y,s:m.a}});await p.mouse.move(grab.x,grab.y);await p.mouse.down();await p.mouse.move(grab.x+dx*grab.s,grab.y+dy*grab.s,{steps:8});await p.waitForTimeout(30);const held=await read();await p.mouse.up();assert.deepEqual(await read(),held,'release keeps exact label position');return held;}
+ let held=await move(0,-24.125);assert(Math.abs(held.y-home.y+24.125)<.03);assert.match(await source(),/@label/);
+ assert(await p.evaluate(()=>window.keptSvg===document.querySelector('#canvas svg')&&window.keptClient===document.querySelector('[data-node="client"]')),'gesture must preserve SVG and node objects');
+ held=await move(0,24.125);assert(Math.abs(held.y-home.y)<.03,'label can be dragged back without moving nodes');
+ await p.click('#undo');assert(Math.abs((await read()).y-home.y+24.125)<.03);await p.click('#redo');assert(Math.abs((await read()).y-home.y)<.03);
+ const saved=await source();await label.dblclick();assert(!await source().then(s=>/label\([^)]*x:/.test(s)),`double click clears the manual pin: ${await p.locator('#status').textContent()} SOURCE ${await source()}`);await p.click('#undo');assert.equal(await source(),saved);
+ const svg=await p.locator('#canvas svg').getAttribute('viewBox');const pos=await read();const b=await label.boundingBox();await p.mouse.move(b.x+b.width/2,b.y+b.height/2);await p.mouse.down();await p.mouse.move(b.x+b.width/2,b.y+b.height/2-32);await p.keyboard.press('Escape');await p.mouse.up();assert.deepEqual(await read(),pos);assert.equal(await source(),saved);assert.equal(await p.locator('#canvas svg').getAttribute('viewBox'),svg);
+ const mobileContext=await browser.newContext({viewport:{width:375,height:900},isMobile:true,hasTouch:true}),mobile=await mobileContext.newPage();
+ await mobile.goto(base);await mobile.waitForFunction(()=>document.querySelector('#status').textContent.includes('revision'));await mobile.getByRole('button',{name:'Move nodes',exact:true}).click();await mobile.locator('#canvas').scrollIntoViewIfNeeded();
+ const mobileSource=await mobile.locator('#source').inputValue(),g=await mobile.locator('[data-label="client->gateway"]').evaluate(el=>{const m=el.ownerSVGElement.getScreenCTM(),q=new DOMPoint(Number(el.dataset.labelX)+8,Number(el.dataset.labelY)).matrixTransform(m);return{x:q.x,y:q.y,s:m.a,home:Number(el.dataset.labelY)}}),cdp=await mobileContext.newCDPSession(mobile);
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:g.x,y:g.y}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:g.x,y:g.y-16*g.s}]});
+ await mobile.waitForFunction(y=>Math.abs(Number(document.querySelector('[data-label="client->gateway"]').dataset.labelY)-y)<.05,g.home-16);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert.match(await mobile.locator('#source').inputValue(),/@label/);await mobile.click('#undo');assert.equal(await mobile.locator('#source').inputValue(),mobileSource);await mobileContext.close();
+ await p.close();console.log('Touch label drag/drop and Undo passed.');console.log('Manual labels: fractional live drag/back, source pins, exact release, Undo/Redo, reset, Escape and retained DOM passed.');
+};

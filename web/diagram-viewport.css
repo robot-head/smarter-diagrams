@@ -27,3 +27,8 @@ main:has(.canvas-panel){grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
 .diagram-viewport{touch-action:none}
 .editor-help{font-size:12px;color:var(--sd-muted);margin:6px 0}
 @media(pointer:coarse){.diagram-pan-hint{flex-basis:100%}}
+
+[data-draggable-label="true"]{cursor:grab;pointer-events:all}
+[data-draggable-label="true"] text{pointer-events:all}
+
+[data-draggable-label="true"]{cursor:grab}

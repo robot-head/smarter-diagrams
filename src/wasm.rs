@@ -141,6 +141,14 @@ impl WasmDragPreview {
         let drags: Vec<crate::edit::Drag> = serde_json::from_str(drags_json).map_err(js_error)?;
         self.inner.update(&drags).map_err(js_error)
     }
+    pub fn update_label(&mut self, feature: &str, x: f64, y: f64) -> Result<(), JsValue> {
+        self.inner
+            .update_label(feature, crate::layout::Point::new(x, y))
+            .map_err(js_error)
+    }
+    pub fn reset_label(&mut self, feature: &str) -> Result<(), JsValue> {
+        self.inner.reset_label(feature).map_err(js_error)
+    }
     pub fn settle(&mut self) -> Result<(), JsValue> {
         self.inner.settle().map_err(js_error)
     }

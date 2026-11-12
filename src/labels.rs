@@ -194,6 +194,7 @@ struct Feature {
     ignore: BTreeSet<String>,
     slot: Option<String>,
     slide: Option<f64>,
+    position: Option<Point>,
 }
 pub fn place(
     scene: &SceneGraph,
@@ -208,6 +209,14 @@ pub(crate) fn place_with_prior(
     l: &Layout,
     prior: Option<&Layout>,
 ) -> Result<Vec<LabelPlacement>, Error> {
+    let travel = prior
+        .map(|p| {
+            l.nodes
+                .iter()
+                .filter_map(|(id, r)| p.nodes.get(id).map(|old| r.center().distance(old.center())))
+                .fold(0., f64::max)
+        })
+        .unwrap_or(0.);
     let mut features = Vec::new();
     for e in &scene.edges {
         let text = crate::render::flow_caption(scene, e).unwrap_or_else(|| e.label.clone());
@@ -228,6 +237,20 @@ pub(crate) fn place_with_prior(
                 .and_then(|a| a.attrs.get("slot"))
                 .map(|v| v.text.clone()),
             slide: ann.and_then(|a| value(&a.attrs, "slide")),
+            position: if let Some(a) =
+                ann.filter(|a| a.attrs.contains_key("x") || a.attrs.contains_key("y"))
+            {
+                Some(Point::new(
+                    value(&a.attrs, "x").ok_or_else(|| {
+                        Error::Layout("manual labels require finite x and y".into())
+                    })?,
+                    value(&a.attrs, "y").ok_or_else(|| {
+                        Error::Layout("manual labels require finite x and y".into())
+                    })?,
+                ))
+            } else {
+                None
+            },
         });
     }
     for node in &scene.nodes {
@@ -245,6 +268,7 @@ pub(crate) fn place_with_prior(
                 ignore,
                 slot: Some("above".into()),
                 slide: Some(0.5),
+                position: None,
             });
         }
         for port in node.ports.values() {
@@ -264,6 +288,7 @@ pub(crate) fn place_with_prior(
                     ignore,
                     slot: None,
                     slide: None,
+                    position: None,
                 });
             }
         }
@@ -299,12 +324,89 @@ pub(crate) fn place_with_prior(
             })
             .collect(),
     );
+    // Most pointer frames only move anchors. Keep the complete previous
+    // caption solution when it is still valid instead of searching again.
+    if let Some(prior) =
+        prior.filter(|_| travel < 32. && features.iter().all(|f| scene.edge(&f.id).is_some()))
+    {
+        let mut kept = Vec::new();
+        for f in &features {
+            if f.slot.is_some() || f.slide.is_some() {
+                break;
+            }
+            let Some(old) = prior
+                .labels
+                .iter()
+                .find(|l| l.feature == f.id && l.text == f.text)
+            else {
+                break;
+            };
+            let mut label = old.clone();
+            if let Some(position) = f.position {
+                label.bounds.x = position.x;
+                label.bounds.y = position.y;
+            }
+            let mut found = false;
+            let target = if f.position.is_some() {
+                label.bounds.center()
+            } else {
+                old.anchor
+            };
+            let mut anchors = f
+                .route
+                .windows(2)
+                .filter_map(|segment| {
+                    let dx = segment[1].x - segment[0].x;
+                    let dy = segment[1].y - segment[0].y;
+                    if dx * dx + dy * dy < 1e-12 {
+                        return None;
+                    }
+                    let t = (((target.x - segment[0].x) * dx + (target.y - segment[0].y) * dy)
+                        / (dx * dx + dy * dy))
+                        .clamp(0., 1.);
+                    Some(Point::new(segment[0].x + t * dx, segment[0].y + t * dy))
+                })
+                .collect::<Vec<_>>();
+            anchors.sort_by(|a, b| a.distance(target).total_cmp(&b.distance(target)));
+            for anchor in anchors {
+                let mut next = label.clone();
+                next.anchor = anchor;
+                next.callout = true;
+                next.knockout = false;
+                next.orthogonal_leader = true;
+                if f.position.is_none() && next.anchor.distance(next.bounds.center()) > 256. {
+                    continue;
+                }
+                for horizontal in [next.horizontal, !next.horizontal] {
+                    next.horizontal = horizontal;
+                    if valid(&next, f, scene, l, &node_index)
+                        && kept.iter().all(|other| !conflict(&next, other))
+                    {
+                        kept.push(next.clone());
+                        found = true;
+                        break;
+                    }
+                }
+                if found {
+                    break;
+                }
+            }
+            if !found {
+                break;
+            }
+        }
+        if kept.len() == features.len() {
+            kept.sort_by(|a, b| a.feature.cmp(&b.feature));
+            return Ok(kept);
+        }
+    }
     let mut fallback_y = bottom;
     for f in &features {
         let mut candidates = generate(f, o, l, scene);
         // Facing horizontal ports use one stable caption rail above the pair.
         // Segment length and A* tie breaks must not toggle inline/callout slots.
-        if f.slot.is_none()
+        if f.position.is_none()
+            && f.slot.is_none()
             && f.slide.is_none()
             && let Some(edge) = scene.edge(&f.id)
             && crate::render::flow_caption(scene, edge).is_some()
@@ -377,7 +479,8 @@ pub(crate) fn place_with_prior(
             cost: 10000. + o.weights.pill,
         });
         fallback_y += text_height(&f.text) + 20.;
-        if f.slot.is_none()
+        if f.position.is_none()
+            && f.slot.is_none()
             && f.slide.is_none()
             && let Some(old) = prior.and_then(|p| {
                 p.labels
@@ -436,7 +539,7 @@ pub(crate) fn place_with_prior(
                     fixed.knockout = false;
                     let distance = fixed.anchor.distance(fixed.bounds.center());
                     if distance < 512. {
-                        for step in [0., 4., 8., 16.] {
+                        for step in [0., (distance - 184.).clamp(0., 16.)] {
                             let mut tethered = fixed.clone();
                             let t = step / distance.max(1.);
                             tethered.bounds.x += (fixed.anchor.x - fixed.bounds.x) * t;
@@ -490,6 +593,68 @@ pub(crate) fn place_with_prior(
                 }
             }
         }
+        if let Some(position) = f.position {
+            if !position.x.is_finite() || !position.y.is_finite() {
+                return Err(Error::Layout(
+                    "manual label coordinates must be finite".into(),
+                ));
+            }
+            candidates.clear();
+            for segment in f.route.windows(2) {
+                let dx = segment[1].x - segment[0].x;
+                let dy = segment[1].y - segment[0].y;
+                if dx * dx + dy * dy < 1e-12 {
+                    continue;
+                }
+                let t = (((position.x - segment[0].x) * dx + (position.y - segment[0].y) * dy)
+                    / (dx * dx + dy * dy))
+                    .clamp(0., 1.);
+                let bounds = Rect::new(
+                    position.x,
+                    position.y,
+                    feature_width(f, scene),
+                    text_height(&f.text),
+                );
+                let anchor = Point::new(segment[0].x + t * dx, segment[0].y + t * dy);
+                if bounds.inflate(2.).contains(anchor) {
+                    candidates.push(Candidate {
+                        cost: -1.,
+                        label: LabelPlacement {
+                            feature: f.id.clone(),
+                            text: f.text.clone(),
+                            bounds,
+                            anchor,
+                            knockout: true,
+                            callout: false,
+                            orthogonal_leader: false,
+                            horizontal: dx.abs() > dy.abs(),
+                            slide: 0.5,
+                        },
+                    });
+                }
+                for horizontal in [true, false] {
+                    candidates.push(Candidate {
+                        cost: 0.,
+                        label: LabelPlacement {
+                            feature: f.id.clone(),
+                            text: f.text.clone(),
+                            bounds: Rect::new(
+                                position.x,
+                                position.y,
+                                feature_width(f, scene),
+                                text_height(&f.text),
+                            ),
+                            anchor: Point::new(segment[0].x + t * dx, segment[0].y + t * dy),
+                            knockout: false,
+                            callout: true,
+                            orthogonal_leader: true,
+                            horizontal,
+                            slide: 0.5,
+                        },
+                    });
+                }
+            }
+        }
         let mut ids = Vec::new();
         for c in candidates {
             let stable_leader = prior.is_none()
@@ -510,7 +675,8 @@ pub(crate) fn place_with_prior(
                 f.id
             )));
         }
-        if f.slot.is_none()
+        if f.position.is_none()
+            && f.slot.is_none()
             && f.slide.is_none()
             && let Some(prior) = prior
             && let Some(old) = prior.labels.iter().find(|label| label.feature == f.id)
@@ -944,6 +1110,15 @@ fn polish(labels: &mut [LabelPlacement], scene: &SceneGraph, l: &Layout, o: &Lay
             .collect(),
     );
     for i in 0..n {
+        if let Some(edge) = scene.edge(&labels[i].feature)
+            && effective_annotations(scene, &edge.id, &edge.annotations, o.variant.as_deref())
+                .iter()
+                .any(|a| {
+                    a.name == "label" && (a.attrs.contains_key("x") || a.attrs.contains_key("y"))
+                })
+        {
+            continue;
+        }
         let mut candidate = labels[i].clone();
         if candidate.horizontal {
             candidate.bounds.x += result[i];
@@ -966,6 +1141,7 @@ fn polish(labels: &mut [LabelPlacement], scene: &SceneGraph, l: &Layout, o: &Lay
             ignore,
             slot: None,
             slide: None,
+            position: None,
         };
         if valid(&candidate, &f, scene, l, &index)
             && labels

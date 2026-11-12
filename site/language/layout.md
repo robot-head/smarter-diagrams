@@ -129,3 +129,11 @@ left: Left service @pin(grid: 0, 0)
 right: Right service @pin(grid: 0, 0)
 left -> right
 ```
+
+### Manual caption positions
+
+The Playground's label drag stores an exact pixel-coordinate center. `ResetLabel` or double-clicking the label removes the manual center so automatic placement can resume.
+
+```diagram
+api.E -> db.W: writes @label(x: 120, y: -76)
+```
