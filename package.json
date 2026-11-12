@@ -9,7 +9,8 @@
     "test:docs": "node scripts/docs-test.cjs",
     "test:browser": "node scripts/browser-test.cjs",
     "bench:browser": "node scripts/browser-benchmark.cjs",
-    "test:layout-audit": "node scripts/layout-audit.cjs"
+    "test:layout-audit": "node scripts/layout-audit.cjs",
+    "test:layout-explore": "node scripts/layout-audit.cjs --explore"
   },
   "devDependencies": {
     "playwright": "1.62.1",

@@ -1,0 +1,831 @@
+{
+  "revision": "5ecfc4f8df861b1ae77736435ac842e57ab474dd",
+  "scope": "36 exploration cases plus 3 diagnostic-isolation controls; 39 cases reviewed individually across 7 contact sheets. Eight routing/caption cases inspected again at native size.",
+  "seeds": [
+    "0xc0ffee01",
+    "0xa11ce002",
+    "0x5eed1203"
+  ],
+  "method": "12 authored feature combinations, 24 bounded grammar cases across three seeds, and 3 feasibility controls. Every successful source compiled repeatedly and with comment/CRLF trivia; Chromium measured actual glyphs, silhouettes, captions, arrowheads and leaders. A Rust helper compared nonempty semantic edge captions against emitted layout labels. Subjective beauty/clarity scores are 1–5 for presentation and concept comprehension, considering both standard-width overview and native-size details; diagnostic controls are unscored.",
+  "counts": {
+    "cases": 39,
+    "rendered": 35,
+    "diagnostics": 4,
+    "semanticFailureCases": 5,
+    "missingCaptions": 9,
+    "timeouts": 0,
+    "paintOrNodeCaptionOverlapCases": 0,
+    "nondeterministic": 0,
+    "triviaDifferences": 0
+  },
+  "fitPanelPx": [
+    730,
+    450
+  ],
+  "limitations": [
+    "Fixed bounded grammars, not coverage-guided or exhaustive fuzzing; related seed cases may share topology while varying dimensions and captions.",
+    "Single Chromium/Linux font environment and static native SVGs; this corpus does not establish drag stability or cross-platform typography.",
+    "Proper-crossing counts exclude bends and common endpoints and are a triage metric, not a proof of crossing optimality.",
+    "Fitted type size alone is not a correctness failure; larger graphs may need panning. Missing semantics and detached labels are evaluated separately."
+  ],
+  "reproduce": [
+    "cargo build --locked --all-features",
+    "npm run test:layout-explore -- --strict",
+    "Open artifacts/layout-exploration/index.html and results.json; the command intentionally fails while the reported diagnostics or missing captions remain."
+  ],
+  "knownDiagnostics": {
+    "c0ffee01-scoped": "infeasible layout: infeasible constraints or dual projection convergence budget exceeded",
+    "a11ce002-scoped": "infeasible layout: infeasible constraints or dual projection convergence budget exceeded",
+    "5eed1203-scoped": "infeasible layout: infeasible constraints or dual projection convergence budget exceeded",
+    "control-scoped-no-captions": "infeasible layout: infeasible constraints or dual projection convergence budget exceeded"
+  },
+  "currentReview": {
+    "minimumFittedTextBelow8px": 17,
+    "remainingPriorities": [
+      {
+        "id": "silent-caption-loss",
+        "priority": "P1",
+        "problem": "Successful layout can silently omit connection captions",
+        "cases": [
+          "09-many-record-slots",
+          "10-many-named-ports",
+          "a11ce002-parallel",
+          "a11ce002-sparse-mesh",
+          "5eed1203-sparse-mesh"
+        ],
+        "evidence": "Nine nonempty edge captions are missing from Layout.labels across five rendered cases, including insert and accepted 4. Actual geometry and paint checks all pass. The selection routine initializes its incumbent with a potentially partial greedy assignment and the caller does not verify that every feature was selected.",
+        "nextStep": "Require a complete assignment for every nonempty caption. Preserve a complete incumbent through budget exhaustion; otherwise trigger bounded layout recovery or return an explicit diagnostic, never a partial visual result.",
+        "acceptance": "All nine captions are represented in these five cases; SVG export and interactive rendering must not silently omit connection semantics. Add a semantic completeness regression.",
+        "code": [
+          "src/labels.rs:1050",
+          "src/labels.rs:773"
+        ]
+      },
+      {
+        "id": "scoped-feedback-feasibility",
+        "priority": "P1",
+        "problem": "Automatic ownership layout rejects a feasible cross-region feedback topology",
+        "cases": [
+          "c0ffee01-scoped",
+          "a11ce002-scoped",
+          "5eed1203-scoped",
+          "control-scoped-no-captions"
+        ],
+        "evidence": "All three caption variants return infeasible constraints or dual projection convergence budget exceeded. The caption-free variant also fails. Flattening ownership renders; a pinned layout retaining both containers and the same feedback topology also renders.",
+        "nextStep": "Isolate ancestor sizing/separation constraints for SCCs crossing ownership groups; keep a feasible container arrangement and distinguish convergence exhaustion from actual constraint inconsistency.",
+        "acceptance": "The three original sources and caption-free control render without user pins. The pinned witness remains valid.",
+        "code": [
+          "src/layout.rs:824",
+          "src/topology.rs:451"
+        ]
+      },
+      {
+        "id": "caption-locality",
+        "priority": "P1",
+        "problem": "Global caption rails create detached labels and mostly empty canvases",
+        "cases": [
+          "09-many-record-slots",
+          "a11ce002-sparse-mesh",
+          "5eed1203-sparse-mesh"
+        ],
+        "evidence": "The identify caption is 400 px from its anchor. The two sparse meshes put send captions 696 and 748 px away, beneath a compact graph. Full-size inspection confirms long empty leaders rather than a fitting artifact.",
+        "nextStep": "Reserve local channel space or reflow nearby ranks before using a global rail. Optimize caption distance and resulting frame area jointly; enforce completeness while improving locality.",
+        "acceptance": "These captions remain near their own routes without hundreds of pixels of empty leader; all source captions remain visible and nonoverlapping.",
+        "code": [
+          "src/labels.rs:987",
+          "src/layout.rs:998"
+        ]
+      },
+      {
+        "id": "series-parallel-folding",
+        "priority": "P1",
+        "problem": "Repeated branch/join stages remain a thin horizontal strip",
+        "cases": [
+          "c0ffee01-branch-join",
+          "a11ce002-branch-join",
+          "5eed1203-branch-join"
+        ],
+        "evidence": "All three sources contain fourteen nodes and three conditional stages. They are crossing-free but have fitted text around 4.2 px in the 730×450 panel; the same issue persists across different caption lengths.",
+        "nextStep": "Recognize series-parallel regions and fold or stack whole decision/branch/join units, preserving the order between regions.",
+        "acceptance": "All three concepts have a compact, obvious stage sequence and readable standard-width previews; explicit pins and ports stay authoritative.",
+        "code": [
+          "src/presentation.rs:401",
+          "src/topology.rs:736"
+        ]
+      },
+      {
+        "id": "bipartite-generalization",
+        "priority": "P1",
+        "problem": "General bipartite graphs use avoidable crossings, merged lanes and detours",
+        "cases": [
+          "02-planar-mesh",
+          "03-dense-mesh",
+          "c0ffee01-sparse-mesh",
+          "a11ce002-sparse-mesh",
+          "5eed1203-sparse-mesh"
+        ],
+        "evidence": "The planar K2,4 case has four proper crossings, one overlapping route pair and a 3.6× maximum detour. K4,4 has 34 proper crossings and six overlapping pairs. Sparse meshes mix source/store ranks and produce 14–25 crossings. Nonplanar examples do require some crossings; the issue is excess crossings and indistinguishable segments.",
+        "nextStep": "Extend role-layer placement, free-side attachment selection and joint channel ordering beyond the complete three-by-three special case. Minimize crossings with a bounded plan and keep distinct edges from coinciding.",
+        "acceptance": "K2,4 is crossing-free; dense/sparse cases have materially fewer excess crossings and no accidental shared segments or missing captions.",
+        "code": [
+          "src/presentation.rs:26",
+          "src/presentation.rs:653",
+          "src/layout.rs:1267"
+        ]
+      },
+      {
+        "id": "composed-fans-and-port-proportions",
+        "priority": "P2",
+        "problem": "Composed fans and named-port bundles lose role alignment and consistent proportions",
+        "cases": [
+          "01-dispatch-collect",
+          "10-many-named-ports",
+          "09-many-record-slots"
+        ],
+        "evidence": "One worker is placed an earlier column than its independent peers. Publisher 3 is much wider than peers with the same role, while publish/accepted paths circulate around the queue. Multi-source records retain close crossings and weak caption association.",
+        "nextStep": "Use role-aware ranks and port-aware ordering across both ends of composed fan bundles; reserve caption space in channels before stretching node bodies.",
+        "acceptance": "Independent workers/publishers have coherent role placement and similar intrinsic proportions, with stable route/caption association."
+      },
+      {
+        "id": "ownership-scope-and-component-polish",
+        "priority": "P2",
+        "problem": "Disconnected scope islands and components lack clear grouping cues",
+        "cases": [
+          "08-cross-ownership",
+          "12-independent-systems"
+        ],
+        "evidence": "One trust title sits over West while four separate highlighted regions denote the shared scope. Shared services contains a long empty vertical gap. Independent pipelines and an observer share rank bands without component framing.",
+        "nextStep": "Repeat or explicitly connect scope labels across clipped islands, compact ownership internals and pack independent components before global placement.",
+        "acceptance": "Scope membership is evident at first glance and unrelated components read as distinct units without misleading adjacency."
+      }
+    ],
+    "cases": [
+      {
+        "id": "01-dispatch-collect",
+        "beauty": 2,
+        "clarity": 3,
+        "review": "All dispatch/result connections are present and do not cross, but Worker 1 occupies an earlier column than the other workers. The parallel role is weaker than a consistent worker column between queue and store.",
+        "status": "rendered",
+        "minFitTextPx": 9.3,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1.314793613410277,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "02-planar-mesh",
+        "beauty": 2,
+        "clarity": 2,
+        "review": "Four proper crossings and one overlapping route pair in the planar K2,4 graph. Perimeter detours obscure a simple two-to-four relationship; free attachment sides and a joint planar embedding should avoid all crossings.",
+        "status": "rendered",
+        "minFitTextPx": 11.9,
+        "routeMetrics": {
+          "properCrossings": 4,
+          "overlappingRoutePairs": 1,
+          "maxDetourRatio": 3.564734895191122,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "a0->b0",
+            "text": "access",
+            "centerToAnchorPx": 64
+          }
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "03-dense-mesh",
+        "beauty": 3,
+        "clarity": 2,
+        "review": "The two layers and uniform captions establish the complete dependency pattern, but 34 proper crossings and six overlapping route pairs make individual paths hard to follow. K4,4 is nonplanar; reducing extra crossings and eliminating coincident segments matters more than promising zero crossings.",
+        "status": "rendered",
+        "minFitTextPx": 7.3,
+        "routeMetrics": {
+          "properCrossings": 34,
+          "overlappingRoutePairs": 6,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "04-sixteen-stages",
+        "beauty": 4,
+        "clarity": 5,
+        "review": "A readable four-by-four snake preserves all sixteen stages and the direction of travel. No crossings or callouts; approximately 12.3 px text in the fitted panel.",
+        "status": "rendered",
+        "minFitTextPx": 12.3,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "05-balanced-tree",
+        "beauty": 4,
+        "clarity": 5,
+        "review": "Four depth bands and ordered subtrees communicate the fifteen-node hierarchy. Short local captions and noncrossing branches keep the result traceable.",
+        "status": "rendered",
+        "minFitTextPx": 9.1,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "06-unbalanced-tree",
+        "beauty": 3,
+        "clarity": 4,
+        "review": "Different branch depths remain explicit. The long one-child branch leaves expected empty space under short branches; the hierarchy is still clear and no routes cross.",
+        "status": "rendered",
+        "minFitTextPx": 8.4,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "07-multiple-retries",
+        "beauty": 2,
+        "clarity": 2,
+        "review": "The SCC arrangement starts with Stage 7 at the upper left and makes restart look like the main progression. All connections are present, but the intended Stage 1-to-8 pipeline and exceptional feedback are not visually separated.",
+        "status": "rendered",
+        "minFitTextPx": 15,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1.6000000000000003,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "08-cross-ownership",
+        "beauty": 2,
+        "clarity": 2,
+        "review": "Ownership and directed writes are clear at native size. Shared services has excessive empty height, and the single trust title over West does not clearly identify all four disjoint highlighted islands across the three ownership groups.",
+        "status": "rendered",
+        "minFitTextPx": 6.4,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "09-many-record-slots",
+        "beauty": 2,
+        "clarity": 1,
+        "review": "The insert caption is silently absent although its source edge is present. identify is 400 px from its anchor; seven proper crossings and remote captions make the six row operations hard to distinguish.",
+        "status": "rendered",
+        "minFitTextPx": 10.3,
+        "routeMetrics": {
+          "properCrossings": 7,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 2,
+          "mostRemoteCallout": {
+            "feature": "checkout->orders#customer_id",
+            "text": "identify",
+            "centerToAnchorPx": 400
+          }
+        },
+        "semanticFailures": [
+          "Missing caption for checkout->orders#id: insert"
+        ]
+      },
+      {
+        "id": "10-many-named-ports",
+        "beauty": 2,
+        "clarity": 1,
+        "review": "accepted 4 is silently absent. Publisher 3 becomes disproportionately wide; inputs, acknowledgements and port captions surround the queue in inconsistent directions, with five crossings and a 160 px port-caption callout.",
+        "status": "rendered",
+        "minFitTextPx": 11.1,
+        "routeMetrics": {
+          "properCrossings": 5,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 6.486352055438593,
+          "calloutCount": 3,
+          "mostRemoteCallout": {
+            "feature": "queue#in3",
+            "text": "in3: input",
+            "centerToAnchorPx": 159.99999999999997
+          }
+        },
+        "semanticFailures": [
+          "Missing caption for queue#ack3->p3: accepted 4"
+        ]
+      },
+      {
+        "id": "11-mixed-typography",
+        "beauty": 4,
+        "clarity": 4,
+        "review": "Wrapped Latin and Japanese text, explicit line breaks and long captions remain contained and legible at native size. The vertical decision hierarchy is coherent and routes do not cross.",
+        "status": "rendered",
+        "minFitTextPx": 9.9,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "12-independent-systems",
+        "beauty": 3,
+        "clarity": 3,
+        "review": "The two chains are distinguishable but share row bands, the checkout chain bends around an unrelated observer, and component boundaries rely on tracing arrows. Pack independent components before arranging their internals.",
+        "status": "rendered",
+        "minFitTextPx": 8.7,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "c0ffee01-dag",
+        "beauty": 2,
+        "clarity": 2,
+        "review": "The folded sequence is visible at native size, but twenty proper crossings, one overlapping route pair, and several long end-directed routes make bypass semantics difficult to trace.",
+        "status": "rendered",
+        "minFitTextPx": 7.8,
+        "routeMetrics": {
+          "properCrossings": 20,
+          "overlappingRoutePairs": 1,
+          "maxDetourRatio": 2.3101607044834584,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "n6->n11",
+            "text": "validate\norganization\naccess",
+            "centerToAnchorPx": 112
+          }
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "c0ffee01-cycle",
+        "beauty": 3,
+        "clarity": 3,
+        "review": "The large ring remains traceable, with one proper crossing and local captions. Long captions and wrapped decision titles reduce fitted text; separate the primary progression from exceptional feedback.",
+        "status": "rendered",
+        "minFitTextPx": 7.8,
+        "routeMetrics": {
+          "properCrossings": 1,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1.6487726542785044,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "c0ffee01-parallel",
+        "beauty": 2,
+        "clarity": 3,
+        "review": "Main progression folds into rows, but the many sends into the final queue use a dense convergence rail and seven crossings. Distinct lane/caption order is more important here than merely reducing frame width.",
+        "status": "rendered",
+        "minFitTextPx": 7.6,
+        "routeMetrics": {
+          "properCrossings": 7,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 3.4874297782274795,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "c0ffee01-tree",
+        "beauty": 4,
+        "clarity": 4,
+        "review": "Depth, stable siblings and contiguous subtrees are clear despite mixed silhouettes. No crossings or remote callouts; large decision shapes require a larger detail scale.",
+        "status": "rendered",
+        "minFitTextPx": 8.4,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "c0ffee01-two-stage",
+        "beauty": 4,
+        "clarity": 5,
+        "review": "Dispatch splits cleanly into two region subtrees, with aligned worker leaves and local captions. The structure reads immediately, with no crossings.",
+        "status": "rendered",
+        "minFitTextPx": 12.0,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "c0ffee01-sparse-mesh",
+        "beauty": 2,
+        "clarity": 2,
+        "review": "Sources and stores are mixed between ranks. Seventeen crossings obscure the bipartite role structure even though captions stay near paths and none are missing.",
+        "status": "rendered",
+        "minFitTextPx": 10.1,
+        "routeMetrics": {
+          "properCrossings": 17,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1.3308051948051949,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "c0ffee01-branch-join",
+        "beauty": 2,
+        "clarity": 2,
+        "review": "The three conditional stages are logically ordered and do not cross, but they form a roughly 4 px-text strip when fitted. Fold series-parallel regions as units rather than treating only Hamiltonian main chains.",
+        "status": "rendered",
+        "minFitTextPx": 4.2,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "c0ffee01-scoped",
+        "beauty": null,
+        "clarity": null,
+        "review": "No SVG is emitted: automatic ownership/feedback placement returns an infeasibility or convergence-budget diagnostic. Removing captions still fails; flat and pinned ownership controls render.",
+        "status": "diagnostic",
+        "minFitTextPx": null,
+        "routeMetrics": null,
+        "semanticFailures": []
+      },
+      {
+        "id": "a11ce002-dag",
+        "beauty": 2,
+        "clarity": 2,
+        "review": "Many backward-looking bypasses surround the folded main sequence. Thirteen proper crossings and one overlapping route pair make the dense graph hard to explain at first glance.",
+        "status": "rendered",
+        "minFitTextPx": 8.1,
+        "routeMetrics": {
+          "properCrossings": 13,
+          "overlappingRoutePairs": 1,
+          "maxDetourRatio": 3.364110201042442,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "a11ce002-cycle",
+        "beauty": 2,
+        "clarity": 2,
+        "review": "The long rectangular cycle has substantial empty interior and fitted text around 5.2 px. Semantic progress through the numbered nodes is hard to find among extra returns.",
+        "status": "rendered",
+        "minFitTextPx": 5.2,
+        "routeMetrics": {
+          "properCrossings": 1,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1.0593898887683066,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "a11ce002-parallel",
+        "beauty": 3,
+        "clarity": 2,
+        "review": "One validate organization access caption is silently absent. The backbone is compact but repeated final-target sends require more consistent lane order and complete captions.",
+        "status": "rendered",
+        "minFitTextPx": 7.4,
+        "routeMetrics": {
+          "properCrossings": 4,
+          "overlappingRoutePairs": 1,
+          "maxDetourRatio": 1.139517625231911,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "n10->n11~2",
+            "text": "read through",
+            "centerToAnchorPx": 112
+          }
+        },
+        "semanticFailures": [
+          "Missing caption for n10->n11: validate organization access"
+        ]
+      },
+      {
+        "id": "a11ce002-tree",
+        "beauty": 4,
+        "clarity": 4,
+        "review": "The asymmetric tree retains clear depth bands, centered parents and local captions. Larger wrapped diamonds make the fully fitted text small, but the native hierarchy remains clear.",
+        "status": "rendered",
+        "minFitTextPx": 7.8,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "a11ce002-two-stage",
+        "beauty": 4,
+        "clarity": 5,
+        "review": "Both region branches and all six workers read clearly. Local captions preserve source/target association without callouts or crossings.",
+        "status": "rendered",
+        "minFitTextPx": 12.0,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "a11ce002-sparse-mesh",
+        "beauty": 1,
+        "clarity": 1,
+        "review": "Four connection captions are absent. Twenty-five proper crossings and a send caption 696 px from its anchor produce a small graph above a large empty canvas. This is semantic loss and caption locality failure, not just a zoom problem.",
+        "status": "rendered",
+        "minFitTextPx": 7.1,
+        "routeMetrics": {
+          "properCrossings": 25,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1.4479856759176364,
+          "calloutCount": 2,
+          "mostRemoteCallout": {
+            "feature": "a4->b2",
+            "text": "send",
+            "centerToAnchorPx": 696
+          }
+        },
+        "semanticFailures": [
+          "Missing caption for a2->b4: validate organization access",
+          "Missing caption for a3->b1: send",
+          "Missing caption for a3->b3: validate organization access",
+          "Missing caption for a4->b4: validate organization access"
+        ]
+      },
+      {
+        "id": "a11ce002-branch-join",
+        "beauty": 2,
+        "clarity": 2,
+        "review": "Three branch/join stages remain an extremely wide strip. A 112 px callout adds noise without improving the global reading order.",
+        "status": "rendered",
+        "minFitTextPx": 4.2,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 4,
+          "mostRemoteCallout": {
+            "feature": "d2->yes2",
+            "text": "validate\norganization\naccess",
+            "centerToAnchorPx": 112
+          }
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "a11ce002-scoped",
+        "beauty": null,
+        "clarity": null,
+        "review": "No SVG is emitted: automatic ownership/feedback placement returns an infeasibility or convergence-budget diagnostic. Removing captions still fails; flat and pinned ownership controls render.",
+        "status": "diagnostic",
+        "minFitTextPx": null,
+        "routeMetrics": null,
+        "semanticFailures": []
+      },
+      {
+        "id": "5eed1203-dag",
+        "beauty": 3,
+        "clarity": 3,
+        "review": "The folded progression is reasonably traceable at native size and captions are complete. Two proper crossings and one overlapping pair remain around the shortcut channels.",
+        "status": "rendered",
+        "minFitTextPx": 7.4,
+        "routeMetrics": {
+          "properCrossings": 2,
+          "overlappingRoutePairs": 1,
+          "maxDetourRatio": 1.2478042346546228,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "5eed1203-cycle",
+        "beauty": 2,
+        "clarity": 2,
+        "review": "The cycle is spread into an irregular wide rectangle. All captions are present, but one crossing and a coincident route pair obscure which paths return and which advance.",
+        "status": "rendered",
+        "minFitTextPx": 6.0,
+        "routeMetrics": {
+          "properCrossings": 1,
+          "overlappingRoutePairs": 1,
+          "maxDetourRatio": 1,
+          "calloutCount": 3,
+          "mostRemoteCallout": {
+            "feature": "n11->n0",
+            "text": "validate\norganization\naccess",
+            "centerToAnchorPx": 112.00000000000023
+          }
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "5eed1203-parallel",
+        "beauty": 3,
+        "clarity": 3,
+        "review": "Compact rows preserve the main chain and all captions. Three proper crossings and two overlapping route pairs still make converging sends harder to distinguish.",
+        "status": "rendered",
+        "minFitTextPx": 9.3,
+        "routeMetrics": {
+          "properCrossings": 3,
+          "overlappingRoutePairs": 2,
+          "maxDetourRatio": 1.6836899764670543,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "5eed1203-tree",
+        "beauty": 3,
+        "clarity": 4,
+        "review": "Clear depth levels and noncrossing subtrees survive the varied shapes. The wide bottom rank makes fitted text about 6.9 px; native-size reading is substantially better.",
+        "status": "rendered",
+        "minFitTextPx": 6.9,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "5eed1203-two-stage",
+        "beauty": 4,
+        "clarity": 5,
+        "review": "Two regions and six workers form clear, ordered subtrees with local captions. No geometric or semantic defect found.",
+        "status": "rendered",
+        "minFitTextPx": 12.0,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "5eed1203-sparse-mesh",
+        "beauty": 1,
+        "clarity": 1,
+        "review": "Two connection captions are absent. Fourteen proper crossings, two overlapping route pairs and a send caption 748 px from its anchor undermine both tracing and fitted readability.",
+        "status": "rendered",
+        "minFitTextPx": 6.7,
+        "routeMetrics": {
+          "properCrossings": 14,
+          "overlappingRoutePairs": 2,
+          "maxDetourRatio": 1.288272921108742,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "a4->b1",
+            "text": "send",
+            "centerToAnchorPx": 748
+          }
+        },
+        "semanticFailures": [
+          "Missing caption for a3->b3: ack",
+          "Missing caption for a4->b0: validate organization access"
+        ]
+      },
+      {
+        "id": "5eed1203-branch-join",
+        "beauty": 2,
+        "clarity": 2,
+        "review": "Repeated branch/join regions form the same thin-strip failure with different caption lengths. The problem is structural, not tied to one wording.",
+        "status": "rendered",
+        "minFitTextPx": 4.2,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 2,
+          "mostRemoteCallout": {
+            "feature": "d0->yes0",
+            "text": "read through",
+            "centerToAnchorPx": 64
+          }
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "5eed1203-scoped",
+        "beauty": null,
+        "clarity": null,
+        "review": "No SVG is emitted: automatic ownership/feedback placement returns an infeasibility or convergence-budget diagnostic. Removing captions still fails; flat and pinned ownership controls render.",
+        "status": "diagnostic",
+        "minFitTextPx": null,
+        "routeMetrics": null,
+        "semanticFailures": []
+      },
+      {
+        "id": "control-scoped-no-captions",
+        "beauty": null,
+        "clarity": null,
+        "review": "No SVG is emitted: automatic ownership/feedback placement returns an infeasibility or convergence-budget diagnostic. Removing captions still fails; flat and pinned ownership controls render.",
+        "status": "diagnostic",
+        "minFitTextPx": null,
+        "routeMetrics": null,
+        "semanticFailures": []
+      },
+      {
+        "id": "control-scoped-flat",
+        "beauty": null,
+        "clarity": null,
+        "review": "Diagnostic control: flattening ownership while preserving the feedback topology renders, with no proper crossings. This is a feasibility isolation case, not a beauty score.",
+        "status": "rendered",
+        "minFitTextPx": 9.1,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      },
+      {
+        "id": "control-scoped-pinned",
+        "beauty": null,
+        "clarity": null,
+        "review": "Diagnostic control: explicit, separated container and child positions produce a valid SVG for the feedback topology. The intentionally generous pinned frame is a feasibility witness, not a recommended presentation.",
+        "status": "rendered",
+        "minFitTextPx": 3.6,
+        "routeMetrics": {
+          "properCrossings": 1,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1.2380952380952381,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "semanticFailures": []
+      }
+    ]
+  },
+  "positiveResults": [
+    "Sixteen-stage pipeline folds into a readable four-by-four sequence with zero crossings.",
+    "Balanced and asymmetric trees retain clear hierarchy and noncrossing branches.",
+    "All three two-stage dispatch concepts retain ordered subtrees, local captions and zero crossings.",
+    "Mixed-script text and explicit newlines remain contained and legible at native size."
+  ],
+  "baselineSemanticRecheck": {
+    "cases": 64,
+    "missingCaptions": 0,
+    "diagnostics": 0,
+    "note": "The original corpus also passes the new semantic completeness check; the failures above require the larger/mixed-feature cases."
+  }
+}
