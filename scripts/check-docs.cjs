@@ -11,6 +11,12 @@ function checkDiagram(source, label, expectError = false) {
   if (result.status !== 0) throw Error(`${label}: ${result.stderr || result.error}`);
   diagrams++;
 }
+const rlib = path.join(root, 'target/debug/libsmarter_diagrams.rlib');
+if (!fs.existsSync(rlib) || !fs.existsSync(binary)) {
+  spawnSync('cargo', ['clean', '-p', 'smarter-diagrams'], { cwd: root, stdio: 'inherit' });
+  const build = spawnSync('cargo', ['build', '--locked', '--all-features'], { cwd: root, stdio: 'inherit' });
+  if (build.status !== 0) throw Error('Failed to build smarter-diagrams for docs check');
+}
 const output = path.join(root, 'target/docs-snippets'); fs.mkdirSync(output, { recursive: true });
 for (const file of files(path.join(root, 'site')).filter(file => file.endsWith('.md'))) {
   const text = fs.readFileSync(file, 'utf8');
