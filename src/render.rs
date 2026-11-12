@@ -644,6 +644,11 @@ pub(crate) fn svg_with_decorations(
                 r.x + crate::shapes::title_gutter(&n.shape) / 2.,
                 r.y + if n.shape == "database" {
                     crate::shapes::CYLINDER_RY.min(r.h / 2.)
+                        - if n.annotations.iter().any(|a| a.name == "sim") {
+                            12.
+                        } else {
+                            0.
+                        }
                 } else {
                     0.
                 },

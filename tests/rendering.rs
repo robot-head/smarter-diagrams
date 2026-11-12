@@ -305,3 +305,13 @@ fn database_title_is_centered_beneath_the_top_cap() {
             .contains(&format!("y=\"{y:.2}\">Database</text>"))
     );
 }
+
+#[test]
+fn simulation_titles_reserve_space_for_the_occupancy_strip() {
+    let d = compile("db: Database @sim(rate: 10, service_rate: 20)\n").unwrap();
+    assert!(d.to_svg().contains("y=\"-4.00\">Database</text>"));
+    let d =
+        compile("db: Organization membership history service @sim(rate: 10, service_rate: 20)\n")
+            .unwrap();
+    assert!(d.layout.nodes["db"].h >= 116.);
+}

@@ -326,11 +326,13 @@ fn layout_pass(
         // Simulation nodes reserve a readable occupancy strip. An explicit
         // size lock below still wins; the viewer only paints status ink that fits.
         let h = if node.shape != "sql_table" && node.annotations.iter().any(|a| a.name == "sim") {
-            h.max(if matches!(node.shape.as_str(), "diamond" | "decision") {
-                96.
-            } else {
-                80.
-            })
+            h.max(title.lines().count() as f64 * 20. + 56.).max(
+                if matches!(node.shape.as_str(), "diamond" | "decision") {
+                    96.
+                } else {
+                    80.
+                },
+            )
         } else {
             h
         };

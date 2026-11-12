@@ -593,9 +593,10 @@
       "Database titles are centered in the body below the top ellipse.",
       "Flexible source ports follow the actual opposite record slots, with captions aligned by source lane.",
       "Root-level trusted members share a contiguous enclosure; nonmembers are excluded and nested ownership clipping is retained.",
-      "Fresh unconstrained graphs get up to two bounded whitespace retries if captions cannot fit; explicit constraints and existing drag layouts are not relaxed."
+      "Fresh unconstrained graphs get up to two bounded whitespace retries if captions cannot fit; explicit constraints and existing drag layouts are not relaxed.",
+      "Simulation title space is reserved separately from occupancy captions, including wrapped titles and the database cap offset."
     ],
-    "verification": "119 Rust tests/doctest pass. All 64 seeded/authored cases and five isolation controls render deterministically with finite geometry and no detected painted geometry or node/caption overlap failures. The previous diagnostic baseline is empty for regression checks."
+    "verification": "120 Rust tests/doctest pass. All 64 seeded/authored cases and five isolation controls render deterministically with finite geometry and no detected painted geometry or node/caption overlap failures. The previous diagnostic baseline is empty for regression checks."
   },
   "baselineKnownDiagnostics": {
     "fuzz-cycle-7": "infeasible layout: no feasible label position for n1->n2",

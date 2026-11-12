@@ -22,11 +22,11 @@ module.exports=async function visualRegressions(browser,page,base){
     const{render_svg}=await import(new URL('./pkg/smarter_diagrams.js',location.href));
     const{paintQueueState}=await import(new URL('./simulation-overlay.js',location.href));
     const failures=[],shapes=['rect','actor','queue','cache','diamond','decision','database','sql_table'];
-    for(const shape of shapes)for(const locked of [false,true]){
+    for(const shape of shapes)for(const locked of [false,true])for(const nodeLabel of (locked?['Status']:['Status','Organization membership history service'])){
       const pin=locked?' @pin(grid: 0,0, lock: [w: 12g, h: 4g])':'';
       const fields=shape==='sql_table'?' { port id: uuid [side: W, pos: 1] }':'';
       const holder=document.createElement('div');holder.style.cssText='position:absolute;left:-10000px;visibility:hidden';
-      holder.innerHTML=render_svg(`node: Status [shape: ${shape}] @sim(service_rate: 1, queue_cap: 10)${pin}${fields}\n`);document.body.append(holder);
+      holder.innerHTML=render_svg(`node: ${JSON.stringify(nodeLabel)} [shape: ${shape}] @sim(service_rate: 1, queue_cap: 10)${pin}${fields}\n`);document.body.append(holder);
       const svg=holder.querySelector('svg');paintQueueState(svg,{nodes:{node:{saturation:1,queued:10,dropped:1}}});
       const node=svg.querySelector('[data-node]'),body=node.querySelector('[data-silhouette]'),overlay=node.querySelector('[data-simulation-overlay]');
       const original=[...node.querySelectorAll('text')].filter(t=>!overlay.contains(t)).map(t=>t.getBBox());
