@@ -65,3 +65,11 @@ The [browser playground](/playground) uses this transaction through `WasmDocumen
 Drag a connection label in the Playground to reposition it without moving nodes or rerouting connections. Its center is saved as `@label(x: ..., y: ...)` in pixel coordinates and survives reopening. Double-click the label to restore automatic placement. Each completed move or reset is one Undo step; Escape cancels a drag. Invalid placements retain the last valid preview.
 
 Rust hosts can use `session.update_label(edge_id, position)` and `session.reset_label(edge_id)` before `document.commit_drag(&session)`.
+
+## Grid, alignment and spacing
+
+Open **Grid & snap** in the Playground canvas toolbar. **Show grid** displays a dot grid; choose 8, 16, 24 or 32 px spacing. **Snap to grid** rounds dragged node and caption centers to that grid. These options are independent and start off, so existing diagrams retain precise free movement.
+
+Enable **Align & equal spacing** for guides that snap node edges and centers to neighboring nodes, or caption centers to other captions. Gap guides show equal edge-to-edge spacing between nodes in the same row or column. Nearby guides retain their target until you move clearly away, keeping small pointer movements stable. Alignment takes priority over grid snapping when both are enabled.
+
+Hold **Alt/Option** to bypass snapping during a drag. The preview shows the position that will be saved on release; each move remains one Undo step, and Escape cancels it. Grid dots and guides are editing aids and are excluded from downloaded SVGs. These canvas options do not add persistent alignment constraints to the diagram language.

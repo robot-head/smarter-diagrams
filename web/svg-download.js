@@ -1,6 +1,7 @@
 // Snapshot the active palette and include its surface for standalone viewers.
 export function standaloneSvg(original){
   const svg=original.cloneNode(true),style=getComputedStyle(original),[x,y,width,height]=(original.dataset.nativeViewBox||original.getAttribute('viewBox')).split(/\s+/).map(Number),box={x,y,width,height};
+  svg.querySelectorAll('[data-authoring-overlay],[data-authoring-overlay-guides]').forEach(el=>el.remove());
   svg.setAttribute('viewBox',`${x} ${y} ${width} ${height}`);
   for(const name of ['width','height','max-width','max-height','margin'])svg.style.removeProperty(name);
   const background=document.createElementNS(svg.namespaceURI,'rect');

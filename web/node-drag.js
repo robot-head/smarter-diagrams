@@ -1,8 +1,8 @@
 // Preview from the immutable gesture baseline; commit once on pointer release.
 // Capture belongs to the canvas, which survives replacement of the SVG children.
 export class NodeDragController {
-  constructor({canvas,view,status,getDocument,touchEnabled,beforeStart,show,onCommit}) {
-    Object.assign(this,{canvas,view,status,getDocument,touchEnabled,beforeStart,show,onCommit});
+  constructor({canvas,view,status,getDocument,touchEnabled,beforeStart,show,onCommit,snapping}) {
+    Object.assign(this,{canvas,view,status,getDocument,touchEnabled,beforeStart,show,onCommit,snapping});
     canvas.addEventListener('pointerdown',event=>this.start(event));
     canvas.addEventListener('pointermove',event=>this.move(event));
     canvas.addEventListener('pointerup',event=>this.finish(event));
@@ -12,6 +12,7 @@ export class NodeDragController {
     for(const type of ['scroll','resize','wheel'])window.addEventListener(type,()=>{if(this.gesture)this.gesture.inverse=undefined},true);
     window.addEventListener('keydown',event=>{if(this.active&&event.key==='Escape'){event.preventDefault();this.cancel()}});
     window.addEventListener('blur',()=>this.cancel());
+    for(const type of ['keydown','keyup'])window.addEventListener(type,event=>{if(event.key==='Alt'&&this.gesture?.lastPoint)this.move({...this.gesture.lastPoint,pointerId:this.gesture.pointer,altKey:type==='keydown',preventDefault(){}})});
   }
   get active(){return !!this.gesture}
   point(event){const inverse=this.gesture?.inverse||this.canvas.querySelector('svg').getScreenCTM().inverse();if(this.gesture)this.gesture.inverse=inverse;return new DOMPoint(event.clientX,event.clientY).matrixTransform(inverse)}
@@ -25,18 +26,21 @@ export class NodeDragController {
     const svg=this.canvas.querySelector('svg'),box=label?{x:Number(node.dataset.labelX),y:Number(node.dataset.labelY),width:0,height:0}:body.getBBox(),point=this.point(event);
     const doc=this.getDocument();let preview;try{preview=doc.begin_drag()}catch(error){this.status.textContent=String(error);return}
     this.gesture={label:!!label,inverse:svg.getScreenCTM().inverse(),node:id,pointer:event.pointerId,x:event.clientX,y:event.clientY,offset:{x:point.x-(label?Number(node.dataset.labelX):box.x+box.width/2),y:point.y-(label?Number(node.dataset.labelY):box.y+box.height/2)},bounds:[...this.view.bounds],fitted:this.view.fitted,markup:svg.outerHTML,status:this.status.textContent,document:doc,preview,frame:0,moved:false,savedFrame:this.view.frame&&[...this.view.frame],valid:true};
+    this.snapping?.begin(id,!!label,box);
     this.view.lockFrame(this.gesture.bounds);
     this.canvas.classList.add('is-dragging');document.body.classList.add('diagram-dragging');
     try{this.canvas.setPointerCapture(event.pointerId)}catch(error){this.cancel();this.status.textContent=String(error)}
   }
   operations(event){
     const point=this.point(event),gesture=this.gesture;
-    return JSON.stringify([{node:gesture.node,position:{x:point.x-gesture.offset.x,y:point.y-gesture.offset.y}}]);
+    const raw={x:point.x-gesture.offset.x,y:point.y-gesture.offset.y},position=this.snapping?this.snapping.snap(raw,event):raw;
+    return JSON.stringify([{node:gesture.node,position}]);
   }
   move(event){
     const gesture=this.gesture;if(!gesture||event.pointerId!==gesture.pointer)return;
-    event.preventDefault();
+    event.preventDefault();gesture.lastPoint={clientX:event.clientX,clientY:event.clientY,altKey:event.altKey};
     gesture.moved=gesture.moved||Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>=4;
+    if(!gesture.moved)return;
     gesture.operations=this.operations(event);
     if(!gesture.frame)gesture.frame=requestAnimationFrame(()=>{
       gesture.frame=0;if(this.gesture!==gesture)return;
@@ -48,11 +52,11 @@ export class NodeDragController {
       if(gesture.moved&&gesture.applied!==gesture.operations){if(gesture.label){const [op]=JSON.parse(gesture.operations);gesture.preview.update_label(gesture.node,op.position.x,op.position.y)}else gesture.preview.update(gesture.operations);gesture.applied=gesture.operations}
       this.show(gesture.moved?gesture.preview.svg():gesture.markup,gesture.bounds);
       gesture.valid=true;this.status.textContent=gesture.status;this.canvas.classList.remove('invalid-drag');
-    }catch(error){gesture.applied=undefined;gesture.valid=false;this.canvas.classList.add('invalid-drag');this.status.textContent=`Cannot place here: ${String(error)}. Move to a clear position or press Escape.`}
+    }catch(error){gesture.applied=undefined;gesture.valid=false;this.snapping?.clear();this.canvas.classList.add('invalid-drag');this.status.textContent=`Cannot place here: ${String(error)}. Move to a clear position or press Escape.`}
   }
   release(restore=true){
     const gesture=this.gesture;if(!gesture)return;
-    this.gesture=undefined;cancelAnimationFrame(gesture.frame);gesture.preview.free();
+    this.gesture=undefined;this.snapping?.clear();cancelAnimationFrame(gesture.frame);gesture.preview.free();
     if(restore){this.view.frame=gesture.savedFrame;this.view.fitted=gesture.fitted}
     this.canvas.classList.remove('is-dragging','invalid-drag');document.body.classList.remove('diagram-dragging');
     if(this.canvas.hasPointerCapture(gesture.pointer))this.canvas.releasePointerCapture(gesture.pointer);
@@ -61,10 +65,14 @@ export class NodeDragController {
   finish(event){
     const gesture=this.gesture;if(!gesture||event.pointerId!==gesture.pointer)return;
     event.preventDefault();
-    const operations=this.operations(event),moved=gesture.moved||Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>=4;
-    if(!moved){this.labelClick=gesture.label?{id:gesture.node,time:event.timeStamp}:undefined;this.cancel();return}
+    const moved=gesture.moved||Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>=4;
+    if(!moved){
+      const previous=this.labelClick,twice=gesture.label&&previous?.id===gesture.node&&event.timeStamp-previous.time<600&&Math.hypot(event.clientX-previous.x,event.clientY-previous.y)<6;
+      this.labelClick=gesture.label?{id:gesture.node,time:event.timeStamp,x:event.clientX,y:event.clientY}:undefined;
+      this.cancel();if(twice){this.resetLabel(event);this.labelResetTime=event.timeStamp;this.labelClick=undefined}return;
+    }
     this.labelClick=undefined;
-    gesture.operations=operations;gesture.moved=true;
+    gesture.operations=this.operations(event);gesture.moved=true;
     this.preview(gesture);
     if(!gesture.valid){const message=this.status.textContent;this.cancel();this.status.textContent=`Move canceled. ${message}`;return}
     try{gesture.document.commit_drag(gesture.preview);this.release(false);this.onCommit()}
@@ -72,6 +80,7 @@ export class NodeDragController {
   }
 
   resetLabel(event){
+    if(event.type==='dblclick'&&this.labelResetTime!==undefined&&event.timeStamp-this.labelResetTime<600)return;
     const label=event.target.closest('[data-draggable-label="true"]'),id=label?.dataset.label||(this.labelClick&&event.timeStamp-this.labelClick.time<600?this.labelClick.id:undefined);if(!id)return;
     event.preventDefault();this.cancel();if(this.beforeStart()===false)return;
     const doc=this.getDocument();let preview;
@@ -81,6 +90,6 @@ export class NodeDragController {
 
   cancel(){
     const gesture=this.release();if(!gesture)return;
-    this.show(gesture.markup);this.status.textContent=gesture.status;
+    if(gesture.moved)this.show(gesture.markup);this.status.textContent=gesture.status;
   }
 }
