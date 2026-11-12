@@ -8,7 +8,7 @@ Unconstrained fans group the independent producers or consumers in one column, w
 
 ### Eight sequential transformations
 
-```diagram
+```diagram guides
 read: Read
 validate: Validate
 normalize: Normalize
@@ -22,7 +22,7 @@ read -> validate -> normalize -> enrich -> filter -> aggregate -> encode -> stor
 
 ### One event reaches five independent consumers
 
-```diagram
+```diagram guides
 bus: Event log [shape: queue]
 c0: Consumer 1
 c1: Consumer 2
@@ -38,7 +38,7 @@ bus -> c4: event
 
 ### Five producers converge at one sink
 
-```diagram
+```diagram guides
 p0: Producer 1
 p1: Producer 2
 p2: Producer 3
@@ -54,7 +54,7 @@ p4 -> warehouse: upload
 
 ### Three protocols share the same endpoints
 
-```diagram
+```diagram guides
 client: Client
 server: Server
 client -> server: HTTPS

@@ -871,39 +871,58 @@ fn incremental_leaf_lowering_matches_fresh_origins_and_structural_fallback() {
 #[test]
 fn fresh_fans_keep_siblings_and_captions_in_readable_columns() {
     for fan_out in [true, false] {
-        let mut source = "hub: Event log [shape: queue]\n".to_owned();
-        for i in 0..5 {
-            source.push_str(&format!("leaf{i}: Consumer {i}\n"));
-            source.push_str(&if fan_out {
-                format!("hub -> leaf{i}: event\n")
-            } else {
-                format!("leaf{i} -> hub: upload\n")
-            });
+        for leaf_count in 3..=8 {
+            let mut source = "hub: Event log [shape: queue]\n".to_owned();
+            for i in 0..leaf_count {
+                source.push_str(&format!("leaf{i}: Consumer {i}\n"));
+                source.push_str(&if fan_out {
+                    format!("hub -> leaf{i}: event\n")
+                } else {
+                    format!("leaf{i} -> hub: upload\n")
+                });
+            }
+            let diagram = compile(&source).unwrap();
+            let first = diagram.layout.nodes["leaf0"];
+            for i in 0..leaf_count {
+                let leaf = diagram.layout.nodes[&format!("leaf{i}")];
+                assert!((leaf.x - first.x).abs() < 0.01);
+                let id = if fan_out {
+                    format!("hub->leaf{i}")
+                } else {
+                    format!("leaf{i}->hub")
+                };
+                let caption = diagram
+                    .layout
+                    .labels
+                    .iter()
+                    .find(|label| label.feature == id)
+                    .unwrap();
+                assert!(!caption.callout);
+                assert!(
+                    (caption.anchor.y - leaf.y).abs() < 0.01,
+                    "caption must stay on its leaf branch"
+                );
+            }
+            let routes: Vec<_> = diagram.layout.routes.values().collect();
+            for (i, a) in routes.iter().enumerate() {
+                for b in &routes[i + 1..] {
+                    for p in a.points.windows(2) {
+                        for q in b.points.windows(2) {
+                            assert!(
+                                !routing::proper_crossing(p[0], p[1], q[0], q[1]),
+                                "a fan must not cross its branches"
+                            );
+                            assert!(
+                                routing::collinear_overlap(p[0], p[1], q[0], q[1]) < 1e-6,
+                                "fan branches must remain distinct"
+                            );
+                        }
+                    }
+                }
+            }
+            assert_eq!(diagram.to_svg(), compile(&source).unwrap().to_svg());
+            layout::validate(&diagram.scene, &diagram.layout, &LayoutOptions::default()).unwrap();
         }
-        let diagram = compile(&source).unwrap();
-        let first = diagram.layout.nodes["leaf0"];
-        for i in 0..5 {
-            let leaf = diagram.layout.nodes[&format!("leaf{i}")];
-            assert!((leaf.x - first.x).abs() < 0.01);
-            let id = if fan_out {
-                format!("hub->leaf{i}")
-            } else {
-                format!("leaf{i}->hub")
-            };
-            let caption = diagram
-                .layout
-                .labels
-                .iter()
-                .find(|label| label.feature == id)
-                .unwrap();
-            assert!(!caption.callout);
-            assert!(
-                (caption.anchor.y - leaf.y).abs() < 0.01,
-                "caption must stay on its leaf branch"
-            );
-        }
-        assert_eq!(diagram.to_svg(), compile(&source).unwrap().to_svg());
-        layout::validate(&diagram.scene, &diagram.layout, &LayoutOptions::default()).unwrap();
     }
 }
 

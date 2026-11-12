@@ -86,7 +86,7 @@ const url = path => new URL(path, base).href;
     }
     if(topic==='ports'||topic==='layout')await page.screenshot({path:`artifacts/language-${topic}.png`,fullPage:true});
   }
-  assert.equal(diagrams,41,'all language and gallery choices must be checked');
+  assert.equal(diagrams,45,'all language and gallery choices must be checked');
   await page.goto(url('language/reference.html'));
   const dense=page.locator('.diagram-examples').last();
   await page.setViewportSize({width:375,height:812});

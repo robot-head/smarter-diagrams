@@ -506,6 +506,7 @@ pub fn layout(
         }
     }
     let mut requests = port_requests(scene, &rects, o, previous);
+    let readable_fan = concept_sides.is_some() && scene.nodes.len() > 2;
     if let Some(sides) = concept_sides {
         for (edge, (source_side, target_side)) in scene.edges.iter().zip(sides) {
             for (source, side, other) in [
@@ -947,8 +948,11 @@ pub fn layout(
     assign_ports(scene, o, &requests, &rects, &mut out)?;
     crate::routing::route_all(scene, o, previous, &mut out)?;
     crate::routing::nudge_channels(scene, o, &mut out);
+    let coordinated_fan = readable_fan && crate::routing::coordinate_fan(scene, o, &mut out);
     out.labels = crate::labels::place(scene, o, &out)?;
-    crate::labels::polish_channels(scene, o, &mut out);
+    if !coordinated_fan {
+        crate::labels::polish_channels(scene, o, &mut out);
+    }
     for zone in &scene.zones {
         let padding = value(&zone.attrs, "padding").unwrap_or(1.5) * o.grid;
         let points: Vec<_> = zone

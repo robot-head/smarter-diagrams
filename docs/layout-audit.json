@@ -567,9 +567,9 @@
     },
     "changes": [
       "Long simple paths fold into a compact sequence when unconstrained.",
-      "Simple fans group leaves in a column and put captions on the horizontal leaf branches.",
+      "Simple fans group leaves in a column, nest outer and inner routing channels without crossings or shared segments, and put captions on the horizontal leaf branches.",
       "Parallel protocols keep matching lane order and reserve caption clearance, including during dragging and reopening saved pins."
     ],
-    "verification": "Full 64-case audit and five controls pass their painted-geometry, overlap and repeatability checks with five explicit known diagnostics. Three Rust regression tests also cover alignment overrides, exact branch labels, straight protocol lanes and drag/reopen clearance."
+    "verification": "All 114 Rust tests/doctest pass. Fan regression coverage checks both directions with three through eight leaves for branch crossings, overlapping segments and caption locality. The other regressions cover explicit row overrides, straight protocol lanes and drag/reopen caption clearance. The full seeded audit and browser checks validate the resulting painted layouts."
   }
 }
