@@ -53,6 +53,8 @@ jobs:
           else
             npx playwright install --with-deps chromium
           fi
+      - name: Check semantic completeness and generated layout geometry
+        run: npm run test:layout-preflight && npm run test:layout-audit -- --strict && npm run test:layout-explore -- --strict
       - name: Test the complete site under its Pages base path
         run: |
           npm run docs:preview -- --port 4173 > /tmp/diagram-docs-preview.log 2>&1 &

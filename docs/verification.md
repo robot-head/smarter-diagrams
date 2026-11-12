@@ -14,7 +14,7 @@ scripts/build-wasm.sh core
 scripts/build-wasm.sh runtime
 ```
 
-The native suite has **61 integration tests and one doctest**. It covers 2,100 generated malformed inputs, exact trivia retention, stale/invalid patches, geometry, cyclic cores, dependent active constraints, mental-map behavior, Unicode, finite-state counterexamples, fluid mass conservation, drift hydration, morphs and visible native-export glyphs. [GitHub CI](../.github/workflows/ci.yml) repeats formatting, Clippy, the all-feature suite, a raw Wasm build, the VS Code JavaScript syntax check and native benchmarks.
+The native suite covers 2,100 generated malformed inputs, exact trivia retention, stale/invalid patches, geometry, cyclic cores, dependent active constraints, mental-map behavior, Unicode, finite-state counterexamples, fluid mass conservation, drift hydration, morphs and visible native-export glyphs. [GitHub CI](../.github/workflows/ci.yml) repeats formatting, Clippy, the all-feature suite, a raw Wasm build, the VS Code JavaScript syntax check and native benchmarks.
 
 Browser checks require Chromium and Playwright (`npm ci`). `CHROMIUM_PATH` overrides `/usr/bin/chromium`. Build both Wasm bundles, serve the repository on loopback port 8765, then run:
 
@@ -26,6 +26,22 @@ node scripts/browser-benchmark.cjs
 The browser smoke check exercises actual Wasm rendering, pointer-to-source edits, undo/redo, Unicode source replacement, flow playback, simulation load/cuts, stratum tilt and branch morph endpoints. It records screenshots under ignored `artifacts/`. The available software WebGPU driver accepted shader compilation but rejected canvas submissions; the verified SVG fallback renders geometry and flat typography correctly. The WebGPU implementation probes submissions and falls back on driver failure. A physical GPU was not available for hardware execution validation.
 
 Neovim 0.12.6 was run headlessly against the real CLI and loopback preview server; its preview endpoint returned the compiled SVG. The VS Code adapter passed Node syntax validation; a VS Code extension host was not available. Native CLI checks compiled the architecture fixture, emitted SVG/PNG/PDF, and exercised MCP initialization and typed tool schemas.
+
+## Layout quality review
+
+Layout checks compare required captions with actual emitted labels, detect coincident connector shafts and remote automatic captions, and check painted text, node silhouettes, arrowheads, leaders and viewport bounds in Chromium. The Wasm corpus also checks graph crossing minima, preserved record rows, scope titles, and exact drag release/reopen behavior. Geometry checks and subjective visual ratings are separate evidence.
+
+```sh
+npm run test:layout-preflight
+npm run test:layout-audit -- --strict
+npm run test:layout-explore -- --strict
+npm run test:layout-quality
+node scripts/check-layout-review.cjs
+```
+
+The last command checks manually recorded beauty and clarity ratings against the SVG hashes from all five completed rounds. It rejects missing ratings, stale engine fingerprints and any score below 5. After discovery, every distinct source is recompiled in five confirmation passes and must match its inspected SVG byte for byte. Identical SVG bytes share one visual review; each fresh image needs its own review. Diagnostic controls remain unscored. A successful bounded corpus is evidence for those examples, not a guarantee that every possible graph or every full-fit thumbnail will be ideal.
+
+The historical [baseline audit](layout-audit.json), [mixed-feature exploration](layout-exploration.json), and [current image review](layout-quality-review.json) preserve the findings and reproduction commands. Generated SVGs, sources, contact sheets and measurements are saved under `artifacts/layout-quality/final/` by the five-round command.
 
 ## Issue evidence
 

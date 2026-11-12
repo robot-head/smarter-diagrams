@@ -83,6 +83,7 @@ const checkSvg = require('./check-rendered-svg.cjs');
   await require('./label-drag-test.cjs')(browser,process.env.DIAGRAM_TEST_URL || 'http://127.0.0.1:8765/web/');
   await require('./snapping-test.cjs')(browser,process.env.DIAGRAM_TEST_URL || 'http://127.0.0.1:8765/web/');
   await require('./presentation-test.cjs')(browser,process.env.DIAGRAM_TEST_URL || 'http://127.0.0.1:8765/web/');
+  await require('./quality-corpus-test.cjs')(browser,process.env.DIAGRAM_TEST_URL || 'http://127.0.0.1:8765/web/');
   assert.deepEqual(errors, []); console.log('Browser: Wasm geometry, pointer edits, trace playback, visible overload/cut state, semantic strata, branch morph, and mobile source/zoom controls passed.');
   await browser.close();
 })().catch(error => { console.error(error); process.exit(1); });

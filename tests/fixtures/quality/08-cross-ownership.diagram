@@ -1,0 +1,9 @@
+client: Browser
+west: West { api: Regional API; worker: Worker; api -> worker: jobs }
+east: East { api: Regional API; worker: Worker; api -> worker: jobs }
+central: Shared services { ledger: Ledger [shape: database]; keys: Key service; ledger -> keys: decrypt }
+client -> west.api: HTTPS
+client -> east.api: failover
+west.worker -> central.ledger: write
+east.worker -> central.ledger: write
+zone trusted "Shared trusted scope" around [west.api,east.api,central.ledger,central.keys] { padding: 1.5g }

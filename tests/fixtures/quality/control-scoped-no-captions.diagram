@@ -1,0 +1,7 @@
+client: Client
+left: West { api: API; queue: Work queue [shape: queue]; worker: Worker; api -> queue -> worker }
+right: East { api: API; queue: Work queue [shape: queue]; worker: Worker; api -> queue -> worker }
+client -> left.api
+client -> right.api
+left.worker -> right.queue
+right.worker -> left.queue

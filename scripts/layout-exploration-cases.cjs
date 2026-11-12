@@ -1,5 +1,5 @@
 // Larger concepts and three independent, reproducible grammar seeds.
-module.exports = () => {
+module.exports = (options = {}) => {
  const cases=[], add=(id,concept,source)=>cases.push({id,concept,source:source.trim()+'\n'});
  const nodes=(prefix,n,label,shape='rect')=>Array.from({length:n},(_,i)=>`${prefix}${i}: ${label} ${i+1} [shape: ${shape}]`).join('\n');
  add('01-dispatch-collect','One dispatcher sends work to five workers; all results converge at a store',`api: API\nqueue: Work queue [shape: queue]\nstore: Results [shape: database]\n${nodes('w',5,'Worker')}\napi -> queue: submit\n${Array.from({length:5},(_,i)=>`queue -> w${i}: dispatch\nw${i} -> store: result`).join('\n')}`);
@@ -13,7 +13,7 @@ module.exports = () => {
  add('10-many-named-ports','Four publishers use explicit input and acknowledgement ports on one queue',`${nodes('p',4,'Publisher')}\nqueue: Event log [shape: queue] {\n${Array.from({length:4},(_,i)=>`port in${i}: input ${i+1} [side: W,ratio: ${(i+1)/9}]\nport ack${i}: ack ${i+1} [side: E,ratio: ${(i+5)/9}]`).join('\n')}\n}\n${Array.from({length:4},(_,i)=>`p${i} -> queue#in${i}: publish ${i+1}\nqueue#ack${i} -> p${i}: accepted ${i+1}`).join('\n')}`);
  add('11-mixed-typography','Different scripts, explicit line breaks and long phrases preserve hierarchy',`client: "Customer service / 東京入口" [shape: actor]\npolicy: ${JSON.stringify("Regional authorization\nand identity policy")} [shape: diamond]\ndb: ${JSON.stringify("Organisation und Mitgliedschaft\n履歴ストア")} [shape: database]\nlog: "Event ingestion and durable audit journal" [shape: queue]\nclient -> policy: "認証 / authorize membership"\npolicy -> db: "Read current organization membership and entitlement status"\npolicy -> log: "Record the decision and its verification evidence"`);
  add('12-independent-systems','Two independent pipelines and an observer should form coherent components',`observer: Observer\n${nodes('a',5,'Checkout stage')}\n${nodes('b',4,'Search stage')}\na0 -> a1 -> a2 -> a3 -> a4: order\nb0 -> b1 -> b2 -> b3: query`);
- const seeds=[0xc0ffee01,0xa11ce002,0x5eed1203];
+ const seeds=options.seeds || [0xc0ffee01,0xa11ce002,0x5eed1203];
  for(const seed of seeds){
   let state=seed;const random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296},pick=a=>a[Math.floor(random()*a.length)],tag=seed.toString(16);
   for(const family of ['dag','cycle','parallel','tree','two-stage','sparse-mesh','branch-join','scoped']){

@@ -36,3 +36,7 @@
 .diagram-viewport{touch-action:none}
 .sd-copy-host{position:relative}.sd-copy{position:absolute;right:8px;top:8px;border:1px solid var(--vp-c-divider);border-radius:6px;background:var(--vp-c-bg);color:var(--vp-c-text-1);padding:4px 8px;font-size:12px;z-index:1}
 @media(pointer:coarse){.diagram-pan-hint{flex-basis:100%}.vp-doc div[class*='language-']>button.copy{opacity:1}}
+
+.diagram-overflow-hint{font-size:12px;font-weight:600;color:var(--vp-c-brand-1);padding:3px 7px;background:var(--vp-c-bg-soft);border-radius:4px}
+@media(min-width:1280px){.VPHome .image-src{max-width:560px;padding:18px}}
+@media(pointer:coarse){.diagram-controls button,.diagram-tabs button{min-height:44px;min-width:44px}}

@@ -1,0 +1,22 @@
+p0: Publisher 1 [shape: rect]
+p1: Publisher 2 [shape: rect]
+p2: Publisher 3 [shape: rect]
+p3: Publisher 4 [shape: rect]
+queue: Event log [shape: queue] {
+port in0: input 1 [side: W,ratio: 0.1111111111111111]
+port ack0: ack 1 [side: E,ratio: 0.5555555555555556]
+port in1: input 2 [side: W,ratio: 0.2222222222222222]
+port ack1: ack 2 [side: E,ratio: 0.6666666666666666]
+port in2: input 3 [side: W,ratio: 0.3333333333333333]
+port ack2: ack 3 [side: E,ratio: 0.7777777777777778]
+port in3: input 4 [side: W,ratio: 0.4444444444444444]
+port ack3: ack 4 [side: E,ratio: 0.8888888888888888]
+}
+p0 -> queue#in0: publish 1
+queue#ack0 -> p0: accepted 1
+p1 -> queue#in1: publish 2
+queue#ack1 -> p1: accepted 2
+p2 -> queue#in2: publish 3
+queue#ack2 -> p2: accepted 3
+p3 -> queue#in3: publish 4
+queue#ack3 -> p3: accepted 4

@@ -50,6 +50,7 @@ const units = (value:number) => Number((value/current.value.grid).toFixed(2))
         <button @click="fit">Fit</button>
         <label v-if="guides"><input v-model="showGrid" type="checkbox"> Show grid</label>
         <span class="diagram-pan-hint">{{ coarse ? 'Pinch to zoom · drag to pan' : 'Ctrl/⌘ + scroll to zoom · swipe to pan' }}</span>
+        <span v-if="bounds[2]*zoom > viewportWidth+2" class="diagram-overflow-hint">Pan for more · Fit shows all</span>
       </div>
       <div ref="viewport" class="diagram-viewport" @wheel="wheel" tabindex="0" :aria-label="`${title} diagram. Ctrl or Command plus scroll to zoom; swipe or use arrow keys to pan.`">
         <div class="diagram-stage" :style="imageStyle">

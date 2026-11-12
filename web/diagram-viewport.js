@@ -11,6 +11,7 @@ export class DiagramViewport {
     this.output=document.createElement('output');this.output.setAttribute('aria-live','polite');this.output.setAttribute('aria-label','Diagram scale');button('','Actual size (100%)',()=>this.setZoom(1)).append(this.output);
     button('+','Zoom in',()=>this.setZoom(this.zoom*1.25));button('Fit','Fit diagram',()=>{this.fitted=true;this.readable=false;this.fit(true)});
     this.hint=document.createElement('span');this.hint.className='diagram-pan-hint';controls.append(this.hint);this.updateHint();
+    this.more=document.createElement('span');this.more.className='diagram-overflow-hint';this.more.textContent='Pan for more · Fit shows all';this.more.hidden=true;controls.append(this.more);
     touchGestures(viewport,{getZoom:()=>this.zoom,setZoom:value=>this.setZoom(value),enabled:()=>!viewport.classList.contains('touch-edit')});
     viewport.addEventListener('wheel',event=>{if(!event.ctrlKey&&!event.metaKey)return;event.preventDefault();this.setZoom(this.zoom*Math.exp(-Math.max(-100,Math.min(100,event.deltaY))*.005))},{passive:false});
     this.observer=new ResizeObserver(()=>{if(this.fitted)this.fit()});this.observer.observe(viewport);this.apply();
@@ -34,5 +35,5 @@ export class DiagramViewport {
     const floor=this.readable?(matchMedia('(pointer: coarse)').matches ? .55 : .7):.05;
     this.zoom=Math.max(floor,Math.min(1,Math.max(1,width)/this.bounds[2],Math.max(1,Math.min(440,height))/this.bounds[3]));this.apply();this.viewport.scrollTo(0,0);
   }
-  apply(){const percent=`${Math.round(this.zoom*100)}%`;if(this.output.textContent!==percent)this.output.textContent=percent;if(!this.target||!this.bounds)return;for(const [name,value]of Object.entries({width:`${this.bounds[2]*this.zoom}px`,height:`${this.bounds[3]*this.zoom}px`,maxWidth:'none',maxHeight:'none',display:'block',margin:'auto'}))if(this.target.style[name]!==value)this.target.style[name]=value;}
+  apply(){const percent=`${Math.round(this.zoom*100)}%`;if(this.output.textContent!==percent)this.output.textContent=percent;if(!this.target||!this.bounds)return;this.more.hidden=this.bounds[2]*this.zoom<=this.viewport.clientWidth-16;for(const [name,value]of Object.entries({width:`${this.bounds[2]*this.zoom}px`,height:`${this.bounds[3]*this.zoom}px`,maxWidth:'none',maxHeight:'none',display:'block',margin:'auto'}))if(this.target.style[name]!==value)this.target.style[name]=value;}
 }

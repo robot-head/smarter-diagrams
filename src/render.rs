@@ -259,30 +259,57 @@ pub fn description(scene: &SceneGraph) -> String {
 pub fn zone_contours(scene: &SceneGraph, l: &Layout, zone: &Zone) -> Vec<Vec<Point>> {
     crate::zones::contours(scene, l, zone)
 }
-fn zone_label(scene: &SceneGraph, zone: &Zone, l: &Layout) -> Option<Rect> {
-    let points = crate::zones::contours(scene, l, zone)
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>();
+fn zone_titles<'a>(scene: &'a SceneGraph, l: &Layout) -> Vec<(&'a Zone, Rect)> {
+    let mut titles = Vec::new();
+    let mut occupied = Vec::new();
+    for zone in &scene.zones {
+        for contour in crate::zones::contours(scene, l, zone) {
+            let area: f64 = contour
+                .iter()
+                .zip(contour.iter().cycle().skip(1))
+                .take(contour.len())
+                .map(|(a, b)| a.x * b.y - b.x * a.y)
+                .sum();
+            if area <= 1e-6 {
+                continue;
+            }
+            if let Some(r) = zone_title_at(scene, zone, l, &contour, &occupied) {
+                occupied.push(r);
+                titles.push((zone, r));
+            }
+        }
+    }
+    titles
+}
+fn zone_title_at(
+    scene: &SceneGraph,
+    zone: &Zone,
+    l: &Layout,
+    points: &[Point],
+    occupied: &[Rect],
+) -> Option<Rect> {
     let left = points.iter().map(|p| p.x).reduce(f64::min)?;
     let top = points.iter().map(|p| p.y).reduce(f64::min)?;
     let right = points.iter().map(|p| p.x).reduce(f64::max)?;
     let w = crate::labels::text_width(&zone.label) + 16.;
     let h = crate::labels::text_height(&zone.label) + 4.;
     let clear = |r: Rect| {
-        !scene.nodes.iter().any(|n| {
-            let node = l.nodes[&n.id];
-            r.inflate(4.).intersects(node)
-                && !(n.container && node.inflate(-6.).encloses(r.inflate(4.)))
-        }) && !l.routes.values().any(|route| {
-            route
-                .points
-                .windows(2)
-                .any(|p| r.inflate(4.).blocks(p[0], p[1]))
-        }) && !l
-            .labels
-            .iter()
-            .any(|label| r.inflate(4.).intersects(label.bounds))
+        !occupied.iter().any(|old| r.inflate(4.).intersects(*old))
+            && !scene.nodes.iter().any(|n| {
+                let node = l.nodes[&n.id];
+                r.inflate(4.).intersects(node)
+                    && !(n.container && node.inflate(-6.).encloses(r.inflate(4.)))
+            })
+            && !l.routes.values().any(|route| {
+                route
+                    .points
+                    .windows(2)
+                    .any(|p| r.inflate(4.).blocks(p[0], p[1]))
+            })
+            && !l
+                .labels
+                .iter()
+                .any(|label| r.inflate(4.).intersects(label.bounds))
     };
     let mut r = Rect::new(left + w / 2., top - h / 2. - 6., w, h);
     // Search along the boundary before climbing away from it. A connector
@@ -305,6 +332,7 @@ fn zone_label(scene: &SceneGraph, zone: &Zone, l: &Layout) -> Option<Rect> {
         .values()
         .map(|r| r.top())
         .chain(l.labels.iter().map(|l| l.bounds.top()))
+        .chain(occupied.iter().map(|r| r.top()))
         .chain(l.routes.values().flat_map(|r| r.points.iter().map(|p| p.y)))
         .fold(r.top(), f64::min);
     r.y = top - r.h / 2. - 16.;
@@ -375,7 +403,7 @@ pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
                 .values()
                 .flat_map(|z| z.iter().map(|p| Rect::new(p.x, p.y, 1., 1.))),
         )
-        .chain(scene.zones.iter().filter_map(|z| zone_label(scene, z, l)))
+        .chain(zone_titles(scene, l).into_iter().map(|(_, r)| r))
         .chain(
             scene
                 .flows
@@ -803,26 +831,24 @@ pub(crate) fn svg_with_decorations(
         );
         s.push_str("</g>");
     }
-    for z in &scene.zones {
-        if let Some(r) = zone_label(scene, z, l) {
-            let _ = write!(
-                s,
-                "<rect data-zone-title-surface=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"8\" fill=\"var(--sd-bg,#ffffff)\" stroke=\"var(--sd-border,#6b8198)\"/>",
-                escape(&z.id),
-                r.left(),
-                r.top(),
-                r.w,
-                r.h
-            );
-            let _ = write!(
-                s,
-                "<text data-zone-label=\"{}\" x=\"{}\" y=\"{}\" style=\"font-weight:600;fill:var(--sd-zone-text,#29493f);paint-order:stroke;stroke:var(--sd-bg,#ffffff);stroke-width:3;stroke-linejoin:round\">{}</text>",
-                escape(&z.id),
-                r.left() + 8.,
-                r.y + 4.,
-                text_content(&z.label, r.left() + 8., 18.)
-            );
-        }
+    for (z, r) in zone_titles(scene, l) {
+        let _ = write!(
+            s,
+            "<rect data-zone-title-surface=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"8\" fill=\"var(--sd-bg,#ffffff)\" stroke=\"var(--sd-border,#6b8198)\"/>",
+            escape(&z.id),
+            r.left(),
+            r.top(),
+            r.w,
+            r.h
+        );
+        let _ = write!(
+            s,
+            "<text data-zone-label=\"{}\" x=\"{}\" y=\"{}\" style=\"font-weight:600;fill:var(--sd-zone-text,#29493f);paint-order:stroke;stroke:var(--sd-bg,#ffffff);stroke-width:3;stroke-linejoin:round\">{}</text>",
+            escape(&z.id),
+            r.left() + 8.,
+            r.y + 4.,
+            text_content(&z.label, r.left() + 8., 18.)
+        );
     }
     s.push_str("</svg>\n");
     namespace_svg(s)

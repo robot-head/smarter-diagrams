@@ -1,0 +1,30 @@
+entry: Request
+exit: Response
+d0: Check 1? [shape: diamond]
+yes0: Apply 1
+no0: Skip 1
+join0: Continue 1
+entry -> d0
+d0 -> yes0: yes
+d0 -> no0: no
+yes0 -> join0
+no0 -> join0
+d1: Check 2? [shape: diamond]
+yes1: Apply 2
+no1: Skip 2
+join1: Continue 2
+join0 -> d1
+d1 -> yes1: yes
+d1 -> no1: no
+yes1 -> join1
+no1 -> join1
+d2: Check 3? [shape: diamond]
+yes2: Apply 3
+no2: Skip 3
+join2: Continue 3
+join1 -> d2
+d2 -> yes2: yes
+d2 -> no2: no
+yes2 -> join2
+no2 -> join2
+join2 -> exit

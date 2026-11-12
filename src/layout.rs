@@ -10,7 +10,7 @@ pub const GRID: f64 = 16.;
 pub(crate) fn header_height(node: &Node) -> f64 {
     24. + (node.label.split('\n').count() - 1) as f64 * 20.
 }
-fn title_width(node: &Node) -> f64 {
+pub(crate) fn title_width(node: &Node) -> f64 {
     crate::labels::text_width(&crate::labels::node_title(node)) * 16. / 15.
         + 32.
         + crate::shapes::title_gutter(&node.shape)
@@ -391,7 +391,9 @@ fn layout_pass(
         Default::default()
     };
     let concept_sides = if previous.is_none() {
-        crate::topology::readable_concept(scene, &mut rects, o, true)
+        crate::duplex::present(scene, &mut rects, o, true)
+            .or_else(|| crate::records::present(scene, &mut rects, o, true))
+            .or_else(|| crate::topology::readable_concept(scene, &mut rects, o, true))
     } else {
         None
     };
@@ -400,6 +402,9 @@ fn layout_pass(
             r.x *= spacing;
             r.y *= spacing;
         }
+    }
+    if previous.is_none() {
+        crate::ownership::pack(scene, &mut rects, o);
     }
     // Size innermost containers before introducing hard containment inequalities.
     for i in (0..n).rev() {
@@ -525,8 +530,11 @@ fn layout_pass(
             break;
         }
     }
-    let concept_sides =
-        concept_sides.or_else(|| crate::topology::readable_concept(scene, &mut rects, o, false));
+    let concept_sides = concept_sides
+        .or_else(|| crate::duplex::present(scene, &mut rects, o, false))
+        .or_else(|| crate::records::present(scene, &mut rects, o, false))
+        .or_else(|| crate::scope_feedback::hints(scene, &rects, o))
+        .or_else(|| crate::topology::readable_concept(scene, &mut rects, o, false));
     let mut requests = port_requests(scene, &rects, o, previous);
     let readable_routes = concept_sides.is_some();
     let readable_fan =
@@ -537,21 +545,58 @@ fn layout_pass(
                 continue;
             };
             for (source, side, other) in [
-                (true, source_side, &edge.target.node),
-                (false, target_side, &edge.source.node),
+                (true, source_side, &edge.target),
+                (false, target_side, &edge.source),
             ] {
                 if let Some(request) = requests
                     .iter_mut()
                     .find(|p| p.key == port_key(edge, source))
                 {
                     request.side = side;
-                    let opposite = rects[scene.index(other).unwrap()];
-                    request.target = if matches!(side, Side::N | Side::S) {
-                        opposite.x
-                    } else {
-                        opposite.y
-                    };
+                    let opposite = rects[scene.index(&other.node).unwrap()];
+                    request.target = port_target(
+                        opposite,
+                        &other.constraint,
+                        side,
+                        if source { target_side } else { source_side },
+                        o.grid,
+                    );
                 }
+            }
+        }
+    }
+    if readable_routes {
+        for edge in &scene.edges {
+            for source in [true, false] {
+                if let Some(request) = requests
+                    .iter_mut()
+                    .find(|p| p.key == port_key(edge, source))
+                    && let Some(target) =
+                        crate::bundles::order(scene, &rects, edge, source, request.side)
+                {
+                    request.target = target;
+                }
+            }
+        }
+    }
+    let endpoint_sides: BTreeMap<_, _> = requests.iter().map(|p| (p.key.clone(), p.side)).collect();
+    for edge in &scene.edges {
+        let sa = endpoint_sides[&port_key(edge, true)];
+        let sb = endpoint_sides[&port_key(edge, false)];
+        for source in [true, false] {
+            if let Some(request) = requests
+                .iter_mut()
+                .find(|p| p.key == port_key(edge, source))
+                && let Some(target) = crate::sequence_routes::parallel_order(
+                    scene,
+                    edge,
+                    source,
+                    sa,
+                    sb,
+                    request.target,
+                )
+            {
+                request.target = target;
             }
         }
     }
@@ -752,9 +797,13 @@ fn layout_pass(
             }
         }
     }
+    let preserve_series = readable_routes && crate::series::recognized(scene);
     // Straighten only opposing single-fanout ports, on their tangential coordinate.
     let sides: BTreeMap<_, _> = requests.iter().cloned().map(|p| (p.key, p.side)).collect();
     for e in &scene.edges {
+        if preserve_series {
+            break;
+        }
         let (a, b) = (
             scene.index(&e.source.node).unwrap(),
             scene.index(&e.target.node).unwrap(),
@@ -982,6 +1031,13 @@ fn layout_pass(
         readable_routes && crate::presentation::coordinate_mesh(scene, o, &mut out);
     let coordinated_backbone =
         readable_routes && crate::presentation::coordinate_backbone(scene, o, &mut out);
+    let coordinated_series = readable_routes && crate::series::coordinate(scene, o, &mut out);
+    let coordinated_bundles = readable_routes && crate::bundles::coordinate(scene, o, &mut out);
+    let coordinated_duplex = readable_routes && crate::duplex::coordinate(scene, o, &mut out);
+    let coordinated_gather = readable_routes && crate::gather::coordinate(scene, o, &mut out);
+    let coordinated_records = readable_routes && crate::records::coordinate(scene, o, &mut out);
+    let coordinated_scopes =
+        readable_routes && crate::scope_feedback::coordinate(scene, o, &mut out);
     let coordinated_loops =
         readable_routes && crate::routing::coordinate_outer_routes(scene, o, &mut out);
     out.labels = match crate::labels::place(scene, o, &out) {
@@ -1006,6 +1062,12 @@ fn layout_pass(
         && !coordinated_tree
         && !coordinated_mesh
         && !coordinated_backbone
+        && !coordinated_series
+        && !coordinated_bundles
+        && !coordinated_duplex
+        && !coordinated_gather
+        && !coordinated_records
+        && !coordinated_scopes
     {
         crate::labels::polish_channels(scene, o, &mut out);
     }
@@ -1264,6 +1326,46 @@ fn attachment_pair(
     (best.1, best.2)
 }
 
+fn port_target(
+    b: Rect,
+    constraint: &PortConstraint,
+    side: Side,
+    other_side: Side,
+    grid: f64,
+) -> f64 {
+    match *constraint {
+        PortConstraint::FixedPos { offset_grid, .. } => {
+            if matches!(side, Side::E | Side::W) && matches!(other_side, Side::E | Side::W) {
+                b.top() + offset_grid * grid
+            } else if matches!(side, Side::N | Side::S) && matches!(other_side, Side::N | Side::S) {
+                b.left() + offset_grid * grid
+            } else if matches!(side, Side::E | Side::W) {
+                b.y
+            } else {
+                b.x
+            }
+        }
+        PortConstraint::FixedRatio { ratio, .. } => {
+            if matches!(side, Side::E | Side::W) && matches!(other_side, Side::E | Side::W) {
+                b.top() + ratio * b.h
+            } else if matches!(side, Side::N | Side::S) && matches!(other_side, Side::N | Side::S) {
+                b.left() + ratio * b.w
+            } else if matches!(side, Side::E | Side::W) {
+                b.y
+            } else {
+                b.x
+            }
+        }
+        _ => {
+            if matches!(side, Side::E | Side::W) {
+                b.y
+            } else {
+                b.x
+            }
+        }
+    }
+}
+
 fn port_requests(
     scene: &SceneGraph,
     rects: &[Rect],
@@ -1280,43 +1382,7 @@ fn port_requests(
             let b = rects[j];
             let side = if source { pair.0 } else { pair.1 };
             let other_side = if source { pair.1 } else { pair.0 };
-            let target = match other.constraint {
-                PortConstraint::FixedPos { offset_grid, .. } => {
-                    if matches!(side, Side::E | Side::W) && matches!(other_side, Side::E | Side::W)
-                    {
-                        b.top() + offset_grid * o.grid
-                    } else if matches!(side, Side::N | Side::S)
-                        && matches!(other_side, Side::N | Side::S)
-                    {
-                        b.left() + offset_grid * o.grid
-                    } else if matches!(side, Side::E | Side::W) {
-                        b.y
-                    } else {
-                        b.x
-                    }
-                }
-                PortConstraint::FixedRatio { ratio, .. } => {
-                    if matches!(side, Side::E | Side::W) && matches!(other_side, Side::E | Side::W)
-                    {
-                        b.top() + ratio * b.h
-                    } else if matches!(side, Side::N | Side::S)
-                        && matches!(other_side, Side::N | Side::S)
-                    {
-                        b.left() + ratio * b.w
-                    } else if matches!(side, Side::E | Side::W) {
-                        b.y
-                    } else {
-                        b.x
-                    }
-                }
-                _ => {
-                    if matches!(side, Side::E | Side::W) {
-                        b.y
-                    } else {
-                        b.x
-                    }
-                }
-            };
+            let target = port_target(b, &other.constraint, side, other_side, o.grid);
 
             let key = port_key(e, source);
             if seen.insert(key.clone()) {
@@ -1373,24 +1439,12 @@ fn stub_envelope(r: Rect, s: [bool; 4], stub: f64) -> Rect {
         r.h + n + south,
     )
 }
-fn is_parallel_bundle(scene: &SceneGraph) -> bool {
-    scene.nodes.len() == 2
-        && scene.edges.len() > 1
-        && scene.edges.iter().all(|e| {
-            e.source.node == scene.edges[0].source.node
-                && e.target.node == scene.edges[0].target.node
-                && matches!(e.source.constraint, PortConstraint::Free)
-                && matches!(e.target.constraint, PortConstraint::Free)
-        })
-}
 fn grow_port_perimeters(
     scene: &SceneGraph,
     requests: &[PortRequest],
     rects: &mut [Rect],
     o: &LayoutOptions,
 ) -> Result<(), Error> {
-    let mesh =
-        crate::presentation::mesh_layers(scene).is_some_and(|(a, b)| a.len() != 3 || b.len() != 3);
     for (i, r) in rects.iter_mut().enumerate() {
         for side in [Side::N, Side::E, Side::S, Side::W] {
             let ports: Vec<_> = requests
@@ -1424,7 +1478,7 @@ fn grow_port_perimeters(
             .iter()
             .any(|a| a.name == "pin" && a.attrs.contains_key("lock"));
             if ports.len() > 1
-                && (peers.len() == 1 || mesh)
+                && peers.len() == 1
                 && !locked
                 && ports.iter().all(|p| {
                     matches!(
@@ -1447,10 +1501,23 @@ fn grow_port_perimeters(
                 length = length.max((ports.len() + 1) as f64 * caption_space.max(o.port_spacing));
             }
             let mut ratios = Vec::new();
+            let movable = ports
+                .iter()
+                .filter(|p| {
+                    !matches!(
+                        p.spec,
+                        PortConstraint::FixedPos { .. } | PortConstraint::FixedRatio { .. }
+                    )
+                })
+                .count();
             for p in &ports {
                 match p.spec {
                     PortConstraint::FixedPos { offset_grid, .. } => {
-                        length = length.max(offset_grid * o.grid + o.corner)
+                        // A free attachment must still fit beside an unused
+                        // fixed slot. Counting ports alone misses the clearance
+                        // consumed by a slot close to the start of the side.
+                        length = length
+                            .max(offset_grid * o.grid + movable as f64 * o.port_spacing + o.corner)
                     }
                     PortConstraint::FixedRatio { ratio, .. } => {
                         if ratio <= 0. || ratio >= 1. {
@@ -1493,7 +1560,6 @@ fn assign_ports(
     rects: &[Rect],
     out: &mut Layout,
 ) -> Result<(), Error> {
-    let parallel_bundle = is_parallel_bundle(scene);
     for (i, node) in scene.nodes.iter().enumerate() {
         for side in [Side::N, Side::E, Side::S, Side::W] {
             let mut ps: Vec<_> = requests
@@ -1508,7 +1574,7 @@ fn assign_ports(
                     a.target.total_cmp(&b.target)
                 };
                 order.then_with(|| {
-                    if reverse && parallel_bundle {
+                    if reverse {
                         b.key.cmp(&a.key)
                     } else {
                         a.key.cmp(&b.key)
@@ -1596,6 +1662,69 @@ fn assign_ports(
                 )
             }) {
                 ordered.sort_by(|a, b| a.1.total_cmp(&b.1));
+                // Evenly spaced ideals can put a free endpoint on the wrong
+                // side of a fixed slot, forcing it beyond the node corner.
+                // Reassign only those infeasible orders to available gaps.
+                let fixed = |j: usize| {
+                    matches!(
+                        ps[j].spec,
+                        PortConstraint::FixedPos { .. } | PortConstraint::FixedRatio { .. }
+                    )
+                };
+                let mut lower = o.corner;
+                let feasible = ordered.iter().all(|&(j, t)| {
+                    let value = if fixed(j) { t } else { t.max(lower) };
+                    let ok = value >= lower - 1e-6 && value <= len - o.corner + 1e-6;
+                    lower = value + o.port_spacing;
+                    ok
+                });
+                if !feasible {
+                    let anchors: Vec<_> = ordered
+                        .iter()
+                        .filter(|&&(j, _)| fixed(j))
+                        .copied()
+                        .collect();
+                    let mut available = Vec::new();
+                    let mut begin = o.corner;
+                    for end in anchors
+                        .iter()
+                        .map(|(_, t)| t - o.port_spacing)
+                        .chain(std::iter::once(len - o.corner))
+                    {
+                        let mut t = begin;
+                        while t <= end + 1e-6 {
+                            available.push(t);
+                            t += o.port_spacing;
+                        }
+                        begin = end + 2. * o.port_spacing;
+                    }
+                    let free: Vec<_> = ordered
+                        .iter()
+                        .filter(|&&(j, _)| !fixed(j))
+                        .copied()
+                        .collect();
+                    if available.len() >= free.len() {
+                        let mut slots = Vec::new();
+                        for &(j, ideal) in &free {
+                            let k = (0..available.len())
+                                .min_by(|&a, &b| {
+                                    (available[a] - ideal)
+                                        .abs()
+                                        .total_cmp(&(available[b] - ideal).abs())
+                                })
+                                .unwrap();
+                            slots.push(available.remove(k));
+                            let _ = j;
+                        }
+                        slots.sort_by(f64::total_cmp);
+                        ordered = anchors;
+                        for ((j, _), t) in free.into_iter().zip(slots) {
+                            desired[j] = t;
+                            ordered.push((j, t));
+                        }
+                        ordered.sort_by(|a, b| a.1.total_cmp(&b.1));
+                    }
+                }
                 cs.retain(|c| c.equality);
                 for pair in ordered.windows(2) {
                     cs.push(Constraint::separation(pair[0].0, pair[1].0, o.port_spacing));

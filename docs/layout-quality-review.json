@@ -1,0 +1,1884 @@
+{
+  "status": "complete",
+  "reviewer": "Codex visual inspection",
+  "reviewedAt": "2026-11-12",
+  "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+  "method": "Inspect every distinct SVG on Chromium contact sheets; reopen dense or ambiguous examples at native size. Reuse a review only when SVG SHA-256 bytes match. Scores are subjective visual judgments, separate from semantic and geometry assertions. After discovery, every one of the 220 distinct sources was recompiled in each of five complete confirmation passes; every SVG byte hash matched its inspected image.",
+  "rubric": {
+    "beauty": "5: no observed material spacing, alignment, shape, clipping or connector defect at readable/native zoom; 4 or below: a concrete visual improvement remains.",
+    "clarity": "5: the stated concept, directions, ownership, captions and attachments are unambiguous at readable/native zoom; 4 or below: a concrete communication problem remains."
+  },
+  "limitations": [
+    "Bounded authored concepts and seeded grammars, not all possible input graphs.",
+    "Dense graphs can require panning; a full-fit thumbnail is not the legibility standard for a large diagram.",
+    "Crossing minima are asserted for named graph families only; arbitrary graphs have no global optimality proof.",
+    "One Chromium/Linux font environment; authored hard constraints and diagnostic controls are evaluated separately."
+  ],
+  "reproduce": [
+    "cargo build --locked --all-features",
+    "npm run test:layout-quality",
+    "npm run test:layout-review"
+  ],
+  "images": [
+    {
+      "id": "01-pipeline",
+      "svgSha256": "371a9444c4f45edb747a93310fa154452ece6e7aca8d29e600428e316e673819",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
+      "notes": "Four aligned stages, short facing connectors and local captions preserve the request progression."
+    },
+    {
+      "id": "02-long-pipeline",
+      "svgSha256": "1d0cef5acd593e994854339f25b4e5cc36f53ab549eed52658fb7ff603464bba",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
+      "notes": "The eight stages fold in an obvious snake with labeled turns and readable boxes."
+    },
+    {
+      "id": "03-fan-out",
+      "svgSha256": "c17c8e45f38275f043a96ef2eb0d49499ddfcef0315cd1f697d664b17ccf1ccd",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
+      "notes": "Five ordered consumer branches have separate shafts and the same caption position near each leaf."
+    },
+    {
+      "id": "04-fan-in",
+      "svgSha256": "18f075f5045a9ce42e1070275d0b0cd31d237b33acb611271b647649bfeaf464",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
+      "notes": "Aligned producers feed ordered ports; upload captions stay beside their individual source branches."
+    },
+    {
+      "id": "05-decision",
+      "svgSha256": "41c4ccd3f033a728771d4dc1da22f80467ab5ec3f04042ac462bc6b859d37e46",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
+      "notes": "The diamond branches into distinct yes/no rows and rejoins at Response without a crossing."
+    },
+    {
+      "id": "06-feedback",
+      "svgSha256": "014473ede59744457a0400b4e883d450f4e239ec3e4125f37e92562ac4b0fda9",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
+      "notes": "The retry connector visibly returns above Jobs and Worker; persistence leaves below the main progression."
+    },
+    {
+      "id": "07-ring",
+      "svgSha256": "761ef9358a2199677f2da73b67ee47f2b1b684472b068953db6d4f36f5f78616",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
+      "notes": "Four peers form an unmistakable directed loop, with captions or short leaders identifying each side."
+    },
+    {
+      "id": "08-self-loop",
+      "svgSha256": "0bb65cccf159395ec0634b5e2e9a4e428c20fceeadbf3d8478a836d7243b4f80",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
+      "notes": "The service has a real outside return loop with a clean incoming arrow and readable retry caption."
+    },
+    {
+      "id": "09-parallel",
+      "svgSha256": "9029d7f87c8670a3c23a3dcf3e1a4ec7806a210f096471673203f19da3f4f7e8",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
+      "notes": "Three protocol tracks face across the gap; their captions sit separately above their shafts."
+    },
+    {
+      "id": "10-bidirectional",
+      "svgSha256": "e96a3adfd6612f3aeb4051dd0c5eb1f54fe171958f07a2cc5e7e0afada73576b",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
+      "notes": "Both arrowheads are visible and the request/reply and publish/ack descriptions belong to their own links."
+    },
+    {
+      "id": "11-disconnected",
+      "svgSha256": "f7bb615a7a1a337f2dd3fd77ffff29deabb5158fc8903f33a131cf6a311ff88b",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
+      "notes": "Checkout and Search occupy separate coherent rows and the standalone Observer is kept apart."
+    },
+    {
+      "id": "12-butterfly",
+      "svgSha256": "de111bb9bfb68d2bcde77c39d9144f52aa274304695372b444d2a93b8dc02348",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
+      "notes": "The two primary paths remain horizontal and the fallback links use distinct inside/outside channels."
+    },
+    {
+      "id": "13-mesh",
+      "svgSha256": "b1714f148956433dbe734558da6e938358eec7f17104f2367fc759553426753b",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
+      "notes": "The K3,3 presentation keeps all nine dependencies traceable, with a visible bridge at its unavoidable crossing."
+    },
+    {
+      "id": "14-long-labels",
+      "svgSha256": "c04204ced5de5b9411de167d7a52703b572e9ebc4391a69f2ccab2f966c50419",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
+      "notes": "Wrapped node titles and captions form a compact vertical progression with straight facing attachments."
+    },
+    {
+      "id": "15-unicode",
+      "svgSha256": "c152d011b68407d90b7847579b0a7e4c83f35a317273a6a285f8bd4304457b9b",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
+      "notes": "Japanese, accented Latin and Greek glyphs retain their hierarchy and fit inside their shapes."
+    },
+    {
+      "id": "16-container",
+      "svgSha256": "d29f33e37ae4cff93c27db3c1e27939db0d3058d56541017beafe4f90f229d79",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
+      "notes": "Production encloses its API and database tightly; the external HTTPS entry clears the header."
+    },
+    {
+      "id": "17-nested",
+      "svgSha256": "2619cc6dde1f6ea54b36711b6e10d29c79017dade40edd0825fe1aa356efd4cc",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
+      "notes": "Cloud and Region ownership remain distinct and the audit connection leaves the inner group cleanly."
+    },
+    {
+      "id": "18-cross-scope",
+      "svgSha256": "9184c4c35c64099e5be2ee59cbdb2b0799f6d79c2a1c59398b26dcf7985813b6",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
+      "notes": "Both peer ownership groups contain compact sequences with one direct replicate connection between them."
+    },
+    {
+      "id": "19-zone",
+      "svgSha256": "f5de1e36272338beceea8fcc5190358f030e336727fbb6e9dbb10b86b74b67c7",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
+      "notes": "API, Ledger and Key service share one contiguous trust enclosure, while Browser stays outside."
+    },
+    {
+      "id": "20-records",
+      "svgSha256": "4b1ef5395da7e67335e17eddeace6864147065a216e7c9c4a600245260b7e1f8",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
+      "notes": "Insert and lookup are separate ordered tracks aimed at the correct visible rows under an external table title."
+    },
+    {
+      "id": "21-ports",
+      "svgSha256": "b62c1c751da6843a84c427b3e9c7aa90c79ab6a545cb5f8a62439f7f27b96a46",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
+      "notes": "Publish and acknowledgment directions are distinct; the input name remains beside the queue attachment."
+    },
+    {
+      "id": "22-obstacle",
+      "svgSha256": "a74ed10fa5c8a0e8cf07aed08b26885f1951e7e08597f290ffa054fd9c28e336",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
+      "notes": "The tunnel takes a compact orthogonal detour around the authored firewall position."
+    },
+    {
+      "id": "23-trace",
+      "svgSha256": "f4b686f625af6f2dad64f08bf31986a42422823f92b87ee9f68b34910be4a07d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
+      "notes": "Numbered blue caption pills and continuous shafts make the three-step request order clear."
+    },
+    {
+      "id": "24-vertical",
+      "svgSha256": "6d6d076d17f0dfd2410ea32a4d66222243f3ea73de07c1ef7bcdfa53db62345d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
+      "notes": "Three centered stages retain north/south attachments and centered gap captions."
+    },
+    {
+      "id": "fuzz-dag-0",
+      "svgSha256": "6c175d86feee6859e4fb762fb5126d48efc1d5a5dbb4d4735ffb7ff66ec5b0cd",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "fuzz-dag-1",
+      "svgSha256": "90cef3ddd1060cc6bd4cb0b0f3e3e628b983e77890479be19d719f9535a0426d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "fuzz-dag-2",
+      "svgSha256": "a4e9d60687175d264cb461dd03f0b28cbc9b742bc3fe25874a2552366434f65d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "fuzz-dag-3",
+      "svgSha256": "a6101970493de78821d9b85bedf492a32bfb38609b87bfdbd53c757615814fbe",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "fuzz-dag-4",
+      "svgSha256": "2712ba02c01578edb87a5122a291b88c7af7ccdda9c9e57b26b22958a7f75e2f",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-fuzz-dag-4.png"
+    },
+    {
+      "id": "fuzz-dag-5",
+      "svgSha256": "d2c9dd6c554ae7162230829a25077b8b0c211e3fe621a2e4a3bbf0da69ee94bd",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "fuzz-dag-6",
+      "svgSha256": "9a97ab3a492b454b5c7d5536033fa3c60cdb27cec1a9365baa5d6e16a62de00d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "fuzz-dag-7",
+      "svgSha256": "94c1d42ee00deb5a410118b8f76fae47ea92e32988e1dc404bea87d5d55a3c86",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "fuzz-cycle-0",
+      "svgSha256": "c09b5ff8a8bba065341ea479bdafca1ad2139dbadbd14adb0e52a055abe515e2",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "fuzz-cycle-1",
+      "svgSha256": "73af4dc7dfcf1354cc4ac3804beb57afa76d4188e147d34b542365f7d4fe529d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "fuzz-cycle-2",
+      "svgSha256": "b3edbd549dd7a1dbdf62398453fb413fabdd765e01a1532344791937b5daec3a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-fuzz-cycle-2.png"
+    },
+    {
+      "id": "fuzz-cycle-3",
+      "svgSha256": "be2dd7d41b569b8ca694a102f5aa3acba8f72883aeefc59be1483153c2bc74c8",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "fuzz-cycle-4",
+      "svgSha256": "807f67597960d8c8455a86b791116f9fe355fbfd2b70b071fcf8093da1883ecf",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "fuzz-cycle-5",
+      "svgSha256": "182f76063b63ec75d3ee41aef83479efdae85a32f508f988362c9b180fa2bcf1",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "fuzz-cycle-6",
+      "svgSha256": "cdfb72396208252fd338f1c0a3e6d3a69cad0d04795c8013c127944cdbc9e696",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "fuzz-cycle-7",
+      "svgSha256": "af324234a4ec6523f33f1cf1003cf46a5a722247232923d33d331f00552a3af7",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "fuzz-parallel-0",
+      "svgSha256": "9965456b8b65ca670f5f11e88d8c7380a5917a354933fbc9ffa5bc72b923a184",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "fuzz-parallel-1",
+      "svgSha256": "4e4772ad334b541231c931d0cb6cad96078d85ace83f1b31469fee060d7d7861",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "fuzz-parallel-2",
+      "svgSha256": "dc10d5bb5b32e970d11b899ad778073b4150b2f79fb58006983dfaec66299a34",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "fuzz-parallel-3",
+      "svgSha256": "81ab1df7000e170b74ce9f56727722769554d79a82693147d959329bfa838cb0",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-fuzz-parallel-3.png"
+    },
+    {
+      "id": "fuzz-parallel-4",
+      "svgSha256": "6634b063ce94624f413fbd988b3e38cc97c386a75888436f5fa6b84e41ebbe2a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "fuzz-parallel-5",
+      "svgSha256": "e1c74e320c48ee372f581d1eb0284dd62b9e8fd785a8a471a394c3ceddec8f47",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "fuzz-parallel-6",
+      "svgSha256": "f80dc6fb2a4ca1ee02a9abf7dbcb482e2536c37f129e6395ebccc86e19617069",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "fuzz-parallel-7",
+      "svgSha256": "ee5c363b9af70251fca0fbeb4b716e3e2f7375b15473ac45ad5392e25fc2daf1",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-fuzz-parallel-7.png"
+    },
+    {
+      "id": "fuzz-pinned-0",
+      "svgSha256": "9eec7251b20571e3256c16da5a0ec915239c0f9909e0d14bafb647638367195f",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
+      "notes": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes."
+    },
+    {
+      "id": "fuzz-pinned-1",
+      "svgSha256": "3fdfbc2b3463e07b000fb177743c359c787d28e14b95b629928a9214a055191e",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
+      "notes": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes."
+    },
+    {
+      "id": "fuzz-pinned-2",
+      "svgSha256": "85224d8174096aec9e88e8d41a1d3ec9b26fb6847a950f064f28e3a1fbb400bf",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
+      "notes": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes."
+    },
+    {
+      "id": "fuzz-pinned-3",
+      "svgSha256": "1c847b5337b9ed2dc67e12565f1bb07f6e9b1cc54ed1d6c28e41f1f2d8d15ba3",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
+      "notes": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes."
+    },
+    {
+      "id": "fuzz-pinned-4",
+      "svgSha256": "28627eeab6c0a7d9578074d4c033f49460054981694d7c084c38bdda2a914399",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
+      "notes": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes."
+    },
+    {
+      "id": "fuzz-pinned-5",
+      "svgSha256": "f8fde0609b6f3f1d3f9e4440c4d57548eed92129f70e5fc601af3cb8597138f4",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
+      "notes": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes."
+    },
+    {
+      "id": "fuzz-pinned-6",
+      "svgSha256": "2f327fb1aadeea5e1db5021102c67753a0ffa9c1fdd4478cd8415b6315dfa47b",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
+      "notes": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes."
+    },
+    {
+      "id": "fuzz-pinned-7",
+      "svgSha256": "ae381b72147fd16d6425ee298b739e8f3015171c7dc15b4321ae50435484cff5",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
+      "notes": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes."
+    },
+    {
+      "id": "fuzz-tree-0",
+      "svgSha256": "1a49bbb2f471a888461aacd2b0b189849bac7f984c897387aa0aa18fd0ab5ac4",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "fuzz-tree-1",
+      "svgSha256": "fefe8737b68cdc090530ca94afa91dc82bd0e6012f4a42ca7afe1f8072e2b91e",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "fuzz-tree-2",
+      "svgSha256": "07d7509253de8e24d0753f3d0ffa137ec6a7658852416ae750f59563a5d1f4eb",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "fuzz-tree-3",
+      "svgSha256": "06fa92bb27d2c09dbae8a1fb17c742fb42ef4bd3dc5c661bb18509a56188259d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "fuzz-tree-4",
+      "svgSha256": "de8bb479eb53ff242daa5c58b95ecb6e1e35764a9dc04d769fcfc99c0c5ae997",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "fuzz-tree-5",
+      "svgSha256": "eed0059e3f085ed123da06ab177bfe7969b344c2ced3da4253583390fe43a992",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "fuzz-tree-6",
+      "svgSha256": "4ce1765d6e03f51ffc7a3b8622529a307133610827ec1e1b5a25de8928480c51",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "fuzz-tree-7",
+      "svgSha256": "0a34e4fdb0272817649fa7f080655239515df5bb137fef31c8c2e72869803c08",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "01-dispatch-collect",
+      "svgSha256": "7bcb2206b8a5dc4999ecf7006405f6002e1bae7eae57be7fe7aba2e7417910e7",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
+      "notes": "A single aligned worker column separates ordered dispatch and result tracks; all five branches remain visible."
+    },
+    {
+      "id": "02-planar-mesh",
+      "svgSha256": "8ac90f6fed72a920966c1eab1d49bc62af4a4f9eae2e8a990ca957b0c992bee3",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
+      "notes": "Two services surround four stores in a balanced arrangement with zero crossings or shared shafts."
+    },
+    {
+      "id": "03-dense-mesh",
+      "svgSha256": "7b44789fe17c44ef608694daad5c14f31887ea31b3c096424b257e1cb8a84b32",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
+      "notes": "The balanced four-quadrant K4,4 arrangement retains every access caption and only the four necessary crossings."
+    },
+    {
+      "id": "04-sixteen-stages",
+      "svgSha256": "ba0bf2545fbabbb5c0c67d0c27df2845b9a8ea4bad0afde9d542c4c8f278c0cd",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
+      "notes": "Sixteen numbered stages fold in four consistent rows; each turn continues the reading direction."
+    },
+    {
+      "id": "05-balanced-tree",
+      "svgSha256": "ba438db204d79967a6b19b1126821c7bcf130a82f2869bbc835a94242fed9ee6",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
+      "notes": "A four-level hierarchy retains separate branch channels and comparable sibling geometry."
+    },
+    {
+      "id": "06-unbalanced-tree",
+      "svgSha256": "b22b63c022dd5a34a757f0d46c62cf48f2e3e2e68c554429eb0d7eac1fc24b20",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
+      "notes": "The three branches remain aligned by depth while their differing lengths stay visible."
+    },
+    {
+      "id": "07-multiple-retries",
+      "svgSha256": "ee6859f9205a19570962d00ee63a57fb08f7409b0fdd49f96a43ce64df5ca0a1",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
+      "notes": "The main progression begins at Stage 1 and the three returns use separate outside channels or a true local loop."
+    },
+    {
+      "id": "08-cross-ownership",
+      "svgSha256": "a2bb85c38f1d8049c8f99ee4fb7a83b2b87f610a3a638a7dcd6bc26e030abd76",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
+      "notes": "West, East and Shared services retain their ownership; every disjoint trusted island carries the same scope title."
+    },
+    {
+      "id": "09-many-record-slots",
+      "svgSha256": "4b3ca023ee069ab44e2c6a5f41e82e5173573e9b786ae003a6e68f83ac2d6575",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
+      "notes": "All six operations follow distinct ordered tracks to their correct rows; Reporting fits inside the Audit branch region."
+    },
+    {
+      "id": "10-many-named-ports",
+      "svgSha256": "6448418ae046ccf5af709b8e19d0adb765ec545208ad3d7dd6fc4f85f3424ab1",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
+      "notes": "Four comparable publishers use nested noncrossing publish/acceptance rails and all eight complete port captions remain visible."
+    },
+    {
+      "id": "11-mixed-typography",
+      "svgSha256": "972fb509545e01295b055ec5c59005b4fb12f1e449d63ee0f780a2cbf5142be0",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
+      "notes": "Wrapped multilingual titles have enough vertical room and the two long operation captions remain associated with separate branches."
+    },
+    {
+      "id": "12-independent-systems",
+      "svgSha256": "03501e365b26991e07e1f00b979e0e6cb80c55f2b0ee13fb4128637cdcc0c7de",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
+      "notes": "Checkout forms one folded component, Search stays in its own row, and Observer is placed separately below."
+    },
+    {
+      "id": "c0ffee01-dag",
+      "svgSha256": "d1e85569a19a221112b1ad6d9be5a1046fad0eed82159a49debdb0c08a87ab0f",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-c0ffee01-dag.png"
+    },
+    {
+      "id": "c0ffee01-cycle",
+      "svgSha256": "3eb87c3cda73a4de43669a9fdd8ec349299ee036a4ec4fa31ea2122f608ee530",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "c0ffee01-parallel",
+      "svgSha256": "e6a54704abbd48f73a7543f61a37b54cb4b6339ed334a41a8d7db39e4c220fc6",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "c0ffee01-tree",
+      "svgSha256": "8a843b980f3bdac272fb0d1632f3a26e8415aa9d3ca4f92bc2a613d4a668d336",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "c0ffee01-two-stage",
+      "svgSha256": "10ed96b453d82b348d285645c3c12940deedc89f88a9d92cd3bcdf0209186b6c",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "c0ffee01-sparse-mesh",
+      "svgSha256": "80d537d7e600a3a86372ecafcfb57ec05c45e7252c832df89d4ca6d0279c5497",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "c0ffee01-branch-join",
+      "svgSha256": "fb5cdfe3a546cfd7edfbbd8e01304a52db5ad4cba509186a498c8fab1f36bd03",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "c0ffee01-scoped",
+      "svgSha256": "c1f28c65bde1062f2fef8ec2f01b7a5c8810cdef208135bf109671217305e26d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "a11ce002-dag",
+      "svgSha256": "af4e6cd8caae2f9e1871ffade02009c8dd97dc156d6b1a624ed59ab255fadf67",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "a11ce002-cycle",
+      "svgSha256": "628262165a740c8bfa39ed54b1b9e27832b176cb79dd3ca05d00d98031fc1a08",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "a11ce002-parallel",
+      "svgSha256": "74883004e2d44da9d29bd1880f824a7710ce3e8f288b95def46c8848e8cbd029",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-a11ce002-parallel.png"
+    },
+    {
+      "id": "a11ce002-tree",
+      "svgSha256": "14760d164814e13ce5397e04d1c8f9a113543203f843d4b7cf9e87a50bb25a46",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "a11ce002-two-stage",
+      "svgSha256": "10224c7ec110593799f6e94cb2a701a3eab6baf85ca3e91e8d625c7026913527",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "a11ce002-sparse-mesh",
+      "svgSha256": "0b383b78261a677d403e475612c6b9405dcd884f4f8420bb2aa35dfd651d5171",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "a11ce002-branch-join",
+      "svgSha256": "60b5469eb396a311079dd4650f569bed2655a9d527864d240026296dae925579",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "a11ce002-scoped",
+      "svgSha256": "6a27a846dd0d97cabc35e20fb2a87c045c72fe34086609d9c28cd83e55865676",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "5eed1203-dag",
+      "svgSha256": "7236931094d49ebff4f48f274a220241ee3c5c17d36f0335d926e60efc28a286",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "5eed1203-cycle",
+      "svgSha256": "c5d6f3eb4cf234319aa4d17d93e5f9b39553cb811f646613ce3614d42a228f30",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "5eed1203-parallel",
+      "svgSha256": "7b3539bc454d3c4ebb2c49dbc4b354f375a2a8eb48bc07bea55360ce35524dec",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "5eed1203-tree",
+      "svgSha256": "99507c0648e7d1597952f18af263b6a323455f3d14f8760fbc181364df131f35",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "5eed1203-two-stage",
+      "svgSha256": "cef196da17d40416e65db7af4d6b2ab75c8447176068266e7db98160908c6a6a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "5eed1203-sparse-mesh",
+      "svgSha256": "af8df84de475ca1e2c5e5e2fc43b70ee7a2258376a6aeac82df83bd95a0844bb",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "5eed1203-branch-join",
+      "svgSha256": "e0d6733942283e68f06a35ed2e450de051dc346572cb8313cd551f181f662121",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "5eed1203-scoped",
+      "svgSha256": "634caf4ec6219ac2d8fb705cb195eaef14eb315ae472c11403d549b950f651bb",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "d1a60001-dag",
+      "svgSha256": "6134d78d57dba5fba92e123e47e3373ae62b87356085312d8b885fa201fb1afa",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "d1a60001-cycle",
+      "svgSha256": "7e81bd330862fac7095f5aea5b1ccc823bd60808aef5965bfdea8879757dc731",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-01/exploration/detail-d1a60001-cycle.png"
+    },
+    {
+      "id": "d1a60001-parallel",
+      "svgSha256": "fea36c14fad3e30affae27cdc67f81c571eaee7909baa2fdeff370c3debe9a81",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "d1a60001-tree",
+      "svgSha256": "dbb61a055acceb0a6889b02ceb5c86e5bf67477192081f1f03937c2bf3e20d9b",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "d1a60001-two-stage",
+      "svgSha256": "d3e09a988321b9dfb508118b77e0692cb90775ca6ac0ff91e142b071874331ec",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "d1a60001-sparse-mesh",
+      "svgSha256": "0274be205faeba6feebf6e51752bc5e671c89a0c79abc3f8cde550f63bb259b7",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "d1a60001-branch-join",
+      "svgSha256": "c03c23c79a1163f80a7a55712d253b7ff98103ab0c45c2a8cf48995292efea11",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "d1a60001-scoped",
+      "svgSha256": "f2b4d7049d16dcdcd4af0d256bd5e963b7583516d5327823b2fcdd401374b8a9",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "c0ffee77-dag",
+      "svgSha256": "5169da567326409e726ea26b6f9c6ffee6b18fcb82a97c7a4a48beadbac3b634",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "c0ffee77-cycle",
+      "svgSha256": "075ecb4a1bc05d56f9414514feab7d29a8070cb12e3a312eb776bfbf7a4318c6",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "c0ffee77-parallel",
+      "svgSha256": "797ec04818d42837ce0bb40f78bdf4f2e934736d195311cc2267731b39f6e3d8",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "c0ffee77-tree",
+      "svgSha256": "769f86cc6a412201864ef384d605fe158faee2ff67eb1506e5b1a474c8ffc8c5",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "c0ffee77-two-stage",
+      "svgSha256": "a1c07d6e9cde9c96f6990ee8b5a74ac61e48d0458af3902e5d0110978a58217b",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "c0ffee77-sparse-mesh",
+      "svgSha256": "0cd26199e89cac9223cd0c77cae1aa416db27ca26bcf996715126fe9382b4301",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "c0ffee77-branch-join",
+      "svgSha256": "b171f3df2f1ef126fc1a339a8707279fdd9c69ff6bacfcd29efb5e8afd18e044",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "c0ffee77-scoped",
+      "svgSha256": "f0ed9278cb5f8f9234199aec2cb8727063669dd2ced9bc985db5affa55c2597e",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "5eedf00d-dag",
+      "svgSha256": "b043b247e4c0a07c82278f55af55f9a72051d3545b8bb077483d0ed6d2b7a72a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "5eedf00d-cycle",
+      "svgSha256": "3a152ffe93b0dfe3c4ac2d39878ef2f92a26f6fa1cbcca89ba593f2cd97cc3c6",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "5eedf00d-parallel",
+      "svgSha256": "dd8143cfef045573eb62f9c6e79b8b2e7c4189fb49b3a40a044c1b4322563d08",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "5eedf00d-tree",
+      "svgSha256": "14295f0745cb722ac1e49ec056d949a09c835110e5c504373891017001d86f87",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "5eedf00d-two-stage",
+      "svgSha256": "c29d1cc2bc75bd050b7c018700f3c078e32d7981e2cd2ae52296c73ec1dde523",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "5eedf00d-sparse-mesh",
+      "svgSha256": "8f41ee74e0802ca03bea31dcd6db4362443dbd436dc855494b9d1caab3fcd5a4",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "5eedf00d-branch-join",
+      "svgSha256": "b9f4f00492190c9ea0713b435cab340e8a09371546608b804cdd2e559d40420d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "5eedf00d-scoped",
+      "svgSha256": "591e4782c2f874152c623d42de5fcae4605852d9ed29b675e8250ab42b611d5a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "10293847-dag",
+      "svgSha256": "a929417dc99c3c43e4391499a940dc594531be0620c5e1111cb84bee3d94361f",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-02/exploration/detail-10293847-dag.png"
+    },
+    {
+      "id": "10293847-cycle",
+      "svgSha256": "c10722e85046b1b62ca8b6e34d6a623de7d3e06e0b6de4101062830df1f05ae0",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "10293847-parallel",
+      "svgSha256": "ee500ede2180affe4d5068ad660318f199726e84d1e9635882002df5022ee1bd",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "10293847-tree",
+      "svgSha256": "fddc64a7e493da763528e066807bf17f9df68ea2a8be5b9b59b7394176366690",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "10293847-two-stage",
+      "svgSha256": "8cf883a0213db56106434d1ffa5cc5643b20e3688f0e540f029f92f0c32a09bb",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "10293847-sparse-mesh",
+      "svgSha256": "a959fcc7f618e632574b32c3605d209534a1aef64e709034ee404458f5f75922",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "10293847-branch-join",
+      "svgSha256": "c046634a3f65f926ddc29bd1bbb4011e9c477d9622b34c7fd77e6b76eeac8cd9",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "10293847-scoped",
+      "svgSha256": "108efb6b0677c53605a141fdee647d22a2c10239b9c2675fb57bc19013dda64a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "7f4a7c15-dag",
+      "svgSha256": "9407dfc1dcf606bb4978b96953d48b92b7601be077e3b92acf776dad34972f8b",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "7f4a7c15-cycle",
+      "svgSha256": "81a2deffaf8c10d88ca647d03d2761c513ba2debca954d9b35ac98ef03cdd7d5",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "7f4a7c15-parallel",
+      "svgSha256": "02b54872cf71e486ef90765471f49d7fa1296833b7279fe85d7ecc1f0166bd0e",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "7f4a7c15-tree",
+      "svgSha256": "ab263da5140cc34b223a374585c91aa987d41e031acdc2da8241d15d0761d08e",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "7f4a7c15-two-stage",
+      "svgSha256": "34fc0f783d3da1bc1e457c305c98f3e3dac3116e9e81570727ff197106815c8f",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "7f4a7c15-sparse-mesh",
+      "svgSha256": "7fc426be5a5fc8567177d15486bf8a688ce6556bf1cf1333a3dade97cf68b06c",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "7f4a7c15-branch-join",
+      "svgSha256": "01b2bdb2d032455985fe5ad3c0153f5e3e9d7aa8102a22cd55e952c863734b99",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "7f4a7c15-scoped",
+      "svgSha256": "295c58ec9be532eec23cdad8b70c9b1c039e5a56dcdf87860c3961069171a952",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "91e10da5-dag",
+      "svgSha256": "eb93b58428d679a6569f156275a9d9e03170590d1ab11f75cb99976218f97e77",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "91e10da5-cycle",
+      "svgSha256": "d20921be86b86d4b99f9d7bdddfa01f816dd400eb71e9114da48cbf19d53ddcb",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "91e10da5-parallel",
+      "svgSha256": "9704a8a466ad4fd0d72623bbc8f6a144d462388348c1c02b9d1d4fc3be1b7909",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "91e10da5-tree",
+      "svgSha256": "6adb0d3b6a902acb5a3a93ea1cafa74cec1958a35476e7421bda16c912c2c0c4",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "91e10da5-two-stage",
+      "svgSha256": "8b1ee19ab7ed72b9b569012fe2e892e9ca5747f9790919004a81eaf51ca25727",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "91e10da5-sparse-mesh",
+      "svgSha256": "da1033192cc96280adfa46fd44813c0cfe1d8fc79042aabff7a60e13869f5aba",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "91e10da5-branch-join",
+      "svgSha256": "ba80b5a7caf4b9a8077fedc80fe1a7396750a3af6655c1cbfa58ff302b6f0188",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "91e10da5-scoped",
+      "svgSha256": "31f042dcd4d3f704badd15b18c8101d5aa999e8e8ae7f6c7a91a8b7c1b1059a6",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "abc12345-dag",
+      "svgSha256": "fa8867a43f5273a05b2cf9b7442fc2e2f27fba5a0ba2b75fa71fb8be0bb6aeae",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "abc12345-cycle",
+      "svgSha256": "9cb810fb35cb6cab0140d7c8c1256a9b601081a8313ae3c1eca78597a674b6df",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-03/exploration/detail-abc12345-cycle.png"
+    },
+    {
+      "id": "abc12345-parallel",
+      "svgSha256": "ae32297df41a817d5f2870ce87b5f81737f383a6e53741688c039e0209ebbdd7",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "abc12345-tree",
+      "svgSha256": "f87742fa9a25ef6b7cfa92ec893e782ab060970537d6ff478fe88358744da458",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "abc12345-two-stage",
+      "svgSha256": "5eb23560ef23bdae95f8cdd1b903d32a2aa87542b911039d25b16a4373de703d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "abc12345-sparse-mesh",
+      "svgSha256": "65877688b50413edd47257cce3ba4ec4f602f8b69d446a041dfe8b081e0bdb21",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "abc12345-branch-join",
+      "svgSha256": "86c645c060ca87e13b4f31ebd748482d8b995e8b653a87772105005251dd19c6",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "abc12345-scoped",
+      "svgSha256": "bc9fbcf8ae985f99c48fd263cff37dc37d69d27bb1a4e21a86ca3fb590bb607f",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "13579bdf-dag",
+      "svgSha256": "4452c2df3a4cff78120622ddb480bb686ea61569b34975cb59a4ab99b09e6dea",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-03/exploration/detail-13579bdf-dag.png"
+    },
+    {
+      "id": "13579bdf-cycle",
+      "svgSha256": "f0d00743fbe9dfa3ca339718c142a2cf601a8bc2f0564a715e005faed46a988a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "13579bdf-parallel",
+      "svgSha256": "4ef563236c5840c5de8ad0ccd64d094f25ead025a3b7f8b19f8343a0e75d84b8",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "13579bdf-tree",
+      "svgSha256": "41340727d437af71d3ff1251dd6c489c5fffae04cf4f9a68a0cb8f9f55cc2d74",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "13579bdf-two-stage",
+      "svgSha256": "96dbcb61e485a40eb39538b33d7233751b01dcacd1824b9ee721b78868a6c148",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "13579bdf-sparse-mesh",
+      "svgSha256": "b78c9a5f7b202ea903fca7e2d22f043c7db9c165d9fae6aa64e38a6a563c92de",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "13579bdf-branch-join",
+      "svgSha256": "f552f2988dddf7d0f97446ca8d3a9b4fb00648d5740777aa68ee16a444485ce6",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "13579bdf-scoped",
+      "svgSha256": "b09832145e5841bf59f454bcd77dd33842e994d58672abc5a03103c747112559",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "2468ace1-dag",
+      "svgSha256": "1acfde5c950b0a99b9042cc4a0b8282a5c4aee48a5358aa11e1b455cfe42050f",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "2468ace1-cycle",
+      "svgSha256": "ba3b931d6708ab79d9940f8bc7fb5f803bf337ea77864825b5c26c08dd349662",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "2468ace1-parallel",
+      "svgSha256": "60baa0bc693b366b50304ee45e911a81fdc64f70601b4d13798a3ae4bf7920e2",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "2468ace1-tree",
+      "svgSha256": "7c725a435b416080159c3956e4d6fcb465bbb3d0c8d0b94586955edb18a957f3",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "2468ace1-two-stage",
+      "svgSha256": "52d93d51354ffaf2444de46fdcc34856d8cbcd02dc4ddd12d4f2a55b9deed43a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "2468ace1-sparse-mesh",
+      "svgSha256": "e2c8cee12c59712488f22c190365f4e3b7d46055941b68c20e8ce6792bf5594d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "2468ace1-branch-join",
+      "svgSha256": "30b25daa8610be4282f86930a0d2a30db83f762432160168233e45986bc29a25",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "2468ace1-scoped",
+      "svgSha256": "36118e36265a51b2255148edf043becfa3ccf1750a096ff1698ad247722a59a1",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "8badf00d-dag",
+      "svgSha256": "b166c8887a067178465c38167d764095bfab737e0d49fe0e51cc02fc118fabb1",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-04/exploration/detail-8badf00d-dag.png"
+    },
+    {
+      "id": "8badf00d-cycle",
+      "svgSha256": "6352a4681958690ff06963f65ff0415217e3f37a997535cb0a708514946494c7",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "8badf00d-parallel",
+      "svgSha256": "34a5d22c65fdcc4e918b2205237e044d1258092c2977ffb737c260fc4e7cd97d",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "8badf00d-tree",
+      "svgSha256": "32022befcc4e1ef40712ef7ae86f760919f3cb9587c885b9ecffeded61cd73f9",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "8badf00d-two-stage",
+      "svgSha256": "0b9d29ad942ce2fcbb0ef5185f73fe6e1954a7168cf6062894a957e77b8dbdf8",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "8badf00d-sparse-mesh",
+      "svgSha256": "8994451481e4ac32ad1c1b0f03deb3606763a636995a23ee052798a223d8068b",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "8badf00d-branch-join",
+      "svgSha256": "0e1285fdbc50ffabfe72061f5828c037e3d356bc4aac7cf95afae9962a09048a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "8badf00d-scoped",
+      "svgSha256": "2a0bab9025dccd1287649dfa5957c0187f2587afe8412efabf9585634e6ecf78",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "6c8e9cf5-dag",
+      "svgSha256": "826262e670fc27e0a1ef0163f54fb7cfbf0aea34754ece98658314a6effd717c",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "6c8e9cf5-cycle",
+      "svgSha256": "9121972fc642c844b7fa5cee8a7175a77ed8a366d26a73e59fa402777609d7b7",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "6c8e9cf5-parallel",
+      "svgSha256": "17ffdcdff1bf75bfe4f086aba3c7e64642b06a2f96b3763ada3eae0f09893385",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "6c8e9cf5-tree",
+      "svgSha256": "91d17765d499f99d7b34d25b9dd8b80e324814c45a5a59724361f025f129f4d1",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "6c8e9cf5-two-stage",
+      "svgSha256": "b14f07aa08e1036401a307236b33b6741dafe13467d119270abfe429faa91377",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "6c8e9cf5-sparse-mesh",
+      "svgSha256": "8eba05e5b6c8beb32550c3ee526014747a6b963bfce2ada7db2a0a001c9c36bf",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "6c8e9cf5-branch-join",
+      "svgSha256": "1a7f4f823b787c466ff147bcadd9f12f243490aaf57d9590b6fd769c826a682e",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "6c8e9cf5-scoped",
+      "svgSha256": "28e8affd51245900e0b8425b92f0df2ed642e5b69caedfb30b4d0fce78fd9f99",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "a341316c-dag",
+      "svgSha256": "b45dd9ee68525f1eec0200dffe49222efa90a3aa3135563dfcf65ab40869c623",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "a341316c-cycle",
+      "svgSha256": "8f2f1a8fd02cbc71e70d5ad65023b5468decbda7e52773c2e9284bc7d44156f1",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "a341316c-parallel",
+      "svgSha256": "bda14d2cda7395fcc5dc47bbfb6654e756fad7ac7e91cbed0bf0e977fcbfeb8e",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "a341316c-tree",
+      "svgSha256": "1092fc530676cf34374c12fa03d204b0024abb9301d29c92b94b08936266737a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "a341316c-two-stage",
+      "svgSha256": "a670917398cb22ea29623ed7880d86eadb6faa1c1d42f62e346cea6b963fb0d7",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "a341316c-sparse-mesh",
+      "svgSha256": "ce3b2943c42ec122d145696295d979d9cb25d10bf94577a24d8cb8bb8fce8220",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "a341316c-branch-join",
+      "svgSha256": "4d690cbbe4f6046a0e9aa04179d2e9fa00b2a8357861151bae9668d2b5ec4123",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "a341316c-scoped",
+      "svgSha256": "d9746853ab1897e5f60e8b21851aa47105fcdc407fe3a0cfd38b4edc138e5dcd",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "deadbeef-dag",
+      "svgSha256": "54cf07cc7d7b658c6e8abb1646ee0b6ffa4147a9784f127cf0f2a020c2a76df1",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-05/exploration/detail-deadbeef-dag.png"
+    },
+    {
+      "id": "deadbeef-cycle",
+      "svgSha256": "10dfe46d226925fb4e0af25ddaed5097e52dd3fc96c72644b99f4b9cd632a5db",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "deadbeef-parallel",
+      "svgSha256": "da6b21ded0fc359e728c7b6a200da0cc57ca2acd54a7894d1168c67aa2544514",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "deadbeef-tree",
+      "svgSha256": "2a7e1259ee419eb3c2cd3a6241b5ae929c5d9a58516e0f86a24bcc1042da6861",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "deadbeef-two-stage",
+      "svgSha256": "eeb2211a665cea50b91a174e95e5d48341bc6726e60ec5cc5f012c6ddc197826",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "deadbeef-sparse-mesh",
+      "svgSha256": "aee201599e235a47a9eb1e9f559db090c0ef90a15ec504b5504e7aecf4e34cd8",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "deadbeef-branch-join",
+      "svgSha256": "94068123327ab1facdc4972f4431886597ad49afdfcec7b0b5988d1cb601e7d3",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "deadbeef-scoped",
+      "svgSha256": "4b629d1a6f29344a60270b5275933f0eef88351f165bb60bc359cfa303495fc6",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "41c64e6d-dag",
+      "svgSha256": "b1d5043e09a197e322d3736ea6172591d8b5d33515a2ef368e4d77b2cc241345",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "41c64e6d-cycle",
+      "svgSha256": "f195fe4a1829cad74038dd5c892a94fcae8374f4ebb3ed07888e1454524b02e9",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "41c64e6d-parallel",
+      "svgSha256": "39a40df04ee947ecb21148fc0db55cd657f035dfdf7b974f1101c64f3d98b63a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded."
+    },
+    {
+      "id": "41c64e6d-tree",
+      "svgSha256": "817d8a1aaab0507e2d95a65f23fefe17931be45edddcf6912bf4cf0a07efc5b8",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "41c64e6d-two-stage",
+      "svgSha256": "4c0dfcae658afbc922f961cf13b346e27f76e1563d57e5a9b6f45c7555090361",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "41c64e6d-sparse-mesh",
+      "svgSha256": "c255b5b74e9ce5a1d6a56cf87f7ae489122a8c75af26a72492df094aaf29bf76",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "41c64e6d-branch-join",
+      "svgSha256": "12b6dd8f1fdeacd289ce3a9c10d723be84b03d46a5fb8f7a7f463eeafc737e16",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "41c64e6d-scoped",
+      "svgSha256": "758663828072e1c13e7279d397828d3bccaec3d7d578b5bde98e14756711ec1a",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    },
+    {
+      "id": "9e3779b9-dag",
+      "svgSha256": "68b5e74856c8e0245f33a4c0d8617178f7fb9ae1c4ac2d285af46351718d4130",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text."
+    },
+    {
+      "id": "9e3779b9-cycle",
+      "svgSha256": "fe28ca4393e69396612431053a2e78509734ac0f6e5c0f0961c6a655d0d95083",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths."
+    },
+    {
+      "id": "9e3779b9-parallel",
+      "svgSha256": "203369607b42ef22cdfa73d1e6803bfff6933f117bc6c838f628868f0c66b6f6",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size.",
+      "nativeEvidence": "artifacts/layout-quality/final/round-05/exploration/detail-9e3779b9-parallel.png"
+    },
+    {
+      "id": "9e3779b9-tree",
+      "svgSha256": "d4897b19be77310b6719c9533d6c4c29763e861b38231fb4fe0315b08682ed13",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
+      "notes": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes."
+    },
+    {
+      "id": "9e3779b9-two-stage",
+      "svgSha256": "487d9748c99e3824d70fc74c6cd1e591a9b0d167e1fb5dc79934d5e93deaa961",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
+      "notes": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks."
+    },
+    {
+      "id": "9e3779b9-sparse-mesh",
+      "svgSha256": "2e5f5769e68e485472974ee98956d5c59a94815d5d20520625a573c8cb8c8eac",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
+      "notes": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks."
+    },
+    {
+      "id": "9e3779b9-branch-join",
+      "svgSha256": "16b75c4ad33232ecdbf72b1dc71d912cb4282c7e20b22535bfadf67f80f584a6",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
+      "notes": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present."
+    },
+    {
+      "id": "9e3779b9-scoped",
+      "svgSha256": "c212a73e608ef741de02f498eb768c1a47b015b91127b36b88327de1738b1f23",
+      "beauty": 5,
+      "clarity": 5,
+      "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
+      "notes": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs."
+    }
+  ],
+  "rounds": [
+    {
+      "round": 1,
+      "seeds": [
+        "0xd1a60001",
+        "0xc0ffee77",
+        "0x5eedf00d"
+      ],
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "distinctExampleImages": 124
+    },
+    {
+      "round": 2,
+      "seeds": [
+        "0x10293847",
+        "0x7f4a7c15",
+        "0x91e10da5"
+      ],
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "distinctExampleImages": 124
+    },
+    {
+      "round": 3,
+      "seeds": [
+        "0xabc12345",
+        "0x13579bdf",
+        "0x2468ace1"
+      ],
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "distinctExampleImages": 124
+    },
+    {
+      "round": 4,
+      "seeds": [
+        "0x8badf00d",
+        "0x6c8e9cf5",
+        "0xa341316c"
+      ],
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "distinctExampleImages": 124
+    },
+    {
+      "round": 5,
+      "seeds": [
+        "0xdeadbeef",
+        "0x41c64e6d",
+        "0x9e3779b9"
+      ],
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "distinctExampleImages": 124
+    }
+  ],
+  "completedAt": "2026-11-12T11:06:23.796Z",
+  "distinctImages": 220,
+  "consecutiveVisualPasses": 5,
+  "confirmationPasses": [
+    {
+      "pass": 1,
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "images": 220,
+      "elapsedMs": 11298
+    },
+    {
+      "pass": 2,
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "images": 220,
+      "elapsedMs": 11964
+    },
+    {
+      "pass": 3,
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "images": 220,
+      "elapsedMs": 11230
+    },
+    {
+      "pass": 4,
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "images": 220,
+      "elapsedMs": 11560
+    },
+    {
+      "pass": 5,
+      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "images": 220,
+      "elapsedMs": 11649
+    }
+  ]
+}

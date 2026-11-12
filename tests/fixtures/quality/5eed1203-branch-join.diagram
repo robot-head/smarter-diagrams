@@ -1,0 +1,30 @@
+entry: Entry
+exit: Exit
+d0: Allowed 1? [shape: diamond]
+yes0: Process 1
+no0: Skip 1
+join0: Merge 1
+entry -> d0: read through
+d0 -> yes0: read through
+d0 -> no0: ack
+yes0 -> join0: retry
+no0 -> join0: 
+d1: Allowed 2? [shape: diamond]
+yes1: Process 2
+no1: Skip 2
+join1: Merge 2
+join0 -> d1: 
+d1 -> yes1: send
+d1 -> no1: send
+yes1 -> join1: retry
+no1 -> join1: validate organization access
+d2: Allowed 3? [shape: diamond]
+yes2: Process 3
+no2: Skip 3
+join2: Merge 3
+join1 -> d2: 
+d2 -> yes2: 
+d2 -> no2: validate organization access
+yes2 -> join2: validate organization access
+no2 -> join2: 
+join2 -> exit:

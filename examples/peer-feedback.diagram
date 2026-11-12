@@ -1,0 +1,7 @@
+client: Client
+left: West { api: API; queue: Work queue [shape: queue]; worker: Worker; api -> queue -> worker: jobs }
+right: East { api: API; queue: Work queue [shape: queue]; worker: Worker; api -> queue -> worker: jobs }
+client -> left.api: validate organization access
+client -> right.api: validate organization access
+left.worker -> right.queue: send
+right.worker -> left.queue: retry
