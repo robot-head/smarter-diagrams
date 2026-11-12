@@ -116,7 +116,8 @@ fn text_content(text: &str, x: f64, height: f64) -> String {
                 escape(line)
             )
         })
-        .collect()
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 /// Fillets are bounded by half of each adjacent segment; arrow bases stay exact.
 fn rounded_path(points: &[Point]) -> String {
@@ -641,9 +642,18 @@ pub(crate) fn svg_with_decorations(
                 s,
                 "<text class=\"node-title\" text-anchor=\"middle\" dominant-baseline=\"central\" x=\"{:.2}\" y=\"{:.2}\">{}</text>",
                 r.x + crate::shapes::title_gutter(&n.shape) / 2.,
-                r.y,
+                r.y + if n.shape == "database" {
+                    crate::shapes::CYLINDER_RY.min(r.h / 2.)
+                        - if n.annotations.iter().any(|a| a.name == "sim") {
+                            12.
+                        } else {
+                            0.
+                        }
+                } else {
+                    0.
+                },
                 text_content(
-                    &n.label,
+                    &crate::labels::node_title(n),
                     r.x + crate::shapes::title_gutter(&n.shape) / 2.,
                     20.
                 )

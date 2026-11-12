@@ -2,6 +2,68 @@
 
 The engine chooses a fresh topology-aware layout, then enforces separation, ownership, pins and relations. Add only the constraints that express your intent. Inconsistent hard constraints return diagnostics.
 
+## Automatic presentation
+
+Unconstrained fans group the independent producers or consumers in one column, with captions beside their horizontal branches. Parallel connections keep a consistent lane order and reserve space for their captions. Long simple pipelines fold into rows to keep the sequence readable. Pins, explicit ports and alignment rules keep control when you specify them; dragging preserves the current arrangement.
+
+Long node titles and connection captions wrap at measured word boundaries. Explicit newlines remain hard breaks, and the source labels and accessible descriptions retain their original text. Unconstrained fresh layouts can reserve additional whitespace when captions need room; hard constraints stay in force.
+
+### Eight sequential transformations
+
+```diagram guides
+read: Read
+validate: Validate
+normalize: Normalize
+enrich: Enrich
+filter: Filter
+aggregate: Aggregate
+encode: Encode
+store: Store
+read -> validate -> normalize -> enrich -> filter -> aggregate -> encode -> store: data
+```
+
+### One event reaches five independent consumers
+
+```diagram guides
+bus: Event log [shape: queue]
+c0: Consumer 1
+c1: Consumer 2
+c2: Consumer 3
+c3: Consumer 4
+c4: Consumer 5
+bus -> c0: event
+bus -> c1: event
+bus -> c2: event
+bus -> c3: event
+bus -> c4: event
+```
+
+### Five producers converge at one sink
+
+```diagram guides
+p0: Producer 1
+p1: Producer 2
+p2: Producer 3
+p3: Producer 4
+p4: Producer 5
+warehouse: Warehouse [shape: database]
+p0 -> warehouse: upload
+p1 -> warehouse: upload
+p2 -> warehouse: upload
+p3 -> warehouse: upload
+p4 -> warehouse: upload
+```
+
+### Three protocols share the same endpoints
+
+```diagram guides
+client: Client
+server: Server
+client -> server: HTTPS
+client -> server: WebSocket
+client -> server: telemetry
+```
+
 ## Absolute pins
 
 ```diagram guides

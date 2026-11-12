@@ -513,3 +513,195 @@ pub fn coffman_graham(scene: &SceneGraph, width: usize) -> Vec<usize> {
     }
     ranks
 }
+
+/// Readable fresh placements for elementary concepts. Explicit constraints and
+/// previous geometry are handled by the caller; drag layouts never use this.
+pub(crate) type SideHints = Vec<Option<(Side, Side)>>;
+pub(crate) fn readable_concept(
+    scene: &SceneGraph,
+    rects: &mut [Rect],
+    o: &LayoutOptions,
+) -> Option<SideHints> {
+    let n = scene.nodes.len();
+    if o.shape_budget == 0
+        || n < 2
+        || scene.nodes.iter().any(|node| {
+            node.container
+                || node.parent.is_some()
+                || !node.ports.is_empty()
+                || crate::layout::effective_annotations(
+                    scene,
+                    &node.id,
+                    &node.annotations,
+                    o.variant.as_deref(),
+                )
+                .iter()
+                .any(|a| a.name == "pin")
+        })
+        || !scene.relations.is_empty()
+        || scene.edges.iter().any(|e| {
+            !matches!(e.source.constraint, PortConstraint::Free)
+                || !matches!(e.target.constraint, PortConstraint::Free)
+                || !e.annotations.is_empty()
+        })
+    {
+        return None;
+    }
+    let pairs: Vec<_> = scene
+        .edges
+        .iter()
+        .map(|e| {
+            (
+                scene.index(&e.source.node).unwrap(),
+                scene.index(&e.target.node).unwrap(),
+            )
+        })
+        .collect();
+    let mut incoming = vec![0; n];
+    let mut outgoing = vec![0; n];
+    for &(a, b) in &pairs {
+        outgoing[a] += 1;
+        incoming[b] += 1;
+    }
+    let caption_width = scene
+        .edges
+        .iter()
+        .map(|e| crate::labels::text_width(&crate::labels::connection_text(scene, e)))
+        .fold(0., f64::max);
+    let caption_height = scene
+        .edges
+        .iter()
+        .map(|e| crate::labels::text_height(&crate::labels::connection_text(scene, e)))
+        .fold(0., f64::max);
+    if n == 2 && pairs.len() >= 2 && pairs.iter().all(|p| *p == pairs[0]) {
+        let (a, b) = pairs[0];
+        if a == b {
+            return None;
+        }
+        let spacing = o.port_spacing.max(caption_height + 12.);
+        let height = (pairs.len() + 1) as f64 * spacing;
+        rects[a].h = rects[a].h.max(height);
+        rects[b].h = rects[b].h.max(height);
+        rects[a].x = 0.;
+        rects[a].y = 0.;
+        rects[b].y = 0.;
+        rects[b].x = (rects[a].w + rects[b].w) / 2. + caption_width + 96.;
+        return Some(vec![Some((Side::E, Side::W)); pairs.len()]);
+    }
+    let sources: Vec<_> = (0..n)
+        .filter(|&i| incoming[i] == 0 && outgoing[i] == 2)
+        .collect();
+    let sinks: Vec<_> = (0..n)
+        .filter(|&i| outgoing[i] == 0 && incoming[i] == 2)
+        .collect();
+    if n == 4 && pairs.len() == 4 && sources.len() == 2 && sinks.len() == 2 {
+        let step = rects.iter().map(|r| r.h).fold(0., f64::max) + caption_height + 96.;
+        let gap = rects.iter().map(|r| r.w).fold(0., f64::max) + 2. * caption_width + 160.;
+        for (row, &i) in sources.iter().enumerate() {
+            rects[i].x = 0.;
+            rects[i].y = row as f64 * step;
+        }
+        for (row, &i) in sinks.iter().enumerate() {
+            rects[i].x = gap;
+            rects[i].y = row as f64 * step;
+        }
+        return Some(
+            pairs
+                .iter()
+                .map(|&(a, b)| {
+                    Some(if a == sources[0] && b == sinks[1] {
+                        (Side::W, Side::S)
+                    } else {
+                        (Side::E, Side::W)
+                    })
+                })
+                .collect(),
+        );
+    }
+    if n >= 3 && pairs.len() == n {
+        let returns: Vec<_> = pairs
+            .iter()
+            .enumerate()
+            .filter(|(i, (a, b))| a != b && pairs[..*i].contains(&(*b, *a)))
+            .collect();
+        if returns.len() == 1 {
+            let (index, &(a, b)) = returns[0];
+            let forward = pairs.iter().position(|p| *p == (b, a)).unwrap();
+            let mut hints = vec![None; pairs.len()];
+            hints[index] = Some((Side::N, Side::N));
+            hints[forward] = Some(if rects[b].x < rects[a].x {
+                (Side::E, Side::W)
+            } else {
+                (Side::W, Side::E)
+            });
+            return Some(hints);
+        }
+    }
+    if n >= 4 && pairs.len() == n - 1 {
+        let hub = (0..n).find(|&i| {
+            (outgoing[i] == n - 1 && incoming[i] == 0) || (incoming[i] == n - 1 && outgoing[i] == 0)
+        });
+        if let Some(hub) = hub {
+            let fan_out = outgoing[hub] == n - 1;
+            if (0..n).filter(|&i| i != hub).all(|i| {
+                if fan_out {
+                    incoming[i] == 1 && outgoing[i] == 0
+                } else {
+                    outgoing[i] == 1 && incoming[i] == 0
+                }
+            }) {
+                let leaves: Vec<_> = (0..n).filter(|&i| i != hub).collect();
+                let leaf_width = leaves.iter().map(|&i| rects[i].w).fold(0., f64::max);
+                let step = leaves.iter().map(|&i| rects[i].h).fold(0., f64::max)
+                    + caption_height.max(24.)
+                    + 48.;
+                let gap = (rects[hub].w + leaf_width) / 2. + 2. * caption_width + 160.;
+                rects[hub].x = if fan_out { 0. } else { gap };
+                rects[hub].y = 0.;
+                for (row, &i) in leaves.iter().enumerate() {
+                    rects[i].x = if fan_out { gap } else { 0. };
+                    rects[i].y = (row as f64 - (leaves.len() - 1) as f64 / 2.) * step;
+                }
+                return Some(vec![Some((Side::E, Side::W)); pairs.len()]);
+            }
+        }
+    }
+    if n < 7
+        || pairs.len() != n - 1
+        || incoming.iter().any(|&v| v > 1)
+        || outgoing.iter().any(|&v| v > 1)
+    {
+        return None;
+    }
+    let start = (0..n).find(|&i| incoming[i] == 0)?;
+    let mut order = vec![start];
+    while let Some(&(_, next)) = pairs.iter().find(|(a, _)| Some(a) == order.last()) {
+        if order.contains(&next) {
+            return None;
+        }
+        order.push(next);
+    }
+    if order.len() != n {
+        return None;
+    }
+    let width = rects.iter().map(|r| r.w).fold(0., f64::max) + caption_width + 96.;
+    let height = rects.iter().map(|r| r.h).fold(0., f64::max) + caption_height + 80.;
+    let columns = (2..n)
+        .min_by(|&a, &b| {
+            let score = |c: usize| {
+                ((c as f64 * width / (n.div_ceil(c) as f64 * height))
+                    / o.target_aspect_ratio.max(0.1))
+                .ln()
+                .abs()
+            };
+            score(a).total_cmp(&score(b))
+        })
+        .unwrap();
+    for (index, &i) in order.iter().enumerate() {
+        let row = index / columns;
+        let col = index % columns;
+        rects[i].x = if row % 2 == 0 { col } else { columns - 1 - col } as f64 * width;
+        rects[i].y = row as f64 * height;
+    }
+    None
+}

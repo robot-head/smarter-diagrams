@@ -867,3 +867,238 @@ fn incremental_leaf_lowering_matches_fresh_origins_and_structural_fallback() {
         serde_json::to_value(&compile(document.source()).unwrap().scene).unwrap()
     );
 }
+
+#[test]
+fn fresh_fans_keep_siblings_and_captions_in_readable_columns() {
+    for fan_out in [true, false] {
+        for leaf_count in 3..=8 {
+            let mut source = "hub: Event log [shape: queue]\n".to_owned();
+            for i in 0..leaf_count {
+                source.push_str(&format!("leaf{i}: Consumer {i}\n"));
+                source.push_str(&if fan_out {
+                    format!("hub -> leaf{i}: event\n")
+                } else {
+                    format!("leaf{i} -> hub: upload\n")
+                });
+            }
+            let diagram = compile(&source).unwrap();
+            let first = diagram.layout.nodes["leaf0"];
+            for i in 0..leaf_count {
+                let leaf = diagram.layout.nodes[&format!("leaf{i}")];
+                assert!((leaf.x - first.x).abs() < 0.01);
+                let id = if fan_out {
+                    format!("hub->leaf{i}")
+                } else {
+                    format!("leaf{i}->hub")
+                };
+                let caption = diagram
+                    .layout
+                    .labels
+                    .iter()
+                    .find(|label| label.feature == id)
+                    .unwrap();
+                assert!(!caption.callout);
+                assert!(
+                    (caption.anchor.y - leaf.y).abs() < 0.01,
+                    "caption must stay on its leaf branch"
+                );
+            }
+            let routes: Vec<_> = diagram.layout.routes.values().collect();
+            for (i, a) in routes.iter().enumerate() {
+                for b in &routes[i + 1..] {
+                    for p in a.points.windows(2) {
+                        for q in b.points.windows(2) {
+                            assert!(
+                                !routing::proper_crossing(p[0], p[1], q[0], q[1]),
+                                "a fan must not cross its branches"
+                            );
+                            assert!(
+                                routing::collinear_overlap(p[0], p[1], q[0], q[1]) < 1e-6,
+                                "fan branches must remain distinct"
+                            );
+                        }
+                    }
+                }
+            }
+            assert_eq!(diagram.to_svg(), compile(&source).unwrap().to_svg());
+            layout::validate(&diagram.scene, &diagram.layout, &LayoutOptions::default()).unwrap();
+        }
+    }
+}
+
+#[test]
+fn long_unconstrained_pipeline_folds_but_explicit_rows_and_drags_stay_put() {
+    let source = "s0 -> s1 -> s2 -> s3 -> s4 -> s5 -> s6 -> s7: data\n";
+    let diagram = compile(source).unwrap();
+    let bounds = render::bounds(&diagram.scene, &diagram.layout);
+    assert!(
+        bounds.w / bounds.h < 2.5,
+        "long chain should fit a readable frame"
+    );
+    assert_eq!(diagram.layout.routes.len(), 7);
+    let source = format!("{source}align row [s0,s1,s2,s3,s4,s5,s6,s7]\n");
+    let row = compile(&source).unwrap();
+    let y = row.layout.nodes["s0"].y;
+    assert!(row.layout.nodes.values().all(|r| (r.y - y).abs() < 0.01));
+    let doc = Document::new(&source).unwrap();
+    let before = doc.snapshot();
+    let session = doc.begin_drag().unwrap();
+    assert_eq!(before.to_svg(), session.snapshot().to_svg());
+}
+
+#[test]
+fn parallel_protocols_have_straight_separated_lanes_and_local_captions() {
+    let source = "client: Client\nserver: Server\nclient -> server: HTTPS\nclient -> server: WebSocket\nclient -> server: telemetry\n";
+    let diagram = compile(source).unwrap();
+    for edge in &diagram.scene.edges {
+        let points = &diagram.layout.routes[&edge.id].points;
+        assert!(
+            points.iter().all(|p| (p.y - points[0].y).abs() < 0.01),
+            "parallel lanes must not exchange order"
+        );
+        let label = diagram
+            .layout
+            .labels
+            .iter()
+            .find(|l| l.feature == edge.id)
+            .unwrap();
+        assert!(
+            !label.callout,
+            "each protocol must label its own lane locally"
+        );
+        assert!((label.anchor.y - points[0].y).abs() < 0.01);
+    }
+    layout::validate(&diagram.scene, &diagram.layout, &LayoutOptions::default()).unwrap();
+    let mut doc = Document::new(source).unwrap();
+    let mut drag = doc.begin_drag().unwrap();
+    let before = drag.snapshot();
+    let center = before.layout.nodes["client"].center();
+    drag.update(&[edit::Drag {
+        node: "client".into(),
+        position: Point::new(center.x, center.y + 4.),
+    }])
+    .unwrap();
+    assert_eq!(
+        drag.snapshot().layout.nodes["client"].h,
+        before.layout.nodes["client"].h,
+        "dragging must keep caption lane clearance"
+    );
+    doc.commit_drag(&drag).unwrap();
+    let reopened = compile(doc.source()).unwrap();
+    assert_eq!(
+        reopened.layout.nodes["client"].h, before.layout.nodes["client"].h,
+        "saved pins must preserve caption clearance"
+    );
+}
+
+#[test]
+fn retry_returns_and_planar_fallbacks_use_clear_outer_rails() {
+    let retry=compile("api -> queue: enqueue\nqueue -> worker: consume\nworker -> db: persist\nworker -> queue: retry\n").unwrap();
+    let points = &retry.layout.routes["worker->queue"].points;
+    let top = retry
+        .layout
+        .nodes
+        .values()
+        .map(|r| r.top())
+        .fold(f64::INFINITY, f64::min);
+    assert!(
+        points.iter().any(|p| p.y < top - 40.),
+        "retry must form a visible outer loop"
+    );
+    let fallback=compile("a: Frontend A\nb: Frontend B\nc: Backend C\nd: Backend D\na -> c: primary\na -> d: fallback\nb -> c: fallback\nb -> d: primary\n").unwrap();
+    let routes: Vec<_> = fallback.layout.routes.values().collect();
+    for (i, a) in routes.iter().enumerate() {
+        for b in &routes[i + 1..] {
+            for p in a.points.windows(2) {
+                for q in b.points.windows(2) {
+                    assert!(!routing::proper_crossing(p[0], p[1], q[0], q[1]));
+                    assert!(routing::collinear_overlap(p[0], p[1], q[0], q[1]) < 1e-6);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn record_slot_order_and_local_captions_follow_the_actual_rows() {
+    let d=compile("api: API @pin(grid: 0,0)\ndb: Orders [shape: sql_table] @pin(grid: 24,0) {\n port id: uuid [side: W,pos: 1]\n port customer_id: uuid [side: W,pos: 2]\n}\napi.E -> db#id: insert\napi.E -> db#customer_id: lookup\n").unwrap();
+    let insert = &d.scene.edges[0];
+    let lookup = &d.scene.edges[1];
+    let a = &d.layout.ports[&layout::port_key(insert, true)];
+    let b = &d.layout.ports[&layout::port_key(lookup, true)];
+    assert!(
+        a.point.y < b.point.y,
+        "source order must match record row order"
+    );
+    for edge in &d.scene.edges {
+        let label = d
+            .layout
+            .labels
+            .iter()
+            .find(|l| l.feature == edge.id)
+            .unwrap();
+        assert!(!label.callout);
+        assert!(
+            (label.anchor.y - d.layout.ports[&layout::port_key(edge, true)].point.y).abs() < 0.01
+        );
+    }
+    for p in d.layout.routes[&insert.id].points.windows(2) {
+        for q in d.layout.routes[&lookup.id].points.windows(2) {
+            assert!(!routing::proper_crossing(p[0], p[1], q[0], q[1]));
+        }
+    }
+}
+
+#[test]
+fn wrapping_keeps_source_text_but_uses_taller_readable_shapes() {
+    let source = "client: Customer account management console\napi: Regional authorization and policy enforcement service\nclient -> api: Authenticate using a short-lived access token\n";
+    let d = compile(source).unwrap();
+    assert!(d.layout.nodes["api"].w < 300. && d.layout.nodes["api"].h >= 68.);
+    assert!(d.layout.labels[0].text.contains('\n'));
+    assert!(!d.scene.nodes[1].label.contains('\n'));
+    assert!(d.to_svg().contains("<tspan"));
+    assert_eq!(Document::new(source).unwrap().source(), source);
+    let caption = "Authenticate requests using a short-lived organization access token";
+    let source = format!("hub -> a: {caption}\nhub -> b: {caption}\nhub -> c: {caption}\n");
+    let fan = compile(&source).unwrap();
+    assert!(
+        render::bounds(&fan.scene, &fan.layout).w < 1000.,
+        "spacing must use the wrapped caption width"
+    );
+    assert!(fan.layout.labels.iter().all(|l| l.text.contains('\n')));
+    let scope = compile(
+        "client -> api\napi -> db\napi -> kms\nzone secure around [api,db,kms] { padding: 1.5g }\n",
+    )
+    .unwrap();
+    let rings = render::zone_contours(&scope.scene, &scope.layout, &scope.scene.zones[0]);
+    assert_eq!(
+        rings.len(),
+        1,
+        "root trust scope should have one contiguous enclosure"
+    );
+    let p = scope.layout.nodes["client"].center();
+    let crossings = rings[0]
+        .iter()
+        .zip(rings[0].iter().cycle().skip(1))
+        .filter(|(a, b)| {
+            (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x
+        })
+        .count();
+    assert_eq!(
+        crossings % 2,
+        0,
+        "Browser must stay outside the trusted scope"
+    );
+}
+
+#[test]
+fn unconstrained_caption_failure_recovers_by_reserving_more_space() {
+    let source = include_str!("fixtures/label-reflow.diagram");
+    let d = compile(source).unwrap();
+    assert_eq!(
+        d.layout.labels.len(),
+        d.scene.edges.iter().filter(|e| !e.label.is_empty()).count()
+    );
+    layout::validate(&d.scene, &d.layout, &LayoutOptions::default()).unwrap();
+    assert_eq!(d.to_svg(), compile(source).unwrap().to_svg());
+}

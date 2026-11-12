@@ -618,6 +618,203 @@ fn simplify(p: &mut Vec<Point>) {
 }
 /// Split shared internal channels with L/straight/R order and centered 1D VPSC lanes.
 /// A channel move is committed only when every participating route retains valid geometry.
+/// Route an unconstrained fan as one ordered bundle. Outermost branches turn
+/// first on fan-out, and last on fan-in, so inner branches cannot cross them.
+pub(crate) fn coordinate_fan(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) -> bool {
+    if scene.nodes.len() < 4 || scene.edges.len() + 1 != scene.nodes.len() {
+        return false;
+    }
+    let fan_out = scene
+        .edges
+        .iter()
+        .all(|e| e.source.node == scene.edges[0].source.node);
+    let hub = if fan_out {
+        &scene.edges[0].source.node
+    } else {
+        &scene.edges[0].target.node
+    };
+    let y = l.nodes[hub].y;
+    let low = scene
+        .edges
+        .iter()
+        .map(|e| l.ports[&port_key(e, true)].stub.x)
+        .fold(f64::NEG_INFINITY, f64::max)
+        + o.lane_spacing;
+    let high = scene
+        .edges
+        .iter()
+        .map(|e| l.ports[&port_key(e, false)].stub.x)
+        .fold(f64::INFINITY, f64::min)
+        - o.lane_spacing;
+    let mut routes = std::collections::BTreeMap::new();
+    for e in &scene.edges {
+        let leaf = if fan_out {
+            &e.target.node
+        } else {
+            &e.source.node
+        };
+        let dy = l.nodes[leaf].y - y;
+        let rank = scene
+            .edges
+            .iter()
+            .filter(|other| {
+                let peer = if fan_out {
+                    &other.target.node
+                } else {
+                    &other.source.node
+                };
+                let offset = l.nodes[peer].y - y;
+                offset.signum() == dy.signum() && offset.abs() > dy.abs() + 1e-6
+            })
+            .count();
+        let lane = if fan_out {
+            low + rank as f64 * o.lane_spacing.max(1.)
+        } else {
+            high - rank as f64 * o.lane_spacing.max(1.)
+        };
+        if lane < low || lane > high {
+            return false;
+        }
+        let a = &l.ports[&port_key(e, true)];
+        let b = &l.ports[&port_key(e, false)];
+        let mut route = Route {
+            edge: e.id.clone(),
+            points: vec![
+                a.point,
+                a.stub,
+                Point::new(lane, a.stub.y),
+                Point::new(lane, b.stub.y),
+                b.stub,
+                b.point,
+            ],
+        };
+        route.points.dedup_by(|a, b| a.distance(*b) < 1e-7);
+        if !route_is_valid(scene, l, e, &route, o.margin) {
+            return false;
+        }
+        routes.insert(e.id.clone(), route);
+    }
+    let values: Vec<_> = routes.values().collect();
+    for (i, a) in values.iter().enumerate() {
+        for b in &values[i + 1..] {
+            for p in a.points.windows(2) {
+                for q in b.points.windows(2) {
+                    if proper_crossing(p[0], p[1], q[0], q[1])
+                        || collinear_overlap(p[0], p[1], q[0], q[1]) > 1e-6
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    l.routes.extend(routes);
+    true
+}
+/// Give a return edge or planar four-node dependency an unmistakable outer rail.
+pub(crate) fn coordinate_outer_routes(
+    scene: &SceneGraph,
+    o: &LayoutOptions,
+    l: &mut Layout,
+) -> bool {
+    let mut candidates = std::collections::BTreeMap::new();
+    let top = l
+        .nodes
+        .values()
+        .map(|r| r.top())
+        .fold(f64::INFINITY, f64::min)
+        - 72.;
+    let bottom = l
+        .nodes
+        .values()
+        .map(|r| r.bottom())
+        .fold(f64::NEG_INFINITY, f64::max)
+        + 72.;
+    let left = l
+        .nodes
+        .values()
+        .map(|r| r.left())
+        .fold(f64::INFINITY, f64::min)
+        - 48.;
+    let outer = scene.nodes.len() == 4
+        && scene.edges.len() == 4
+        && scene.edges.iter().any(|e| {
+            l.ports[&port_key(e, true)].side == Side::W
+                && l.ports[&port_key(e, false)].side == Side::S
+        });
+    for (i, e) in scene.edges.iter().enumerate() {
+        let a = &l.ports[&port_key(e, true)];
+        let b = &l.ports[&port_key(e, false)];
+        let points = if a.side == Side::N
+            && b.side == Side::N
+            && scene.edges[..i].iter().any(|other| {
+                other.source.node == e.target.node && other.target.node == e.source.node
+            }) {
+            vec![
+                a.point,
+                a.stub,
+                Point::new(a.stub.x, top),
+                Point::new(b.stub.x, top),
+                b.stub,
+                b.point,
+            ]
+        } else if outer && a.side == Side::W && b.side == Side::S {
+            vec![
+                a.point,
+                a.stub,
+                Point::new(left, a.stub.y),
+                Point::new(left, bottom),
+                Point::new(b.stub.x, bottom),
+                b.stub,
+                b.point,
+            ]
+        } else if outer && a.side == Side::E && b.side == Side::W {
+            let x = (a.stub.x + b.stub.x) / 2.;
+            vec![
+                a.point,
+                a.stub,
+                Point::new(x, a.stub.y),
+                Point::new(x, b.stub.y),
+                b.stub,
+                b.point,
+            ]
+        } else {
+            continue;
+        };
+        let mut route = Route {
+            edge: e.id.clone(),
+            points,
+        };
+        route.points.dedup_by(|a, b| a.distance(*b) < 1e-7);
+        if !route_is_valid(scene, l, e, &route, o.margin) {
+            return false;
+        }
+        candidates.insert(e.id.clone(), route);
+    }
+    if candidates.is_empty() {
+        return false;
+    }
+    let routes: Vec<_> = scene
+        .edges
+        .iter()
+        .map(|e| candidates.get(&e.id).unwrap_or(&l.routes[&e.id]))
+        .collect();
+    for (i, a) in routes.iter().enumerate() {
+        for b in &routes[i + 1..] {
+            for p in a.points.windows(2) {
+                for q in b.points.windows(2) {
+                    if proper_crossing(p[0], p[1], q[0], q[1])
+                        || collinear_overlap(p[0], p[1], q[0], q[1]) > 1e-6
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    l.routes.extend(candidates);
+    true
+}
 pub fn nudge_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
     use std::collections::BTreeMap;
     #[derive(Clone)]

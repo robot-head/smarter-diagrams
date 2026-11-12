@@ -1,5 +1,6 @@
 //! Rectilinear union contours with holes for unrelated nodes. Membership never
-//! implies ownership, and disconnected members may form disconnected islands.
+//! implies ownership. Root-level members share an enclosure; ownership clipping
+//! can retain separate islands for members in nested containers.
 use crate::{layout::*, model::*};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -41,6 +42,15 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
         if r.w > 0. && r.h > 0. {
             includes.push(r);
         }
+    }
+    // A root-level shared boundary reads as one enclosure. Subtract nonmembers
+    // below; nested ownership retains its separately clipped regions.
+    if members
+        .iter()
+        .all(|id| scene.node(id).is_some_and(|n| n.parent.is_none()))
+        && let Some(envelope) = includes.iter().copied().reduce(Rect::union)
+    {
+        includes.push(envelope);
     }
     let exclusions: Vec<_> = scene
         .nodes

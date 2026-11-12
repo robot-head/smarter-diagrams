@@ -1,0 +1,15 @@
+n0: "Validate request 0" [shape: database]
+n1: "API 1" [shape: rect]
+n2: "Cache 2" [shape: database]
+n3: "Event log 3" [shape: queue]
+n4: "Worker 4" [shape: cache]
+n5: "地域ゲートウェイ 5" [shape: rect]
+n6: "地域ゲートウェイ 6" [shape: rect]
+n7: "Validate request 7" [shape: rect]
+n0 -> n1: send
+n0 -> n2: read through
+n1 -> n3: send
+n1 -> n4: validate organization access
+n2 -> n5: 
+n2 -> n6: send
+n3 -> n7: read through

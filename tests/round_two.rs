@@ -6,7 +6,12 @@ fn svg_namespaces_preserve_literal_reference_text_and_accessible_names() {
     let d = compile(&format!("a: \"{label}\"\n")).unwrap();
     let svg = d.to_svg();
     assert!(svg.contains(&format!("aria-label=\"{label}\"")));
-    assert!(svg.contains(&format!(">{label}</text>")));
+    for word in label.split_whitespace() {
+        assert!(
+            svg.contains(&format!(">{word}</tspan>")),
+            "wrapped text must retain literal references"
+        );
+    }
     assert!(svg.contains("aria-labelledby=\"sd-"));
 }
 
