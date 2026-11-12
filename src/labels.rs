@@ -277,6 +277,17 @@ pub(crate) fn place_with_prior(
             {
                 continue;
             }
+            let uses: Vec<_> = scene
+                .edges
+                .iter()
+                .filter(|e| {
+                    (e.source.node == node.id && e.source.port.as_ref() == Some(&port.id))
+                        || (e.target.node == node.id && e.target.port.as_ref() == Some(&port.id))
+                })
+                .collect();
+            if !uses.is_empty() && uses.iter().all(|e| e.label.trim() == port.label.trim()) {
+                continue;
+            }
             let key = format!("{}#{}", node.id, port.id);
             if let Some(p) = l.ports.get(&key) {
                 let mut ignore = ancestors(scene, &node.id);
@@ -796,7 +807,12 @@ fn fan_caption(f: &Feature, scene: &SceneGraph, l: &Layout) -> Option<Candidate>
             .edges
             .iter()
             .all(|e| e.source.node == edge.source.node && e.target.node == edge.target.node);
-    if !fan_out && !fan_in && !record_bundle {
+    let mesh = crate::presentation::mesh_layers(scene).is_some()
+        && scene.edges.iter().all(|e| {
+            l.ports[&port_key(e, true)].side == Side::E
+                && l.ports[&port_key(e, false)].side == Side::W
+        });
+    if !fan_out && !fan_in && !record_bundle && !mesh {
         return None;
     }
     let leaf = if fan_out {
@@ -805,7 +821,7 @@ fn fan_caption(f: &Feature, scene: &SceneGraph, l: &Layout) -> Option<Candidate>
         &edge.source.node
     };
     let body = l.nodes[leaf];
-    let branch_y = if record_bundle {
+    let branch_y = if record_bundle || mesh {
         l.ports[&port_key(edge, true)].point.y
     } else {
         body.y

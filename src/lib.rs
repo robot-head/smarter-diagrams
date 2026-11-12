@@ -23,6 +23,7 @@ pub mod layout;
 pub mod lint;
 pub mod mcp;
 pub mod model;
+mod presentation;
 pub mod render;
 pub mod routing;
 mod shapes;

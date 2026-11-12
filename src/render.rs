@@ -266,27 +266,39 @@ fn zone_label(scene: &SceneGraph, zone: &Zone, l: &Layout) -> Option<Rect> {
         .collect::<Vec<_>>();
     let left = points.iter().map(|p| p.x).reduce(f64::min)?;
     let top = points.iter().map(|p| p.y).reduce(f64::min)?;
+    let right = points.iter().map(|p| p.x).reduce(f64::max)?;
     let w = crate::labels::text_width(&zone.label) + 16.;
     let h = crate::labels::text_height(&zone.label) + 4.;
-    let mut r = Rect::new(left + w / 2., top - h / 2. - 6., w, h);
-    for _ in 0..scene.nodes.len() + l.labels.len() + 4 {
-        let obstructed = scene.nodes.iter().any(|n| {
+    let clear = |r: Rect| {
+        !scene.nodes.iter().any(|n| {
             let node = l.nodes[&n.id];
             r.inflate(4.).intersects(node)
                 && !(n.container && node.inflate(-6.).encloses(r.inflate(4.)))
-        }) || l.routes.values().any(|route| {
+        }) && !l.routes.values().any(|route| {
             route
                 .points
                 .windows(2)
                 .any(|p| r.inflate(4.).blocks(p[0], p[1]))
-        }) || l
+        }) && !l
             .labels
             .iter()
-            .any(|label| r.inflate(4.).intersects(label.bounds));
-        if !obstructed {
-            return Some(r);
+            .any(|label| r.inflate(4.).intersects(label.bounds))
+    };
+    let mut r = Rect::new(left + w / 2., top - h / 2. - 6., w, h);
+    // Search along the boundary before climbing away from it. A connector
+    // entering near the left corner should not push the title above unrelated
+    // nodes and make its scope ambiguous.
+    let columns = ((right - left - w).max(0.) / 16.).ceil() as usize;
+    let columns = columns.min(128);
+    for row in 0..scene.nodes.len() + l.labels.len() + 4 {
+        let y = top - h / 2. - 6. - row as f64 * 32.;
+        for col in 0..=columns + 1 {
+            let x = left + w / 2. + col as f64 * 16.;
+            r = Rect::new(x, y, w, h);
+            if clear(r) {
+                return Some(r);
+            }
         }
-        r.y -= 32.;
     }
     let top = l
         .nodes

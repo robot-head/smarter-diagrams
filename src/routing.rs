@@ -624,6 +624,17 @@ pub(crate) fn coordinate_fan(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layo
     if scene.nodes.len() < 4 || scene.edges.len() + 1 != scene.nodes.len() {
         return false;
     }
+    if !scene
+        .edges
+        .iter()
+        .all(|e| e.source.node == scene.edges[0].source.node)
+        && !scene
+            .edges
+            .iter()
+            .all(|e| e.target.node == scene.edges[0].target.node)
+    {
+        return false;
+    }
     let fan_out = scene
         .edges
         .iter()

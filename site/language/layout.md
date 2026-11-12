@@ -4,7 +4,7 @@ The engine chooses a fresh topology-aware layout, then enforces separation, owne
 
 ## Automatic presentation
 
-Unconstrained fans group the independent producers or consumers in one column, with captions beside their horizontal branches. Parallel connections keep a consistent lane order and reserve space for their captions. Long simple pipelines fold into rows to keep the sequence readable. Pins, explicit ports and alignment rules keep control when you specify them; dragging preserves the current arrangement.
+Unconstrained fans group the independent producers or consumers in one column, with captions beside their horizontal branches. Parallel connections keep a consistent lane order and reserve space for their captions. Long pipelines, including main chains with shortcuts or parallel sends, fold into rows sized from their actual occupants. Trees keep depth ranks, sibling order and centered subtrees. Complete many-to-many connections use distinct channels; the three-by-three case uses a perimeter arrangement with just one unavoidable crossing. Pins, explicit ports and alignment rules keep control when you specify them; dragging preserves the current arrangement.
 
 Long node titles and connection captions wrap at measured word boundaries. Explicit newlines remain hard breaks, and the source labels and accessible descriptions retain their original text. Unconstrained fresh layouts can reserve additional whitespace when captions need room; hard constraints stay in force.
 
@@ -62,6 +62,58 @@ server: Server
 client -> server: HTTPS
 client -> server: WebSocket
 client -> server: telemetry
+```
+
+### A chain with shortcuts
+
+The main sequence stays compact while sparse bypasses use outside channels with separate attachments. Denser bypass sets keep interior routing so the frame stays readable.
+
+```diagram guides
+read -> validate -> normalize -> enrich -> filter -> aggregate -> encode -> store: data
+read -> filter: skip optional work
+normalize -> store: cached result
+```
+
+### A branching hierarchy
+
+Depth runs down the page, with each subtree kept together. Explicit ports and pins can choose a different arrangement.
+
+```diagram guides
+root: Request
+left: Regional processing
+right: Global processing
+root -> left: local
+root -> right: global
+left -> orders: write
+left -> inventory: reserve
+right -> audit: record
+right -> metrics: measure
+orders: Orders [shape: database]
+inventory: Inventory [shape: database]
+audit: Audit log [shape: queue]
+metrics: Metrics [shape: database]
+```
+
+### A many-to-many dependency
+
+All three services access all three stores. This graph cannot be drawn without a crossing. One connection goes around the perimeter, leaving a single crossing inside; a gap marks the crossing without implying a junction.
+
+```diagram guides
+a: Service A
+b: Service B
+c: Service C
+x: Store X [shape: database]
+y: Store Y [shape: database]
+z: Store Z [shape: database]
+a -> x: access
+a -> y: access
+a -> z: access
+b -> x: access
+b -> y: access
+b -> z: access
+c -> x: access
+c -> y: access
+c -> z: access
 ```
 
 ## Absolute pins
