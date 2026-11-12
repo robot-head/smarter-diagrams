@@ -255,6 +255,58 @@ pub fn place(
     let mut fallback_y = bottom;
     for f in &features {
         let mut candidates = generate(f, o, l, scene);
+        // Facing horizontal ports use one stable caption rail above the pair.
+        // Segment length and A* tie breaks must not toggle inline/callout slots.
+        if f.slot.is_none()
+            && f.slide.is_none()
+            && let Some(edge) = scene.edge(&f.id)
+            && crate::render::flow_caption(scene, edge).is_some()
+        {
+            let a = &l.ports[&port_key(edge, true)];
+            let b = &l.ports[&port_key(edge, false)];
+            if matches!((a.side, b.side), (Side::E, Side::W) | (Side::W, Side::E)) {
+                let points = &f.route;
+                let total: f64 = points.windows(2).map(|p| p[0].distance(p[1])).sum();
+                let mut remaining = total / 2.;
+                let mut anchor = points[0];
+                for pair in points.windows(2) {
+                    let length = pair[0].distance(pair[1]);
+                    if remaining <= length && length > 1e-9 {
+                        let t = remaining / length;
+                        anchor = Point::new(
+                            pair[0].x + t * (pair[1].x - pair[0].x),
+                            pair[0].y + t * (pair[1].y - pair[0].y),
+                        );
+                        break;
+                    }
+                    remaining -= length;
+                }
+                let h = text_height(&f.text);
+                candidates.push(Candidate {
+                    label: LabelPlacement {
+                        feature: f.id.clone(),
+                        text: f.text.clone(),
+                        bounds: Rect::new(
+                            (a.stub.x + b.stub.x) / 2.,
+                            l.nodes[&edge.source.node]
+                                .top()
+                                .min(l.nodes[&edge.target.node].top())
+                                - h / 2.
+                                - 24.,
+                            feature_width(f, scene),
+                            h,
+                        ),
+                        anchor,
+                        knockout: false,
+                        callout: true,
+                        horizontal: true,
+                        slide: 0.5,
+                    },
+                    cost: -10000.,
+                });
+            }
+        }
+
         let w = feature_width(f, scene);
         let anchor = f.route.get(f.route.len() / 2).copied().unwrap_or_default();
         candidates.push(Candidate {
