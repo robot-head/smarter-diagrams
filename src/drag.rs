@@ -152,9 +152,45 @@ impl DragSession {
             });
         }
         let source = edit::apply_ops(&self.anchors, &ops, Placement::Layout)?.source;
-        // A fresh route pass has no stretched/stale paths to accumulate. This is
-        // also the result obtained by reopening the saved diagram source.
-        let candidate = compile_with(&source, &self.options, None)?;
+        // A fresh route pass provides a safe fallback without accumulated
+        // pointer history; stationary connections then prefer their baseline.
+        let mut candidate = compile_with(&source, &self.options, None)?;
+        // Prefer the immutable gesture baseline for stationary connections.
+        // Never reuse the last pointer frame: reversals must not accumulate
+        // detours, and a moving obstacle must still invalidate an old path.
+        let mut stable = candidate.layout.clone();
+        let mut changed = false;
+        for edge in &candidate.scene.edges {
+            let source = port_key(edge, true);
+            let target = port_key(edge, false);
+            if stable.ports.get(&source) == self.baseline.layout.ports.get(&source)
+                && stable.ports.get(&target) == self.baseline.layout.ports.get(&target)
+                && let Some(route) = self.baseline.layout.routes.get(&edge.id)
+                && crate::routing::route_is_valid(
+                    &candidate.scene,
+                    &stable,
+                    edge,
+                    route,
+                    self.options.margin,
+                )
+                && stable.routes.get(&edge.id) != Some(route)
+            {
+                stable.routes.insert(edge.id.clone(), route.clone());
+                changed = true;
+            }
+        }
+        if changed {
+            // Refit captions to the retained paths. If that cannot be done
+            // safely, the fully validated canonical candidate remains available.
+            if let Ok(labels) = crate::labels::place(&candidate.scene, &self.options, &stable) {
+                stable.labels = labels;
+                if crate::layout::validate(&candidate.scene, &stable, &self.options).is_ok()
+                    && crate::labels::placements_clear(&candidate.scene, &stable)
+                {
+                    candidate.layout = stable;
+                }
+            }
+        }
         for (id, position) in moved {
             if candidate.layout.nodes[&id].center().distance(position) > 1e-5 {
                 return Err(Error::Edit(format!(
@@ -175,5 +211,92 @@ impl DragSession {
             return Err(Error::Edit("the current placement is invalid".into()));
         }
         crate::layout::validate(&self.prepared.scene, &self.prepared.layout, &self.options)
+    }
+}
+
+#[cfg(test)]
+mod neighbor_tests {
+    use super::*;
+    #[test]
+    fn stationary_paths_remain_fixed_until_they_are_obstructed() {
+        let doc = crate::Document::new(
+            "a @pin(grid: 0,0)\nb @pin(grid: 24,12)\nm @pin(grid: 12,24)\nm.E -> a.W\na.E -> b.W\n",
+        )
+        .unwrap();
+        let mut saved = (*doc.snapshot()).clone();
+        let edge = saved.scene.edge("a->b").unwrap().clone();
+        let a = &saved.layout.ports[&port_key(&edge, true)];
+        let b = &saved.layout.ports[&port_key(&edge, false)];
+        // A valid existing corridor, rather than whichever equal-cost corridor
+        // a fresh A* search happens to choose on this visibility lattice.
+        saved.layout.routes.get_mut(&edge.id).unwrap().points = vec![
+            a.point,
+            a.stub,
+            Point::new(176., a.stub.y),
+            Point::new(176., b.stub.y),
+            b.stub,
+            b.point,
+        ];
+        saved.layout.labels =
+            crate::labels::place(&saved.scene, &LayoutOptions::default(), &saved.layout).unwrap();
+        crate::layout::validate(&saved.scene, &saved.layout, &LayoutOptions::default()).unwrap();
+        let baseline = Arc::new(saved);
+        let original = &baseline.layout.routes[&edge.id];
+        let mut gesture = DragSession::new(baseline.clone(), 0, LayoutOptions::default()).unwrap();
+        let mut retained = 0;
+        let mut unnecessary_reroutes = 0;
+        for x in [96., 160., 224., 288., 352.] {
+            for y in [-160., 224., 320., 400.] {
+                if gesture
+                    .update(&[Drag {
+                        node: "m".into(),
+                        position: Point::new(x, y),
+                    }])
+                    .is_err()
+                {
+                    continue;
+                }
+                let shown = gesture.snapshot();
+                if crate::routing::route_is_valid(&shown.scene, &shown.layout, &edge, original, 8.)
+                {
+                    assert_eq!(
+                        &shown.layout.routes[&edge.id], original,
+                        "neighbor changed at {x},{y}"
+                    );
+                    let fresh = crate::compile(&shown.parse.source).unwrap();
+                    if fresh.layout.routes[&edge.id] != *original {
+                        unnecessary_reroutes += 1;
+                    }
+                    retained += 1;
+                }
+                gesture.settle().unwrap();
+            }
+        }
+        assert!(retained >= 10);
+        assert!(
+            unnecessary_reroutes > 0,
+            "fixture must exercise a route that fresh search would change"
+        );
+        // Move the obstacle onto the old shaft. Keeping that path would be
+        // unsafe: a fresh route must replace it or the update must be rejected.
+        let segment = original
+            .points
+            .windows(2)
+            .max_by(|a, b| a[0].distance(a[1]).total_cmp(&b[0].distance(b[1])))
+            .unwrap();
+        let position = Point::new(
+            (segment[0].x + segment[1].x) / 2.,
+            (segment[0].y + segment[1].y) / 2.,
+        );
+        if gesture
+            .update(&[Drag {
+                node: "m".into(),
+                position,
+            }])
+            .is_ok()
+        {
+            assert_ne!(&gesture.snapshot().layout.routes[&edge.id], original);
+            gesture.settle().unwrap();
+        }
     }
 }
