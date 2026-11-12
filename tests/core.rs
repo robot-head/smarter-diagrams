@@ -1102,3 +1102,98 @@ fn unconstrained_caption_failure_recovers_by_reserving_more_space() {
     layout::validate(&d.scene, &d.layout, &LayoutOptions::default()).unwrap();
     assert_eq!(d.to_svg(), compile(source).unwrap().to_svg());
 }
+
+#[test]
+fn readable_return_and_fan_routes_survive_dragging_and_reopening_pins() {
+    for source in [
+        "api -> queue: enqueue\nqueue -> worker: consume\nworker -> db: persist\nworker -> queue: retry\n",
+        "hub -> a: event\nhub -> b: event\nhub -> c: event\nhub -> d: event\nhub -> e: event\n",
+        "a: Frontend A\nb: Frontend B\nc: Backend C\nd: Backend D\na -> c: primary\na -> d: fallback\nb -> c: fallback\nb -> d: primary\n",
+    ] {
+        let mut doc = Document::new(source).unwrap();
+        let node = if source.contains("retry") {
+            "worker"
+        } else if source.contains("hub") {
+            "hub"
+        } else {
+            "a"
+        };
+        let before = doc.snapshot();
+        let body = before.layout.nodes[node];
+        let mut drag = doc.begin_drag().unwrap();
+        drag.update(&[edit::Drag {
+            node: node.into(),
+            position: Point::new(body.x, body.y + 4.),
+        }])
+        .unwrap();
+        doc.commit_drag(&drag).unwrap();
+        for diagram in [
+            drag.snapshot(),
+            std::sync::Arc::new(compile(doc.source()).unwrap()),
+        ] {
+            assert!((diagram.layout.nodes[node].y - body.y - 4.).abs() < 0.01);
+            for (id, old) in &before.layout.nodes {
+                let now = diagram.layout.nodes[id];
+                assert!(
+                    (now.x - old.x).abs() < 0.01
+                        && (now.y - old.y - if id == node { 4. } else { 0. }).abs() < 0.01,
+                    "route planning must preserve all node positions"
+                );
+            }
+            if source.contains("retry") {
+                let top = diagram
+                    .layout
+                    .nodes
+                    .values()
+                    .map(|r| r.top())
+                    .fold(f64::INFINITY, f64::min);
+                assert!(
+                    diagram.layout.routes["worker->queue"]
+                        .points
+                        .iter()
+                        .any(|p| p.y < top - 40.),
+                    "return loop must remain visible"
+                );
+            }
+            let routes: Vec<_> = diagram.layout.routes.values().collect();
+            for (i, a) in routes.iter().enumerate() {
+                for b in &routes[i + 1..] {
+                    for p in a.points.windows(2) {
+                        for q in b.points.windows(2) {
+                            assert!(!routing::proper_crossing(p[0], p[1], q[0], q[1]));
+                        }
+                    }
+                }
+            }
+        }
+        if source.contains("retry") {
+            let snapshot = doc.snapshot();
+            let label = snapshot
+                .layout
+                .labels
+                .iter()
+                .find(|l| l.feature == "worker->queue")
+                .unwrap()
+                .bounds;
+            let mut caption = doc.begin_drag().unwrap();
+            caption
+                .update_label("worker->queue", Point::new(label.x, label.y - 8.))
+                .unwrap();
+            doc.commit_drag(&caption).unwrap();
+            let reopened = compile(doc.source()).unwrap();
+            let top = reopened
+                .layout
+                .nodes
+                .values()
+                .map(|r| r.top())
+                .fold(f64::INFINITY, f64::min);
+            assert!(
+                reopened.layout.routes["worker->queue"]
+                    .points
+                    .iter()
+                    .any(|p| p.y < top - 40.),
+                "manual caption pins must not collapse the loop"
+            );
+        }
+    }
+}

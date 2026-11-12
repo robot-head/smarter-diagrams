@@ -387,7 +387,7 @@ fn layout_pass(
         Default::default()
     };
     let concept_sides = if previous.is_none() {
-        crate::topology::readable_concept(scene, &mut rects, o)
+        crate::topology::readable_concept(scene, &mut rects, o, true)
     } else {
         None
     };
@@ -521,6 +521,8 @@ fn layout_pass(
             break;
         }
     }
+    let concept_sides =
+        concept_sides.or_else(|| crate::topology::readable_concept(scene, &mut rects, o, false));
     let mut requests = port_requests(scene, &rects, o, previous);
     let readable_routes = concept_sides.is_some();
     let readable_fan =
