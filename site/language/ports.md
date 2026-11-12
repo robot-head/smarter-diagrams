@@ -18,7 +18,7 @@ Ratios must be strictly between 0 and 1 and still respect corner clearance. Two 
 
 ### 1. Free attachment
 
-The compiler chooses the side and attachment point from the topology.
+The compiler compares attachment-side pairs using estimated connector length, bends, outward stubs and node obstacles, then assigns positions along the selected sides. During a canvas gesture, changing an automatic side carries a switching cost, so nearly equal alternatives do not flicker. Explicit side, order, ratio and slot constraints remain fixed.
 
 ```diagram
 producer: Producer

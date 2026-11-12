@@ -1,7 +1,7 @@
 use smarter_diagrams::{
     edit::Drag,
     layout::port_key,
-    layout::{LayoutOptions, Point},
+    layout::{LayoutOptions, Point, Rect},
     *,
 };
 
@@ -303,4 +303,104 @@ fn client_micro_motion_keeps_the_same_elbow_and_caption_rail() {
         }
     }
     assert!(checked >= 24);
+}
+
+#[test]
+fn database_backtracking_detour_survives_two_axis_micro_motion() {
+    let source = format!(
+        "{}\n@layout {{\nclient @pin(grid: 0,0)\ngateway @pin(grid: 15,0)\nworker @pin(grid: 30,0)\ndb @pin(grid: 10,25)\n}}\n",
+        include_str!("../examples/simulation.diagram")
+    );
+    let doc = Document::new(&source).unwrap();
+    let mut drag = doc.begin_drag().unwrap();
+    let mut first = None;
+    for i in 0..80 {
+        let delta = if i % 2 == 0 { 0.1 } else { -0.1 };
+        drag.update(&[at("db", 160. + delta, 400. + delta)])
+            .unwrap();
+        let shown = drag.snapshot();
+        let points = &shown.layout.routes["worker->db"].points;
+        let label = shown
+            .layout
+            .labels
+            .iter()
+            .find(|l| l.feature == "worker->db")
+            .unwrap();
+        let bounds = points
+            .iter()
+            .copied()
+            .fold(Rect::new(points[0].x, points[0].y, 0., 0.), |r, p| {
+                r.union(Rect::new(p.x, p.y, 0., 0.))
+            });
+        if let Some((old, label_center)) = first {
+            let old: Rect = old;
+            let label_center: Point = label_center;
+            assert!(
+                old.center().distance(bounds.center()) < 1.,
+                "detour corridor jumped"
+            );
+            assert!(
+                label_center.distance(label.bounds.center()) < 1.,
+                "detour caption jumped at {i}: {label_center:?} -> {label:?}; points={points:?}"
+            );
+        } else {
+            first = Some((bounds, label.bounds.center()));
+        }
+        drag.settle().unwrap();
+    }
+}
+
+#[test]
+fn automatic_attachments_consider_obstacles_and_explicit_sides_stay_fixed() {
+    for fixed in [false, true] {
+        let edge = if fixed {
+            "worker.E -> db.W"
+        } else {
+            "worker -> db"
+        };
+        let d = compile(&format!(
+            "gateway @pin(grid: 15,0)\nworker @pin(grid: 30,0)\ndb @pin(grid: 10,25)\n{edge}\n"
+        ))
+        .unwrap();
+        let e = &d.scene.edges[0];
+        let a = &d.layout.ports[&port_key(e, true)];
+        let b = &d.layout.ports[&port_key(e, false)];
+        if fixed {
+            assert_eq!(a.side, model::Side::E);
+            assert_eq!(b.side, model::Side::W);
+        } else {
+            assert_eq!(a.side, model::Side::S);
+            assert_eq!(b.side, model::Side::E);
+        }
+    }
+}
+
+#[test]
+fn free_attachment_sides_have_a_switching_cost_during_micro_motion() {
+    let doc = Document::new("a @pin(grid: 0,0)\nb @pin(grid: 20,20)\na -> b\n").unwrap();
+    let mut drag = doc.begin_drag().unwrap();
+    let mut pair = None;
+    for i in 0..60 {
+        drag.update(&[at("a", 0., if i % 2 == 0 { 0.1 } else { -0.1 })])
+            .unwrap();
+        let d = drag.snapshot();
+        let e = &d.scene.edges[0];
+        let now = (
+            d.layout.ports[&port_key(e, true)].side,
+            d.layout.ports[&port_key(e, false)].side,
+        );
+        if let Some(pair) = pair {
+            assert_eq!(
+                now, pair,
+                "automatic ports must not switch at the diagonal tie"
+            );
+        } else {
+            pair = Some(now);
+        }
+    }
+    drag.update(&[at("a", 640., 320.)]).unwrap();
+    let d = drag.snapshot();
+    let e = &d.scene.edges[0];
+    assert_eq!(d.layout.ports[&port_key(e, true)].side, model::Side::W);
+    assert_eq!(d.layout.ports[&port_key(e, false)].side, model::Side::E);
 }

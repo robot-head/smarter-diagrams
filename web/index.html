@@ -16,9 +16,10 @@
 gateway: API gateway @sim(service_rate: 100, queue_cap: 200)
 worker: Worker @sim(service_rate: 50, queue_cap: 100, retry: exp_backoff(0.5, 0.2))
 db: Database @sim(service_rate: 80)
-client.E -> gateway.W: HTTPS
-gateway.E -> worker.W: jobs
-worker.E -> db.W: writes
+client -> gateway: HTTPS
+gateway -> worker: jobs
+worker -> db: writes
+align row [client,gateway,worker,db]
 flow request { client -> gateway -> worker -> db }
 </textarea></details><p id="status" role="status">Loading Rust/Wasm…</p><pre id="metrics"></pre></section><section class="canvas-panel"><div id="canvas-controls"></div><section id="canvas" aria-label="Diagram canvas"></section><p id="simulation-legend" hidden>Queue labels and bars show occupancy. Orange outlines identify queues at or near capacity; dashed red connections are cut.</p></section></main>
 <script type="module">

@@ -887,6 +887,62 @@ pub(crate) fn retain_detour(
     } else {
         points[last - 1].x = b.point.x;
     }
+    // A turn at the old stub must follow an outward-moving port. Move its
+    // whole perpendicular run, not just one vertex (which would create a
+    // diagonal or a tiny U-turn and discard an otherwise valid corridor).
+    for (port, turn, next) in [(a, 1, 2), (b, last - 1, last - 2)] {
+        let (nx, ny) = port.side.normal();
+        if nx != 0. && (points[turn].x - port.stub.x) * nx < 0. {
+            points[turn].x = port.stub.x;
+            points[next].x = port.stub.x;
+        } else if ny != 0. && (points[turn].y - port.stub.y) * ny < 0. {
+            points[turn].y = port.stub.y;
+            points[next].y = port.stub.y;
+        }
+    }
+    // Tight corridors next to moving bodies must follow their clearance
+    // boundary, rather than become invalid on alternating subpixel frames.
+    for node in &scene.nodes {
+        let (Some(old), Some(new)) = (prior.nodes.get(&node.id), l.nodes.get(&node.id)) else {
+            continue;
+        };
+        if old == new || old.center().distance(new.center()) > 16. {
+            continue;
+        }
+        let old = old.inflate(margin);
+        let new = new.inflate(margin);
+        for i in 1..last - 1 {
+            let (p, q) = (points[i], points[i + 1]);
+            if (p.y - q.y).abs() < 1e-6 && p.x.max(q.x) > new.left() && p.x.min(q.x) < new.right() {
+                let y = if p.y <= old.top() + 1e-6 && p.y > new.top() {
+                    Some(new.top())
+                } else if p.y >= old.bottom() - 1e-6 && p.y < new.bottom() {
+                    Some(new.bottom())
+                } else {
+                    None
+                };
+                if let Some(y) = y {
+                    points[i].y = y;
+                    points[i + 1].y = y;
+                }
+            } else if (p.x - q.x).abs() < 1e-6
+                && p.y.max(q.y) > new.top()
+                && p.y.min(q.y) < new.bottom()
+            {
+                let x = if p.x <= old.left() + 1e-6 && p.x > new.left() {
+                    Some(new.left())
+                } else if p.x >= old.right() - 1e-6 && p.x < new.right() {
+                    Some(new.right())
+                } else {
+                    None
+                };
+                if let Some(x) = x {
+                    points[i].x = x;
+                    points[i + 1].x = x;
+                }
+            }
+        }
+    }
     points[0] = a.point;
     points[last] = b.point;
     points.insert(1, a.stub);
@@ -944,9 +1000,16 @@ mod detour_tests {
             let mut next = d.layout.clone();
             let delta = if i % 2 == 0 { 0.1 } else { -0.1 };
             next.nodes.get_mut("a").unwrap().y += delta;
+            next.nodes.get_mut("a").unwrap().x += delta;
+            next.nodes.get_mut("b").unwrap().x -= delta;
             let port = next.ports.get_mut(&port_key(e, true)).unwrap();
             port.point.y += delta;
             port.stub.y += delta;
+            port.point.x += delta;
+            port.stub.x += delta;
+            let port = next.ports.get_mut(&port_key(e, false)).unwrap();
+            port.point.x -= delta;
+            port.stub.x -= delta;
             next.routes.insert(
                 e.id.clone(),
                 path(&next, e, if i % 2 == 0 { 64. } else { -64. }),
@@ -955,7 +1018,7 @@ mod detour_tests {
             assert!(kept.points.iter().any(|p| p.y == -64.));
             assert!(!kept.points.iter().any(|p| p.y == 64.));
             assert!(
-                kept.points.len() <= 6,
+                coalesced(&kept.points).len() <= 6,
                 "retention must not accumulate bends"
             );
             next.routes.insert(e.id.clone(), kept);

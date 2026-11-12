@@ -152,9 +152,9 @@ impl DragSession {
             });
         }
         let source = edit::apply_ops(&self.anchors, &ops, Placement::Layout)?.source;
-        // A fresh route pass provides a safe fallback without accumulated
-        // pointer history; stationary connections then prefer their baseline.
-        let mut candidate = compile_with(&source, &self.options, None)?;
+        // Compile the anchored geometry with the last validated layout supplying
+        // attachment switching costs and checked route reuse.
+        let mut candidate = compile_with(&source, &self.options, Some(&self.prepared.layout))?;
         // Prefer the immutable gesture baseline for stationary connections.
         // Moving obstacles must still invalidate an old path. Stateful detour
         // retention below has separate validity and excess-length bounds.
