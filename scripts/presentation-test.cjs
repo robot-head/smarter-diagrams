@@ -30,6 +30,22 @@ module.exports = async (browser, base) => {
   await page.setViewportSize({width:375,height:900});
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   await page.locator('#canvas').screenshot({path:'artifacts/presentation-mesh-mobile.png'});
+  await page.setViewportSize({width:1360,height:1000});
+  const shortcuts='read -> validate -> normalize -> enrich -> filter -> aggregate -> encode -> store: data\nread -> filter: skip optional work\nnormalize -> store: cached result\n';
+  await page.locator('#source').fill(shortcuts);await page.click('#render');
+  await page.waitForFunction(()=>document.querySelectorAll('#canvas [data-node]').length===8);
+  assert.deepEqual(await page.evaluate(checkSvg,await page.locator('#canvas svg').evaluate(svg=>svg.outerHTML)),[]);
+  const shortcutCrossings=await page.evaluate(async source=>{
+    const {layout_json}=await import(new URL('./pkg/smarter_diagrams.js',location.href));
+    const routes=Object.values(JSON.parse(layout_json(source)).routes);
+    const cross=(a,b,c,d)=>{
+      if(Math.abs(a.y-b.y)<1e-6&&Math.abs(c.x-d.x)<1e-6)return c.x>Math.min(a.x,b.x)+1e-6&&c.x<Math.max(a.x,b.x)-1e-6&&a.y>Math.min(c.y,d.y)+1e-6&&a.y<Math.max(c.y,d.y)-1e-6;
+      return Math.abs(a.x-b.x)<1e-6&&Math.abs(c.y-d.y)<1e-6?cross(c,d,a,b):false;
+    };
+    let count=0;for(let i=0;i<routes.length;i++)for(let j=i+1;j<routes.length;j++)for(let p=1;p<routes[i].points.length;p++)for(let q=1;q<routes[j].points.length;q++)count+=cross(routes[i].points[p-1],routes[i].points[p],routes[j].points[q-1],routes[j].points[q]);return count;
+  },shortcuts);
+  assert.equal(shortcutCrossings,0,'outside bypasses must not cross the main sequence');
+  await page.locator('#canvas').screenshot({path:'artifacts/presentation-shortcuts-desktop.png'});
   await page.close();
-  console.log('Presentation: one-crossing mesh, editor replacement, readable initial scale, mobile containment, and Wasm drag/reopen passed.');
+  console.log('Presentation: one-crossing mesh, noncrossing shortcuts, editor replacement, readable initial scale, mobile containment, and Wasm drag/reopen passed.');
 };

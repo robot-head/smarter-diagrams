@@ -237,3 +237,25 @@ fn shortcut_backbones_are_recognized_independently_of_node_declaration_order() {
     );
     layout::validate(&d.scene, &d.layout, &LayoutOptions::default()).unwrap();
 }
+
+#[test]
+fn folded_shortcuts_use_outside_channels_without_crossing_the_main_sequence() {
+    let source = "read -> validate -> normalize -> enrich -> filter -> aggregate -> encode -> store: data\nread -> filter: skip optional work\nnormalize -> store: cached result\n";
+    let mut doc = Document::new(source).unwrap();
+    let before = doc.snapshot();
+    assert_eq!(crossings(&before), 0);
+    let body = before.layout.nodes["read"];
+    let mut drag = doc.begin_drag().unwrap();
+    for dx in [0.1, -0.1, 1., -1., 4.] {
+        drag.update(&[edit::Drag {
+            node: "read".into(),
+            position: Point::new(body.x + dx, body.y + 4.),
+        }])
+        .unwrap();
+        assert_eq!(crossings(&drag.snapshot()), 0);
+    }
+    doc.commit_drag(&drag).unwrap();
+    let reopened = compile(doc.source()).unwrap();
+    assert_eq!(crossings(&reopened), 0);
+    assert!((reopened.layout.nodes["read"].x - body.x - 4.).abs() < 0.01);
+}

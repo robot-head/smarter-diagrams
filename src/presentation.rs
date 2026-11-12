@@ -444,6 +444,109 @@ pub(crate) fn backbone(scene: &SceneGraph) -> Option<Vec<usize>> {
     }
 }
 
+fn shortcut_sides(scene: &SceneGraph, rects: &[Rect], order: &[usize]) -> Option<SideHints> {
+    // Too many exterior rails enlarge the frame and make fitted text smaller.
+    // Dense bypass sets retain the normal interior channel planner.
+    if scene.edges.len().saturating_sub(scene.nodes.len() - 1) > 3 {
+        return None;
+    }
+
+    let mut rank = vec![0; rects.len()];
+    for (step, &i) in order.iter().enumerate() {
+        rank[i] = step;
+    }
+    let left = rects.iter().map(|r| r.x).fold(f64::INFINITY, f64::min);
+    let right = rects.iter().map(|r| r.x).fold(f64::NEG_INFINITY, f64::max);
+    let mut hints = vec![None; scene.edges.len()];
+    for (index, e) in scene.edges.iter().enumerate() {
+        let a = scene.index(&e.source.node)?;
+        let b = scene.index(&e.target.node)?;
+        if rank[a] >= rank[b] {
+            return None;
+        }
+        if rank[b] == rank[a] + 1 {
+            continue;
+        }
+        let p = rects[a];
+        let q = rects[b];
+        // Preserve lateral choices through small drags. Intermediate columns
+        // retain normal port selection because an outside exit may be blocked.
+        let side = |r: Rect| {
+            if (r.x - left).abs() < 32. {
+                Some(Side::W)
+            } else if (r.x - right).abs() < 32. {
+                Some(Side::E)
+            } else {
+                None
+            }
+        };
+        if let (Some(sa), Some(sb)) = (side(p), side(q)) {
+            hints[index] = Some((sa, sb));
+        }
+    }
+    hints.iter().any(Option::is_some).then_some(hints)
+}
+
+pub(crate) fn backbone_sides(scene: &SceneGraph, rects: &[Rect]) -> Option<SideHints> {
+    shortcut_sides(scene, rects, &backbone(scene)?)
+}
+
+pub(crate) fn coordinate_backbone(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) -> bool {
+    let rects: Vec<_> = scene.nodes.iter().map(|n| l.nodes[&n.id]).collect();
+    let Some(hints) = backbone_sides(scene, &rects) else {
+        return false;
+    };
+    let bounds = rects.iter().copied().reduce(Rect::union).unwrap();
+    let mut routes = BTreeMap::new();
+    let mut lane = 0;
+    for (index, e) in scene.edges.iter().enumerate() {
+        let Some((sa, sb)) = hints[index] else {
+            continue;
+        };
+        let a = &l.ports[&port_key(e, true)];
+        let b = &l.ports[&port_key(e, false)];
+        if a.side != sa || b.side != sb {
+            return false;
+        }
+        let clearance = o.stub + o.margin + lane as f64 * o.lane_spacing.max(12.);
+        lane += 1;
+        let outside_x = |side| {
+            if side == Side::W {
+                bounds.left() - clearance
+            } else {
+                bounds.right() + clearance
+            }
+        };
+        let x = outside_x(sa);
+        let mut points = vec![a.point, a.stub, Point::new(x, a.stub.y)];
+        if sa == sb {
+            points.push(Point::new(x, b.stub.y));
+        } else {
+            let y = if (a.stub.y + b.stub.y) / 2. < bounds.y {
+                bounds.top() - clearance
+            } else {
+                bounds.bottom() + clearance
+            };
+            let target_x = outside_x(sb);
+            points.extend([
+                Point::new(x, y),
+                Point::new(target_x, y),
+                Point::new(target_x, b.stub.y),
+            ]);
+        }
+        points.extend([b.stub, b.point]);
+        points.dedup_by(|a, b| a.distance(*b) < 1e-7);
+        routes.insert(
+            e.id.clone(),
+            Route {
+                edge: e.id.clone(),
+                points,
+            },
+        );
+    }
+    commit(scene, o, l, routes)
+}
+
 fn commit(
     scene: &SceneGraph,
     o: &LayoutOptions,

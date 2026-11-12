@@ -734,12 +734,14 @@ pub(crate) fn readable_concept(
     if backbone.is_some() {
         crate::presentation::reserve_perimeters(scene, rects, o);
     }
-    if !place_nodes
-        || (backbone.is_none()
-            && (n < 7
-                || pairs.len() != n - 1
-                || incoming.iter().any(|&v| v > 1)
-                || outgoing.iter().any(|&v| v > 1)))
+    if !place_nodes {
+        return crate::presentation::backbone_sides(scene, rects);
+    }
+    if backbone.is_none()
+        && (n < 7
+            || pairs.len() != n - 1
+            || incoming.iter().any(|&v| v > 1)
+            || outgoing.iter().any(|&v| v > 1))
     {
         return None;
     }
@@ -818,5 +820,5 @@ pub(crate) fn readable_concept(
         rects[i].x = xs[col];
         rects[i].y = ys[row];
     }
-    None
+    crate::presentation::backbone_sides(scene, rects)
 }

@@ -759,49 +759,49 @@
       },
       {
         "id": "fuzz-dag-0",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 11.5,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-1",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 12.1,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-2",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
-        "minFitTextPx": 11.3,
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
+        "minFitTextPx": 10.8,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-3",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
-        "minFitTextPx": 10.6,
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
+        "minFitTextPx": 10.3,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-4",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 8.7,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-5",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
-        "minFitTextPx": 10.4,
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
+        "minFitTextPx": 10.8,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-6",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 10.0,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-7",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 15,
         "paintFailures": []
       },
@@ -855,68 +855,68 @@
       },
       {
         "id": "fuzz-parallel-0",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 8.5,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-1",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 9.8,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-2",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 11.2,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-3",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 12.6,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-4",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 11.1,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-5",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 9.4,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-6",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 9.9,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-7",
-        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "review": "Compact main sequence with per-track sizes and distinct captions. Sparse shortcuts with clear lateral exits use outside channels; dense bypasses retain interior routing to protect fitted readability. Text remains at least 8 px in the audit panel.",
         "minFitTextPx": 10.4,
         "paintFailures": []
       },
       {
         "id": "fuzz-pinned-0",
         "review": "Fixed centers are respected and wrapped titles are readable. Cross-row routes remain dense; improve channel ordering without moving pinned nodes.",
-        "minFitTextPx": 10.0,
+        "minFitTextPx": 9.5,
         "paintFailures": []
       },
       {
         "id": "fuzz-pinned-1",
         "review": "Fixed centers are respected and wrapped titles are readable. Cross-row routes remain dense; improve channel ordering without moving pinned nodes.",
-        "minFitTextPx": 10.5,
+        "minFitTextPx": 10.0,
         "paintFailures": []
       },
       {
         "id": "fuzz-pinned-2",
         "review": "Fixed centers are respected and wrapped titles are readable. Cross-row routes remain dense; improve channel ordering without moving pinned nodes.",
-        "minFitTextPx": 9.2,
+        "minFitTextPx": 8.3,
         "paintFailures": []
       },
       {
@@ -928,7 +928,7 @@
       {
         "id": "fuzz-pinned-4",
         "review": "Wrapped labels now fit at the original fixed centers; several three-row crossovers still require careful tracing.",
-        "minFitTextPx": 9.2,
+        "minFitTextPx": 8.1,
         "paintFailures": []
       },
       {
@@ -1006,7 +1006,7 @@
       },
       {
         "problem": "Thin shortcut-bearing DAGs and parallel backbones",
-        "change": "Recognize a declared main sequence with shortcuts or parallel sends; choose folded rows with per-track body sizes and caption space. Cyclic main sequences fold only when predicted frame fit improves. All 16 seeded DAG/parallel cases fit text at 8 px or more in the audit panel."
+        "change": "Recognize a topological main sequence independently of declaration order; fold shortcuts and parallel sends using per-track body sizes and caption space. Up to three sparse bypasses with clear lateral exits use outside channels, preserving choices through small drags and saved pins; dense sets retain compact interior planning. The illustrated two-shortcut chain has no crossings. All 16 seeded DAG/parallel cases retain fitted text at 8 px or more."
       },
       {
         "problem": "Tree hierarchy hidden by return bends and mixed depths",

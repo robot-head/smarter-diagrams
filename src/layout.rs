@@ -980,6 +980,8 @@ fn layout_pass(
         readable_routes && crate::presentation::coordinate_tree(scene, o, &mut out);
     let coordinated_mesh =
         readable_routes && crate::presentation::coordinate_mesh(scene, o, &mut out);
+    let coordinated_backbone =
+        readable_routes && crate::presentation::coordinate_backbone(scene, o, &mut out);
     let coordinated_loops =
         readable_routes && crate::routing::coordinate_outer_routes(scene, o, &mut out);
     out.labels = match crate::labels::place(scene, o, &out) {
@@ -999,7 +1001,12 @@ fn layout_pass(
         }
         Err(error) => return Err(error),
     };
-    if !coordinated_fan && !coordinated_loops && !coordinated_tree && !coordinated_mesh {
+    if !coordinated_fan
+        && !coordinated_loops
+        && !coordinated_tree
+        && !coordinated_mesh
+        && !coordinated_backbone
+    {
         crate::labels::polish_channels(scene, o, &mut out);
     }
     for zone in &scene.zones {

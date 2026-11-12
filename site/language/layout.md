@@ -66,7 +66,7 @@ client -> server: telemetry
 
 ### A chain with shortcuts
 
-The main sequence stays compact while bypasses remain distinct.
+The main sequence stays compact while sparse bypasses use outside channels with separate attachments. Denser bypass sets keep interior routing so the frame stays readable.
 
 ```diagram guides
 read -> validate -> normalize -> enrich -> filter -> aggregate -> encode -> store: data
