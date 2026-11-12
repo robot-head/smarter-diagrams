@@ -16,6 +16,9 @@ pub struct LabelPlacement {
     pub anchor: Point,
     pub knockout: bool,
     pub callout: bool,
+    /// Use an orthogonal leader for a retained interactive caption.
+    #[serde(default)]
+    pub orthogonal_leader: bool,
     pub horizontal: bool,
     pub slide: f64,
 }
@@ -45,8 +48,7 @@ fn clearance(label: &LabelPlacement) -> Rect {
         2.
     })
 }
-/// Leader ink stops outside the nearest edge of its own text box.
-pub fn leader(label: &LabelPlacement) -> Option<(Point, Point)> {
+fn straight_leader(label: &LabelPlacement) -> Option<(Point, Point)> {
     if !label.callout {
         return None;
     }
@@ -57,6 +59,46 @@ pub fn leader(label: &LabelPlacement) -> Option<(Point, Point)> {
         .min(r.h / 2. / dy.abs().max(1e-9))
         .min(1.);
     Some((label.anchor, Point::new(r.x + dx * t, r.y + dy * t)))
+}
+/// The leader's endpoint span. Use [`leader_path`] for its rendered segments.
+pub fn leader(label: &LabelPlacement) -> Option<(Point, Point)> {
+    let path = leader_path(label);
+    Some((*path.first()?, *path.last()?))
+}
+/// Actual leader vertices; collision checks and SVG emission share this path.
+pub fn leader_path(label: &LabelPlacement) -> Vec<Point> {
+    let Some((a, b)) = straight_leader(label) else {
+        return Vec::new();
+    };
+    if !label.orthogonal_leader {
+        return vec![a, b];
+    }
+    let r = label.bounds.inflate(2.);
+    let a = label.anchor;
+    if r.contains(a) {
+        return Vec::new();
+    }
+    let vertical = if a.y >= r.top() && a.y <= r.bottom() {
+        false
+    } else if a.x >= r.left() && a.x <= r.right() {
+        true
+    } else {
+        label.horizontal
+    };
+    let (bend, end) = if vertical {
+        (
+            Point::new(r.x, a.y),
+            Point::new(r.x, if a.y < r.y { r.top() } else { r.bottom() }),
+        )
+    } else {
+        (
+            Point::new(a.x, r.y),
+            Point::new(if a.x < r.x { r.left() } else { r.right() }, r.y),
+        )
+    };
+    let mut path = vec![a, bend, end];
+    path.dedup_by(|a, b| a.distance(*b) < 1e-7);
+    path
 }
 pub(crate) fn segment_hits(a: Point, b: Point, r: Rect) -> bool {
     let mut lo: f64 = 0.;
@@ -80,21 +122,18 @@ pub(crate) fn segment_hits(a: Point, b: Point, r: Rect) -> bool {
 }
 fn footprint(label: &LabelPlacement) -> Rect {
     let r = clearance(label);
-    leader(label)
-        .map(|(a, b)| {
-            r.union(Rect::new(
-                (a.x + b.x) / 2.,
-                (a.y + b.y) / 2.,
-                (a.x - b.x).abs() + 2.,
-                (a.y - b.y).abs() + 2.,
-            ))
-        })
-        .unwrap_or(r)
+    leader_path(label)
+        .into_iter()
+        .fold(r, |r, p| r.union(Rect::new(p.x, p.y, 2., 2.)))
 }
 fn conflict(a: &LabelPlacement, b: &LabelPlacement) -> bool {
     clearance(a).intersects(clearance(b))
-        || leader(a).is_some_and(|(x, y)| segment_hits(x, y, clearance(b)))
-        || leader(b).is_some_and(|(x, y)| segment_hits(x, y, clearance(a)))
+        || leader_path(a)
+            .windows(2)
+            .any(|p| segment_hits(p[0], p[1], clearance(b)))
+        || leader_path(b)
+            .windows(2)
+            .any(|p| segment_hits(p[0], p[1], clearance(a)))
 }
 /// Keep a valid gesture caption instead of searching for a new preferred slot.
 pub(crate) fn placements_clear(scene: &SceneGraph, layout: &Layout) -> bool {
@@ -160,6 +199,14 @@ pub fn place(
     scene: &SceneGraph,
     o: &LayoutOptions,
     l: &Layout,
+) -> Result<Vec<LabelPlacement>, Error> {
+    place_with_prior(scene, o, l, None)
+}
+pub(crate) fn place_with_prior(
+    scene: &SceneGraph,
+    o: &LayoutOptions,
+    l: &Layout,
+    prior: Option<&Layout>,
 ) -> Result<Vec<LabelPlacement>, Error> {
     let mut features = Vec::new();
     for e in &scene.edges {
@@ -299,6 +346,7 @@ pub fn place(
                         anchor,
                         knockout: false,
                         callout: true,
+                        orthogonal_leader: false,
                         horizontal: true,
                         slide: 0.5,
                     },
@@ -322,15 +370,136 @@ pub fn place(
                 anchor,
                 knockout: true,
                 callout: true,
+                orthogonal_leader: false,
                 horizontal: true,
                 slide: 0.5,
             },
             cost: 10000. + o.weights.pill,
         });
         fallback_y += text_height(&f.text) + 20.;
+        if f.slot.is_none()
+            && f.slide.is_none()
+            && let Some(old) = prior.and_then(|p| {
+                p.labels
+                    .iter()
+                    .find(|label| label.feature == f.id && label.text == f.text)
+            })
+            && scene.edge(&f.id).is_some()
+        {
+            let minimum = candidates
+                .iter()
+                .map(|c| c.cost)
+                .reduce(f64::min)
+                .unwrap_or(0.);
+            for c in &mut candidates {
+                c.cost = c.cost - minimum
+                    + 4. * c.label.bounds.center().distance(old.bounds.center())
+                    + if (c.label.callout, c.label.knockout, c.label.horizontal)
+                        != (old.callout, old.knockout, old.horizontal)
+                    {
+                        128.
+                    } else {
+                        0.
+                    };
+            }
+            if let Some(anchor) = f
+                .route
+                .windows(2)
+                .filter(|p| p[0].distance(p[1]) > 1e-7)
+                .map(|p| {
+                    let dx = p[1].x - p[0].x;
+                    let dy = p[1].y - p[0].y;
+                    let t = (((old.anchor.x - p[0].x) * dx + (old.anchor.y - p[0].y) * dy)
+                        / (dx * dx + dy * dy))
+                        .clamp(0., 1.);
+                    Point::new(p[0].x + t * dx, p[0].y + t * dy)
+                })
+                .min_by(|a, b| a.distance(old.anchor).total_cmp(&b.distance(old.anchor)))
+            {
+                // A still-clear caption need not move just because its nearest
+                // route segment or attachment changes. Try anchors on every
+                // segment; the normal leader/body checks decide feasibility.
+                for segment in f.route.windows(2) {
+                    let dx = segment[1].x - segment[0].x;
+                    let dy = segment[1].y - segment[0].y;
+                    if dx * dx + dy * dy < 1e-12 {
+                        continue;
+                    }
+                    let t = (((old.bounds.x - segment[0].x) * dx
+                        + (old.bounds.y - segment[0].y) * dy)
+                        / (dx * dx + dy * dy))
+                        .clamp(0., 1.);
+                    let mut fixed = old.clone();
+                    fixed.anchor = Point::new(segment[0].x + t * dx, segment[0].y + t * dy);
+                    fixed.callout = true;
+                    fixed.orthogonal_leader = true;
+                    fixed.knockout = false;
+                    let distance = fixed.anchor.distance(fixed.bounds.center());
+                    if distance < 512. {
+                        for step in [0., 4., 8., 16.] {
+                            let mut tethered = fixed.clone();
+                            let t = step / distance.max(1.);
+                            tethered.bounds.x += (fixed.anchor.x - fixed.bounds.x) * t;
+                            tethered.bounds.y += (fixed.anchor.y - fixed.bounds.y) * t;
+                            let excess =
+                                (tethered.anchor.distance(tethered.bounds.center()) - 120.).max(0.);
+                            let mut alternate = tethered.clone();
+                            alternate.horizontal = !alternate.horizontal;
+                            candidates.push(Candidate {
+                                cost: 4. * step + excess * excess / 32. - 1.,
+                                label: alternate,
+                            });
+                            candidates.push(Candidate {
+                                cost: 4. * step + excess * excess / 32. - 2.,
+                                label: tethered,
+                            });
+                        }
+                    }
+                }
+                let mut label = old.clone();
+                label.bounds.x += anchor.x - old.anchor.x;
+                label.bounds.y += anchor.y - old.anchor.y;
+                label.anchor = anchor;
+                let mut offsets = Vec::new();
+                for x in [-32., -16., -8., 0., 8., 16., 32.] {
+                    for y in [-32., -16., -8., 0., 8., 16., 32.] {
+                        offsets.push(Point::new(x, y));
+                    }
+                }
+                for offset in offsets {
+                    let mut nearby = label.clone();
+                    nearby.bounds.x += offset.x;
+                    nearby.bounds.y += offset.y;
+                    if offset.distance(Point::default()) > 0. {
+                        nearby.callout = true;
+                        nearby.orthogonal_leader = true;
+                        nearby.knockout = false;
+                    }
+                    if nearby.orthogonal_leader {
+                        let mut alternate = nearby.clone();
+                        alternate.horizontal = !alternate.horizontal;
+                        candidates.push(Candidate {
+                            cost: 4. * alternate.bounds.center().distance(old.bounds.center()),
+                            label: alternate,
+                        });
+                    }
+                    candidates.push(Candidate {
+                        cost: 4. * nearby.bounds.center().distance(old.bounds.center()) - 1.,
+                        label: nearby,
+                    });
+                }
+            }
+        }
         let mut ids = Vec::new();
         for c in candidates {
-            if valid(&c.label, f, scene, l, &node_index) {
+            let stable_leader = prior.is_none()
+                || !leader_path(&c.label).windows(2).any(|p| {
+                    scene.nodes.iter().any(|n| {
+                        !f.ignore.contains(&n.id)
+                            && segment_hits(p[0], p[1], l.nodes[&n.id].inflate(4.))
+                    })
+                });
+            if stable_leader && valid(&c.label, f, scene, l, &node_index) {
                 ids.push(all.len());
                 all.push(c);
             }
@@ -340,6 +509,34 @@ pub fn place(
                 "no feasible label position for {}",
                 f.id
             )));
+        }
+        if f.slot.is_none()
+            && f.slide.is_none()
+            && let Some(prior) = prior
+            && let Some(old) = prior.labels.iter().find(|label| label.feature == f.id)
+        {
+            let travel = l
+                .nodes
+                .iter()
+                .filter_map(|(id, r)| {
+                    prior
+                        .nodes
+                        .get(id)
+                        .map(|old| r.center().distance(old.center()))
+                })
+                .fold(0., f64::max);
+            let radius = (2. * travel + 8.).max(24.);
+            if ids
+                .iter()
+                .any(|id| all[*id].label.bounds.center().distance(old.bounds.center()) <= radius)
+            {
+                for id in &ids {
+                    let distance = all[*id].label.bounds.center().distance(old.bounds.center());
+                    if distance > radius {
+                        all[*id].cost += 1_000_000. + distance * distance;
+                    }
+                }
+            }
         }
         ids.sort_by(|a, b| all[*a].cost.total_cmp(&all[*b].cost));
         by_feature.push(ids);
@@ -481,6 +678,7 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
                         anchor,
                         knockout: side == 0.,
                         callout: false,
+                        orthogonal_leader: false,
                         horizontal,
                         slide: (arc + len * t) / total,
                     },
@@ -510,6 +708,7 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
                         anchor,
                         knockout: false,
                         callout: false,
+                        orthogonal_leader: false,
                         horizontal: true,
                         slide: 0.5,
                     },
@@ -532,6 +731,7 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
                     anchor,
                     knockout: true,
                     callout: true,
+                    orthogonal_leader: false,
                     horizontal: true,
                     slide: 0.5,
                 },
@@ -554,7 +754,9 @@ fn valid(
         let n = &scene.nodes[hit.id];
         if !f.ignore.contains(&n.id)
             && (r.intersects(hit.bounds)
-                || leader(label).is_some_and(|(a, b)| segment_hits(a, b, hit.bounds)))
+                || leader_path(label)
+                    .windows(2)
+                    .any(|p| segment_hits(p[0], p[1], hit.bounds)))
         {
             return false;
         }
