@@ -376,6 +376,11 @@ pub fn layout(
     } else {
         Default::default()
     };
+    let concept_sides = if previous.is_none() {
+        crate::topology::readable_concept(scene, &mut rects, o)
+    } else {
+        None
+    };
     // Size innermost containers before introducing hard containment inequalities.
     for i in (0..n).rev() {
         if scene.nodes[i].container {
@@ -500,8 +505,29 @@ pub fn layout(
             break;
         }
     }
-    let requests = port_requests(scene, &rects, o, previous);
-    grow_port_perimeters(&requests, &mut rects, o)?;
+    let mut requests = port_requests(scene, &rects, o, previous);
+    if let Some(sides) = concept_sides {
+        for (edge, (source_side, target_side)) in scene.edges.iter().zip(sides) {
+            for (source, side, other) in [
+                (true, source_side, &edge.target.node),
+                (false, target_side, &edge.source.node),
+            ] {
+                if let Some(request) = requests
+                    .iter_mut()
+                    .find(|p| p.key == port_key(edge, source))
+                {
+                    request.side = side;
+                    let opposite = rects[scene.index(other).unwrap()];
+                    request.target = if matches!(side, Side::N | Side::S) {
+                        opposite.x
+                    } else {
+                        opposite.y
+                    };
+                }
+            }
+        }
+    }
+    grow_port_perimeters(scene, &requests, &mut rects, o)?;
     // Absolute child pins can enlarge an auto-sized container; explicit size locks stay hard.
     for i in (0..n).rev() {
         if !scene.nodes[i].container {
@@ -1252,7 +1278,18 @@ fn stub_envelope(r: Rect, s: [bool; 4], stub: f64) -> Rect {
         r.h + n + south,
     )
 }
+fn is_parallel_bundle(scene: &SceneGraph) -> bool {
+    scene.nodes.len() == 2
+        && scene.edges.len() > 1
+        && scene.edges.iter().all(|e| {
+            e.source.node == scene.edges[0].source.node
+                && e.target.node == scene.edges[0].target.node
+                && matches!(e.source.constraint, PortConstraint::Free)
+                && matches!(e.target.constraint, PortConstraint::Free)
+        })
+}
 fn grow_port_perimeters(
+    scene: &SceneGraph,
     requests: &[PortRequest],
     rects: &mut [Rect],
     o: &LayoutOptions,
@@ -1264,6 +1301,21 @@ fn grow_port_perimeters(
                 .filter(|p| p.node == i && p.side == side)
                 .collect();
             let mut length = ports.len().saturating_sub(1) as f64 * o.port_spacing + 2. * o.corner;
+            if ports.len() > 1 && is_parallel_bundle(scene) {
+                let caption_space = scene
+                    .edges
+                    .iter()
+                    .map(|e| {
+                        if matches!(side, Side::N | Side::S) {
+                            crate::labels::text_width(&e.label) + 32.
+                        } else {
+                            crate::labels::text_height(&e.label)
+                        }
+                    })
+                    .fold(0., f64::max)
+                    + 12.;
+                length = length.max((ports.len() + 1) as f64 * caption_space.max(o.port_spacing));
+            }
             let mut ratios = Vec::new();
             for p in &ports {
                 match p.spec {
@@ -1311,6 +1363,7 @@ fn assign_ports(
     rects: &[Rect],
     out: &mut Layout,
 ) -> Result<(), Error> {
+    let parallel_bundle = is_parallel_bundle(scene);
     for (i, node) in scene.nodes.iter().enumerate() {
         for side in [Side::N, Side::E, Side::S, Side::W] {
             let mut ps: Vec<_> = requests
@@ -1324,7 +1377,13 @@ fn assign_ports(
                 } else {
                     a.target.total_cmp(&b.target)
                 };
-                order.then(a.key.cmp(&b.key))
+                order.then_with(|| {
+                    if reverse && parallel_bundle {
+                        b.key.cmp(&a.key)
+                    } else {
+                        a.key.cmp(&b.key)
+                    }
+                })
             });
             let positions: Vec<_> = ps
                 .iter()

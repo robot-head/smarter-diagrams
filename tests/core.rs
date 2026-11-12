@@ -867,3 +867,107 @@ fn incremental_leaf_lowering_matches_fresh_origins_and_structural_fallback() {
         serde_json::to_value(&compile(document.source()).unwrap().scene).unwrap()
     );
 }
+
+#[test]
+fn fresh_fans_keep_siblings_and_captions_in_readable_columns() {
+    for fan_out in [true, false] {
+        let mut source = "hub: Event log [shape: queue]\n".to_owned();
+        for i in 0..5 {
+            source.push_str(&format!("leaf{i}: Consumer {i}\n"));
+            source.push_str(&if fan_out {
+                format!("hub -> leaf{i}: event\n")
+            } else {
+                format!("leaf{i} -> hub: upload\n")
+            });
+        }
+        let diagram = compile(&source).unwrap();
+        let first = diagram.layout.nodes["leaf0"];
+        for i in 0..5 {
+            let leaf = diagram.layout.nodes[&format!("leaf{i}")];
+            assert!((leaf.x - first.x).abs() < 0.01);
+            let id = if fan_out {
+                format!("hub->leaf{i}")
+            } else {
+                format!("leaf{i}->hub")
+            };
+            let caption = diagram
+                .layout
+                .labels
+                .iter()
+                .find(|label| label.feature == id)
+                .unwrap();
+            assert!(!caption.callout);
+            assert!(
+                (caption.anchor.y - leaf.y).abs() < 0.01,
+                "caption must stay on its leaf branch"
+            );
+        }
+        assert_eq!(diagram.to_svg(), compile(&source).unwrap().to_svg());
+        layout::validate(&diagram.scene, &diagram.layout, &LayoutOptions::default()).unwrap();
+    }
+}
+
+#[test]
+fn long_unconstrained_pipeline_folds_but_explicit_rows_and_drags_stay_put() {
+    let source = "s0 -> s1 -> s2 -> s3 -> s4 -> s5 -> s6 -> s7: data\n";
+    let diagram = compile(source).unwrap();
+    let bounds = render::bounds(&diagram.scene, &diagram.layout);
+    assert!(
+        bounds.w / bounds.h < 2.5,
+        "long chain should fit a readable frame"
+    );
+    assert_eq!(diagram.layout.routes.len(), 7);
+    let source = format!("{source}align row [s0,s1,s2,s3,s4,s5,s6,s7]\n");
+    let row = compile(&source).unwrap();
+    let y = row.layout.nodes["s0"].y;
+    assert!(row.layout.nodes.values().all(|r| (r.y - y).abs() < 0.01));
+    let doc = Document::new(&source).unwrap();
+    let before = doc.snapshot();
+    let session = doc.begin_drag().unwrap();
+    assert_eq!(before.to_svg(), session.snapshot().to_svg());
+}
+
+#[test]
+fn parallel_protocols_have_straight_separated_lanes_and_local_captions() {
+    let source = "client: Client\nserver: Server\nclient -> server: HTTPS\nclient -> server: WebSocket\nclient -> server: telemetry\n";
+    let diagram = compile(source).unwrap();
+    for edge in &diagram.scene.edges {
+        let points = &diagram.layout.routes[&edge.id].points;
+        assert!(
+            points.iter().all(|p| (p.y - points[0].y).abs() < 0.01),
+            "parallel lanes must not exchange order"
+        );
+        let label = diagram
+            .layout
+            .labels
+            .iter()
+            .find(|l| l.feature == edge.id)
+            .unwrap();
+        assert!(
+            !label.callout,
+            "each protocol must label its own lane locally"
+        );
+        assert!((label.anchor.y - points[0].y).abs() < 0.01);
+    }
+    layout::validate(&diagram.scene, &diagram.layout, &LayoutOptions::default()).unwrap();
+    let mut doc = Document::new(source).unwrap();
+    let mut drag = doc.begin_drag().unwrap();
+    let before = drag.snapshot();
+    let center = before.layout.nodes["client"].center();
+    drag.update(&[edit::Drag {
+        node: "client".into(),
+        position: Point::new(center.x, center.y + 4.),
+    }])
+    .unwrap();
+    assert_eq!(
+        drag.snapshot().layout.nodes["client"].h,
+        before.layout.nodes["client"].h,
+        "dragging must keep caption lane clearance"
+    );
+    doc.commit_drag(&drag).unwrap();
+    let reopened = compile(doc.source()).unwrap();
+    assert_eq!(
+        reopened.layout.nodes["client"].h, before.layout.nodes["client"].h,
+        "saved pins must preserve caption clearance"
+    );
+}
