@@ -516,11 +516,12 @@ pub fn coffman_graham(scene: &SceneGraph, width: usize) -> Vec<usize> {
 
 /// Readable fresh placements for elementary concepts. Explicit constraints and
 /// previous geometry are handled by the caller; drag layouts never use this.
+pub(crate) type SideHints = Vec<Option<(Side, Side)>>;
 pub(crate) fn readable_concept(
     scene: &SceneGraph,
     rects: &mut [Rect],
     o: &LayoutOptions,
-) -> Option<Vec<(Side, Side)>> {
+) -> Option<SideHints> {
     let n = scene.nodes.len();
     if o.shape_budget == 0
         || n < 2
@@ -585,7 +586,56 @@ pub(crate) fn readable_concept(
         rects[a].y = 0.;
         rects[b].y = 0.;
         rects[b].x = (rects[a].w + rects[b].w) / 2. + caption_width + 96.;
-        return Some(vec![(Side::E, Side::W); pairs.len()]);
+        return Some(vec![Some((Side::E, Side::W)); pairs.len()]);
+    }
+    let sources: Vec<_> = (0..n)
+        .filter(|&i| incoming[i] == 0 && outgoing[i] == 2)
+        .collect();
+    let sinks: Vec<_> = (0..n)
+        .filter(|&i| outgoing[i] == 0 && incoming[i] == 2)
+        .collect();
+    if n == 4 && pairs.len() == 4 && sources.len() == 2 && sinks.len() == 2 {
+        let step = rects.iter().map(|r| r.h).fold(0., f64::max) + caption_height + 96.;
+        let gap = rects.iter().map(|r| r.w).fold(0., f64::max) + 2. * caption_width + 160.;
+        for (row, &i) in sources.iter().enumerate() {
+            rects[i].x = 0.;
+            rects[i].y = row as f64 * step;
+        }
+        for (row, &i) in sinks.iter().enumerate() {
+            rects[i].x = gap;
+            rects[i].y = row as f64 * step;
+        }
+        return Some(
+            pairs
+                .iter()
+                .map(|&(a, b)| {
+                    Some(if a == sources[0] && b == sinks[1] {
+                        (Side::W, Side::S)
+                    } else {
+                        (Side::E, Side::W)
+                    })
+                })
+                .collect(),
+        );
+    }
+    if n >= 3 && pairs.len() == n {
+        let returns: Vec<_> = pairs
+            .iter()
+            .enumerate()
+            .filter(|(i, (a, b))| a != b && pairs[..*i].contains(&(*b, *a)))
+            .collect();
+        if returns.len() == 1 {
+            let (index, &(a, b)) = returns[0];
+            let forward = pairs.iter().position(|p| *p == (b, a)).unwrap();
+            let mut hints = vec![None; pairs.len()];
+            hints[index] = Some((Side::N, Side::N));
+            hints[forward] = Some(if rects[b].x < rects[a].x {
+                (Side::E, Side::W)
+            } else {
+                (Side::W, Side::E)
+            });
+            return Some(hints);
+        }
     }
     if n >= 4 && pairs.len() == n - 1 {
         let hub = (0..n).find(|&i| {
@@ -612,7 +662,7 @@ pub(crate) fn readable_concept(
                     rects[i].x = if fan_out { gap } else { 0. };
                     rects[i].y = (row as f64 - (leaves.len() - 1) as f64 / 2.) * step;
                 }
-                return Some(vec![(Side::E, Side::W); pairs.len()]);
+                return Some(vec![Some((Side::E, Side::W)); pairs.len()]);
             }
         }
     }

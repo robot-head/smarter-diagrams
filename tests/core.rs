@@ -990,3 +990,107 @@ fn parallel_protocols_have_straight_separated_lanes_and_local_captions() {
         "saved pins must preserve caption clearance"
     );
 }
+
+#[test]
+fn retry_returns_and_planar_fallbacks_use_clear_outer_rails() {
+    let retry=compile("api -> queue: enqueue\nqueue -> worker: consume\nworker -> db: persist\nworker -> queue: retry\n").unwrap();
+    let points = &retry.layout.routes["worker->queue"].points;
+    let top = retry
+        .layout
+        .nodes
+        .values()
+        .map(|r| r.top())
+        .fold(f64::INFINITY, f64::min);
+    assert!(
+        points.iter().any(|p| p.y < top - 40.),
+        "retry must form a visible outer loop"
+    );
+    let fallback=compile("a: Frontend A\nb: Frontend B\nc: Backend C\nd: Backend D\na -> c: primary\na -> d: fallback\nb -> c: fallback\nb -> d: primary\n").unwrap();
+    let routes: Vec<_> = fallback.layout.routes.values().collect();
+    for (i, a) in routes.iter().enumerate() {
+        for b in &routes[i + 1..] {
+            for p in a.points.windows(2) {
+                for q in b.points.windows(2) {
+                    assert!(!routing::proper_crossing(p[0], p[1], q[0], q[1]));
+                    assert!(routing::collinear_overlap(p[0], p[1], q[0], q[1]) < 1e-6);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn record_slot_order_and_local_captions_follow_the_actual_rows() {
+    let d=compile("api: API @pin(grid: 0,0)\ndb: Orders [shape: sql_table] @pin(grid: 24,0) {\n port id: uuid [side: W,pos: 1]\n port customer_id: uuid [side: W,pos: 2]\n}\napi.E -> db#id: insert\napi.E -> db#customer_id: lookup\n").unwrap();
+    let insert = &d.scene.edges[0];
+    let lookup = &d.scene.edges[1];
+    let a = &d.layout.ports[&layout::port_key(insert, true)];
+    let b = &d.layout.ports[&layout::port_key(lookup, true)];
+    assert!(
+        a.point.y < b.point.y,
+        "source order must match record row order"
+    );
+    for edge in &d.scene.edges {
+        let label = d
+            .layout
+            .labels
+            .iter()
+            .find(|l| l.feature == edge.id)
+            .unwrap();
+        assert!(!label.callout);
+        assert!(
+            (label.anchor.y - d.layout.ports[&layout::port_key(edge, true)].point.y).abs() < 0.01
+        );
+    }
+    for p in d.layout.routes[&insert.id].points.windows(2) {
+        for q in d.layout.routes[&lookup.id].points.windows(2) {
+            assert!(!routing::proper_crossing(p[0], p[1], q[0], q[1]));
+        }
+    }
+}
+
+#[test]
+fn wrapping_keeps_source_text_but_uses_taller_readable_shapes() {
+    let source = "client: Customer account management console\napi: Regional authorization and policy enforcement service\nclient -> api: Authenticate using a short-lived access token\n";
+    let d = compile(source).unwrap();
+    assert!(d.layout.nodes["api"].w < 300. && d.layout.nodes["api"].h >= 68.);
+    assert!(d.layout.labels[0].text.contains('\n'));
+    assert!(!d.scene.nodes[1].label.contains('\n'));
+    assert!(d.to_svg().contains("<tspan"));
+    assert_eq!(Document::new(source).unwrap().source(), source);
+    let scope = compile(
+        "client -> api\napi -> db\napi -> kms\nzone secure around [api,db,kms] { padding: 1.5g }\n",
+    )
+    .unwrap();
+    let rings = render::zone_contours(&scope.scene, &scope.layout, &scope.scene.zones[0]);
+    assert_eq!(
+        rings.len(),
+        1,
+        "root trust scope should have one contiguous enclosure"
+    );
+    let p = scope.layout.nodes["client"].center();
+    let crossings = rings[0]
+        .iter()
+        .zip(rings[0].iter().cycle().skip(1))
+        .filter(|(a, b)| {
+            (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x
+        })
+        .count();
+    assert_eq!(
+        crossings % 2,
+        0,
+        "Browser must stay outside the trusted scope"
+    );
+}
+
+#[test]
+fn unconstrained_caption_failure_recovers_by_reserving_more_space() {
+    let source = include_str!("fixtures/label-reflow.diagram");
+    let d = compile(source).unwrap();
+    assert_eq!(
+        d.layout.labels.len(),
+        d.scene.edges.iter().filter(|e| !e.label.is_empty()).count()
+    );
+    layout::validate(&d.scene, &d.layout, &LayoutOptions::default()).unwrap();
+    assert_eq!(d.to_svg(), compile(source).unwrap().to_svg());
+}

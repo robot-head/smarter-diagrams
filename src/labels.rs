@@ -219,7 +219,7 @@ pub(crate) fn place_with_prior(
         .unwrap_or(0.);
     let mut features = Vec::new();
     for e in &scene.edges {
-        let text = crate::render::flow_caption(scene, e).unwrap_or_else(|| e.label.clone());
+        let text = connection_text(scene, e);
         if text.is_empty() {
             continue;
         }
@@ -260,7 +260,7 @@ pub(crate) fn place_with_prior(
             ignore.remove(&node.id);
             features.push(Feature {
                 id: node.id.clone(),
-                text: node.label.clone(),
+                text: node_title(node),
                 route: vec![
                     Point::new(r.left(), r.top()),
                     Point::new(r.right(), r.top()),
@@ -778,19 +778,25 @@ pub(crate) fn place_with_prior(
 // In a simple fan, a caption belongs to the independent leaf's horizontal
 // branch. Prefer the same offset from that leaf instead of a random elbow.
 fn fan_caption(f: &Feature, scene: &SceneGraph, l: &Layout) -> Option<Candidate> {
-    if scene.nodes.len() < 4 || scene.edges.len() + 1 != scene.nodes.len() {
-        return None;
-    }
     let edge = scene.edge(&f.id)?;
-    let fan_out = scene
-        .edges
-        .iter()
-        .all(|e| e.source.node == edge.source.node);
-    let fan_in = scene
-        .edges
-        .iter()
-        .all(|e| e.target.node == edge.target.node);
-    if !fan_out && !fan_in {
+    let fan = scene.nodes.len() >= 4 && scene.edges.len() + 1 == scene.nodes.len();
+    let fan_out = fan
+        && scene
+            .edges
+            .iter()
+            .all(|e| e.source.node == edge.source.node);
+    let fan_in = fan
+        && scene
+            .edges
+            .iter()
+            .all(|e| e.target.node == edge.target.node);
+    let record_bundle = edge.target.port.is_some()
+        && scene.edges.len() > 1
+        && scene
+            .edges
+            .iter()
+            .all(|e| e.source.node == edge.source.node && e.target.node == edge.target.node);
+    if !fan_out && !fan_in && !record_bundle {
         return None;
     }
     let leaf = if fan_out {
@@ -799,10 +805,15 @@ fn fan_caption(f: &Feature, scene: &SceneGraph, l: &Layout) -> Option<Candidate>
         &edge.source.node
     };
     let body = l.nodes[leaf];
+    let branch_y = if record_bundle {
+        l.ports[&port_key(edge, true)].point.y
+    } else {
+        body.y
+    };
     let w = feature_width(f, scene);
     let h = text_height(&f.text);
     for (segment, pair) in f.route.windows(2).enumerate() {
-        if (pair[0].y - body.y).abs() > 0.01 || (pair[1].y - body.y).abs() > 0.01 {
+        if (pair[0].y - branch_y).abs() > 0.01 || (pair[1].y - branch_y).abs() > 0.01 {
             continue;
         }
         let left = pair[0].x.min(pair[1].x) + w / 2. + 8.;
@@ -815,7 +826,7 @@ fn fan_caption(f: &Feature, scene: &SceneGraph, l: &Layout) -> Option<Candidate>
         } else {
             body.right() + w / 2. + 20.
         };
-        let anchor = Point::new(x.clamp(left, right), body.y);
+        let anchor = Point::new(x.clamp(left, right), branch_y);
         return Some(Candidate {
             cost: -1000.,
             label: LabelPlacement {
@@ -1091,6 +1102,48 @@ fn select_component(
     };
     search.visit(0, 0., &mut Vec::new());
     search.best
+}
+/// Wrap at word boundaries using the same glyph estimates as geometry. Explicit
+/// newlines remain hard breaks; source labels and accessibility text stay intact.
+pub(crate) fn wrap_text(text: &str, width: f64) -> String {
+    text.split('\n')
+        .map(|line| {
+            if text_width(line) <= width {
+                return line.to_owned();
+            }
+            let mut lines = Vec::new();
+            let mut current = String::new();
+            for word in line.split_whitespace() {
+                let next = if current.is_empty() {
+                    word.to_owned()
+                } else {
+                    format!("{current} {word}")
+                };
+                if !current.is_empty() && text_width(&next) > width {
+                    lines.push(current);
+                    current = word.to_owned();
+                } else {
+                    current = next;
+                }
+            }
+            lines.push(current);
+            lines.join("\n")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+pub(crate) fn node_title(node: &Node) -> String {
+    if node.container {
+        node.label.clone()
+    } else {
+        wrap_text(&node.label, 180.)
+    }
+}
+pub(crate) fn connection_text(scene: &SceneGraph, edge: &Edge) -> String {
+    wrap_text(
+        &crate::render::flow_caption(scene, edge).unwrap_or_else(|| edge.label.clone()),
+        180.,
+    )
 }
 pub fn text_height(text: &str) -> f64 {
     text.split('\n').count() as f64 * 18. + 6.

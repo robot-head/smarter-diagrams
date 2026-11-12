@@ -641,9 +641,13 @@ pub(crate) fn svg_with_decorations(
                 s,
                 "<text class=\"node-title\" text-anchor=\"middle\" dominant-baseline=\"central\" x=\"{:.2}\" y=\"{:.2}\">{}</text>",
                 r.x + crate::shapes::title_gutter(&n.shape) / 2.,
-                r.y,
+                r.y + if n.shape == "database" {
+                    crate::shapes::CYLINDER_RY.min(r.h / 2.)
+                } else {
+                    0.
+                },
                 text_content(
-                    &n.label,
+                    &crate::labels::node_title(n),
                     r.x + crate::shapes::title_gutter(&n.shape) / 2.,
                     20.
                 )

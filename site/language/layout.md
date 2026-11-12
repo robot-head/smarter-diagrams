@@ -6,6 +6,8 @@ The engine chooses a fresh topology-aware layout, then enforces separation, owne
 
 Unconstrained fans group the independent producers or consumers in one column, with captions beside their horizontal branches. Parallel connections keep a consistent lane order and reserve space for their captions. Long simple pipelines fold into rows to keep the sequence readable. Pins, explicit ports and alignment rules keep control when you specify them; dragging preserves the current arrangement.
 
+Long node titles and connection captions wrap at measured word boundaries. Explicit newlines remain hard breaks, and the source labels and accessible descriptions retain their original text. Unconstrained fresh layouts can reserve additional whitespace when captions need room; hard constraints stay in force.
+
 ### Eight sequential transformations
 
 ```diagram guides

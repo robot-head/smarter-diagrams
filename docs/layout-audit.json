@@ -26,13 +26,7 @@
     "npm run test:layout-audit",
     "Open artifacts/layout-audit/index.html and results.json"
   ],
-  "knownDiagnostics": {
-    "fuzz-cycle-7": "infeasible layout: no feasible label position for n1->n2",
-    "fuzz-pinned-3": "infeasible layout: n3 and n4 overlap or leave less than 8 px body clearance",
-    "fuzz-pinned-4": "infeasible layout: n0 and n1 overlap or leave less than 8 px body clearance",
-    "fuzz-tree-0": "infeasible layout: no feasible label position for n1->n4",
-    "fuzz-tree-6": "infeasible layout: no feasible label position for n2->n5"
-  },
+  "knownDiagnostics": {},
   "findings": [
     {
       "id": "label-reflow",
@@ -541,8 +535,8 @@
   ],
   "followUp": {
     "summary": "Fixed the four reported presentations in the engine while preserving their unconstrained input sources. Original measurements and reviews above describe baseline 38f8245.",
-    "rendered": 59,
-    "remainingDiagnostics": 5,
+    "rendered": 64,
+    "remainingDiagnostics": 0,
     "currentCases": {
       "02-long-pipeline": {
         "status": "rendered",
@@ -559,17 +553,486 @@
         "aspectRatio": 1.1,
         "minimumFittedTextPx": 11.2
       },
+      "06-feedback": {
+        "status": "rendered",
+        "aspectRatio": 2.1,
+        "minimumFittedTextPx": 15
+      },
       "09-parallel": {
         "status": "rendered",
         "aspectRatio": 2.49,
         "minimumFittedTextPx": 15
+      },
+      "12-butterfly": {
+        "status": "rendered",
+        "aspectRatio": 1.98,
+        "minimumFittedTextPx": 15.0
+      },
+      "14-long-labels": {
+        "status": "rendered",
+        "aspectRatio": 3.1,
+        "minimumFittedTextPx": 13.7
+      },
+      "19-zone": {
+        "status": "rendered",
+        "aspectRatio": 2.41,
+        "minimumFittedTextPx": 14.8
+      },
+      "20-records": {
+        "status": "rendered",
+        "aspectRatio": 3.45,
+        "minimumFittedTextPx": 13
       }
     },
     "changes": [
       "Long simple paths fold into a compact sequence when unconstrained.",
       "Simple fans group leaves in a column, nest outer and inner routing channels without crossings or shared segments, and put captions on the horizontal leaf branches.",
-      "Parallel protocols keep matching lane order and reserve caption clearance, including during dragging and reopening saved pins."
+      "Parallel protocols keep matching lane order and reserve caption clearance, including during dragging and reopening saved pins.",
+      "Retry edges use a separate visible return rail; planar two-by-two fallbacks use distinct inner/outer corridors.",
+      "Node titles and connection captions wrap at measured word boundaries, keeping source labels and accessible descriptions intact.",
+      "Database titles are centered in the body below the top ellipse.",
+      "Flexible source ports follow the actual opposite record slots, with captions aligned by source lane.",
+      "Root-level trusted members share a contiguous enclosure; nonmembers are excluded and nested ownership clipping is retained.",
+      "Fresh unconstrained graphs get up to two bounded whitespace retries if captions cannot fit; explicit constraints and existing drag layouts are not relaxed."
     ],
-    "verification": "All 114 Rust tests/doctest pass. Fan regression coverage checks both directions with three through eight leaves for branch crossings, overlapping segments and caption locality. The other regressions cover explicit row overrides, straight protocol lanes and drag/reopen caption clearance. The full seeded audit and browser checks validate the resulting painted layouts."
+    "verification": "119 Rust tests/doctest pass. All 64 seeded/authored cases and five isolation controls render deterministically with finite geometry and no detected painted geometry or node/caption overlap failures. The previous diagnostic baseline is empty for regression checks."
+  },
+  "baselineKnownDiagnostics": {
+    "fuzz-cycle-7": "infeasible layout: no feasible label position for n1->n2",
+    "fuzz-pinned-3": "infeasible layout: n3 and n4 overlap or leave less than 8 px body clearance",
+    "fuzz-pinned-4": "infeasible layout: n0 and n1 overlap or leave less than 8 px body clearance",
+    "fuzz-tree-0": "infeasible layout: no feasible label position for n1->n4",
+    "fuzz-tree-6": "infeasible layout: no feasible label position for n2->n5",
+    "03-fan-out": "infeasible layout: no feasible label position for bus->c2"
+  },
+  "currentReview": {
+    "coverage": "All 64 updated layouts inspected across 11 contact sheets; recovered cycle/tree cases inspected again after whitespace recovery.",
+    "allCasesRender": true,
+    "minimumFittedTextBelow8px": 17,
+    "remainingPriorities": [
+      {
+        "priority": "P1",
+        "problem": "Many-to-many route and caption congestion",
+        "cases": [
+          "13-mesh",
+          "fuzz-parallel-7"
+        ],
+        "nextStep": "Plan shared corridors jointly, retain distinguishable lanes, reduce crossings where topology allows, and keep captions associated with the relevant source/target."
+      },
+      {
+        "priority": "P1",
+        "problem": "Thin shortcut-bearing DAGs and parallel backbones",
+        "cases": [
+          "fuzz-dag-4",
+          "fuzz-parallel-0",
+          "fuzz-parallel-6"
+        ],
+        "nextStep": "Extend aspect-aware placement to a main backbone plus bypasses; use a readable zoom floor and panning rather than shrinking every detail."
+      },
+      {
+        "priority": "P1",
+        "problem": "Tree hierarchy hidden by return bends and mixed depths",
+        "cases": [
+          "fuzz-tree-0",
+          "fuzz-tree-1",
+          "fuzz-tree-5"
+        ],
+        "nextStep": "Use stable depth ranks, sibling ordering and subtree centering before metric routing; preserve existing drag geometry."
+      },
+      {
+        "priority": "P2",
+        "problem": "Duplicate named-port and edge captions",
+        "cases": [
+          "21-ports"
+        ],
+        "nextStep": "Distinguish port identity from connection semantics, or suppress redundant visible captions while preserving accessible metadata."
+      }
+    ],
+    "cases": [
+      {
+        "id": "01-pipeline",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 11.7,
+        "paintFailures": []
+      },
+      {
+        "id": "02-long-pipeline",
+        "review": "Folded three-row sequence is readable; fitted text is about 14.3 px.",
+        "minFitTextPx": 14.3,
+        "paintFailures": []
+      },
+      {
+        "id": "03-fan-out",
+        "review": "All five consumers render in one column; ordered channels do not cross and labels stay beside each leaf.",
+        "minFitTextPx": 11.2,
+        "paintFailures": []
+      },
+      {
+        "id": "04-fan-in",
+        "review": "Producers and upload labels form consistent columns; outer branches route around inner branches without crossing.",
+        "minFitTextPx": 11.2,
+        "paintFailures": []
+      },
+      {
+        "id": "05-decision",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 11.7,
+        "paintFailures": []
+      },
+      {
+        "id": "06-feedback",
+        "review": "A separate top return rail and arrow make the retry cycle explicit; consume stays straight.",
+        "minFitTextPx": 15,
+        "paintFailures": []
+      },
+      {
+        "id": "07-ring",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 15,
+        "paintFailures": []
+      },
+      {
+        "id": "08-self-loop",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 15,
+        "paintFailures": []
+      },
+      {
+        "id": "09-parallel",
+        "review": "Three straight, separated protocol lanes each carry a nearby caption; no remote WebSocket callout.",
+        "minFitTextPx": 15,
+        "paintFailures": []
+      },
+      {
+        "id": "10-bidirectional",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 15,
+        "paintFailures": []
+      },
+      {
+        "id": "11-disconnected",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 15,
+        "paintFailures": []
+      },
+      {
+        "id": "12-butterfly",
+        "review": "Distinct inner and outer fallback routes remove the ambiguous central U-shaped bundle and avoid crossings.",
+        "minFitTextPx": 15.0,
+        "paintFailures": []
+      },
+      {
+        "id": "13-mesh",
+        "review": "The K3,3 center is still congested; repeated access captions do not make individual dependencies easy to trace. Some crossings are unavoidable, but the presentation can be clearer.",
+        "minFitTextPx": 15,
+        "paintFailures": []
+      },
+      {
+        "id": "14-long-labels",
+        "review": "Wrapped titles and captions use taller balanced boxes; fitted text improves from about 7.4 px to 13.7 px.",
+        "minFitTextPx": 13.7,
+        "paintFailures": []
+      },
+      {
+        "id": "15-unicode",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 15,
+        "paintFailures": []
+      },
+      {
+        "id": "16-container",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 14.9,
+        "paintFailures": []
+      },
+      {
+        "id": "17-nested",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 14.4,
+        "paintFailures": []
+      },
+      {
+        "id": "18-cross-scope",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 11.0,
+        "paintFailures": []
+      },
+      {
+        "id": "19-zone",
+        "review": "A single root-level enclosure makes shared membership clear while keeping Browser outside.",
+        "minFitTextPx": 14.8,
+        "paintFailures": []
+      },
+      {
+        "id": "20-records",
+        "review": "Insert and lookup retain slot order, do not cross, and have vertically separated source-lane captions.",
+        "minFitTextPx": 13,
+        "paintFailures": []
+      },
+      {
+        "id": "21-ports",
+        "review": "Opposite ratio ordering removes the weave. Port and edge ack captions remain redundant and could use clearer visual hierarchy.",
+        "minFitTextPx": 15,
+        "paintFailures": []
+      },
+      {
+        "id": "22-obstacle",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 12.9,
+        "paintFailures": []
+      },
+      {
+        "id": "23-trace",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 11.7,
+        "paintFailures": []
+      },
+      {
+        "id": "24-vertical",
+        "review": "Rechecked for unnecessary crossings, label association, text fit and shape centering; no new blocking defect found beyond the baseline notes.",
+        "minFitTextPx": 15,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-dag-0",
+        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
+        "minFitTextPx": 7.5,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-dag-1",
+        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
+        "minFitTextPx": 6.5,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-dag-2",
+        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
+        "minFitTextPx": 7.3,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-dag-3",
+        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
+        "minFitTextPx": 6.6,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-dag-4",
+        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
+        "minFitTextPx": 5.4,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-dag-5",
+        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
+        "minFitTextPx": 6.6,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-dag-6",
+        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
+        "minFitTextPx": 5.5,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-dag-7",
+        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
+        "minFitTextPx": 7.6,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-cycle-0",
+        "review": "Wrapping improves long node titles and keeps the main cycle readable. Secondary reciprocal edges and remote callouts can still be clearer.",
+        "minFitTextPx": 7.4,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-cycle-1",
+        "review": "Wrapping improves long node titles and keeps the main cycle readable. Secondary reciprocal edges and remote callouts can still be clearer.",
+        "minFitTextPx": 10.1,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-cycle-2",
+        "review": "Wrapping improves long node titles and keeps the main cycle readable. Secondary reciprocal edges and remote callouts can still be clearer.",
+        "minFitTextPx": 12.2,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-cycle-3",
+        "review": "Wrapping improves long node titles and keeps the main cycle readable. Secondary reciprocal edges and remote callouts can still be clearer.",
+        "minFitTextPx": 10.3,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-cycle-4",
+        "review": "Wrapping improves long node titles and keeps the main cycle readable. Secondary reciprocal edges and remote callouts can still be clearer.",
+        "minFitTextPx": 15,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-cycle-5",
+        "review": "Wrapping improves long node titles and keeps the main cycle readable. Secondary reciprocal edges and remote callouts can still be clearer.",
+        "minFitTextPx": 9.6,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-cycle-6",
+        "review": "Wrapping improves long node titles and keeps the main cycle readable. Secondary reciprocal edges and remote callouts can still be clearer.",
+        "minFitTextPx": 12.0,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-cycle-7",
+        "review": "Whitespace recovery now renders the graph. Its large frame still reduces fitted text to about 7.1 px.",
+        "minFitTextPx": 7.1,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-parallel-0",
+        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
+        "minFitTextPx": 5.0,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-parallel-1",
+        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
+        "minFitTextPx": 5.1,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-parallel-2",
+        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
+        "minFitTextPx": 6.4,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-parallel-3",
+        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
+        "minFitTextPx": 8.5,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-parallel-4",
+        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
+        "minFitTextPx": 5.7,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-parallel-5",
+        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
+        "minFitTextPx": 5.6,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-parallel-6",
+        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
+        "minFitTextPx": 5.1,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-parallel-7",
+        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
+        "minFitTextPx": 8.5,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-pinned-0",
+        "review": "Fixed centers are respected and wrapped titles are readable. Cross-row routes remain dense; improve channel ordering without moving pinned nodes.",
+        "minFitTextPx": 10.0,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-pinned-1",
+        "review": "Fixed centers are respected and wrapped titles are readable. Cross-row routes remain dense; improve channel ordering without moving pinned nodes.",
+        "minFitTextPx": 10.5,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-pinned-2",
+        "review": "Fixed centers are respected and wrapped titles are readable. Cross-row routes remain dense; improve channel ordering without moving pinned nodes.",
+        "minFitTextPx": 9.2,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-pinned-3",
+        "review": "Wrapped labels now fit at the original fixed centers; long perimeter routes remain visually busy.",
+        "minFitTextPx": 9.6,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-pinned-4",
+        "review": "Wrapped labels now fit at the original fixed centers; several three-row crossovers still require careful tracing.",
+        "minFitTextPx": 9.2,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-pinned-5",
+        "review": "Fixed centers are respected and wrapped titles are readable. Cross-row routes remain dense; improve channel ordering without moving pinned nodes.",
+        "minFitTextPx": 10.2,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-pinned-6",
+        "review": "Fixed centers are respected and wrapped titles are readable. Cross-row routes remain dense; improve channel ordering without moving pinned nodes.",
+        "minFitTextPx": 10.1,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-pinned-7",
+        "review": "Fixed centers are respected and wrapped titles are readable. Cross-row routes remain dense; improve channel ordering without moving pinned nodes.",
+        "minFitTextPx": 10.9,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-tree-0",
+        "review": "Wrapping makes the former failure render, but backward-looking parent-to-child routes still obscure depth.",
+        "minFitTextPx": 10.3,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-tree-1",
+        "review": "Wrapped titles improve shape proportions. Sibling grouping, subtree centering and avoiding backward-looking child routes remain the main quality criteria.",
+        "minFitTextPx": 8.8,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-tree-2",
+        "review": "Wrapped titles improve shape proportions. Sibling grouping, subtree centering and avoiding backward-looking child routes remain the main quality criteria.",
+        "minFitTextPx": 10.0,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-tree-3",
+        "review": "Wrapped titles improve shape proportions. Sibling grouping, subtree centering and avoiding backward-looking child routes remain the main quality criteria.",
+        "minFitTextPx": 13.9,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-tree-4",
+        "review": "Wrapped titles improve shape proportions. Sibling grouping, subtree centering and avoiding backward-looking child routes remain the main quality criteria.",
+        "minFitTextPx": 13.3,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-tree-5",
+        "review": "Whitespace recovery renders it; sideways and backward routes leave the hierarchy unclear, with about 7.9 px fitted text.",
+        "minFitTextPx": 7.9,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-tree-6",
+        "review": "Whitespace recovery renders it; the tree is traceable at full size but still dense at Fit.",
+        "minFitTextPx": 8.1,
+        "paintFailures": []
+      },
+      {
+        "id": "fuzz-tree-7",
+        "review": "Wrapped titles improve shape proportions. Sibling grouping, subtree centering and avoiding backward-looking child routes remain the main quality criteria.",
+        "minFitTextPx": 12.5,
+        "paintFailures": []
+      }
+    ]
   }
 }

@@ -273,13 +273,35 @@ fn long_decisions_reserve_an_interior_title_rectangle() {
     let source = "node: \"Approve international payment request?\" [shape: diamond]\n";
     let diagram = compile(source).unwrap();
     let r = diagram.layout.nodes["node"];
-    let width = smarter_diagrams::labels::text_width(&diagram.scene.nodes[0].label) * 14. / 13.;
-    assert!((width + 16.) / r.w + 24. / r.h <= 1.);
+    let svg = diagram.to_svg();
+    let lines: Vec<_> = svg
+        .split("<tspan ")
+        .skip(1)
+        .map(|span| span.split_once('>').unwrap().1.split_once('<').unwrap().0)
+        .collect();
+    assert!(lines.len() > 1, "long titles should wrap");
+    assert_eq!(lines.join(" "), diagram.scene.nodes[0].label);
+    let width = lines
+        .iter()
+        .map(|line| smarter_diagrams::labels::text_width(line) * 16. / 15.)
+        .fold(0., f64::max);
+    assert!((width + 16.) / r.w + (lines.len() as f64 * 20.) / r.h <= 1.);
     let locked = format!("{} @pin(grid: 0,0, lock: [w: 8g, h: 3g])\n", source.trim());
     assert!(
         compile(&locked)
             .unwrap_err()
             .to_string()
             .contains("decision title")
+    );
+}
+
+#[test]
+fn database_title_is_centered_beneath_the_top_cap() {
+    let d = compile("db: Database\n").unwrap();
+    let r = d.layout.nodes["db"];
+    let y = r.y + 8.;
+    assert!(
+        d.to_svg()
+            .contains(&format!("y=\"{y:.2}\">Database</text>"))
     );
 }

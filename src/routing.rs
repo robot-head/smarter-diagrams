@@ -711,6 +711,110 @@ pub(crate) fn coordinate_fan(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layo
     l.routes.extend(routes);
     true
 }
+/// Give a return edge or planar four-node dependency an unmistakable outer rail.
+pub(crate) fn coordinate_outer_routes(
+    scene: &SceneGraph,
+    o: &LayoutOptions,
+    l: &mut Layout,
+) -> bool {
+    let mut candidates = std::collections::BTreeMap::new();
+    let top = l
+        .nodes
+        .values()
+        .map(|r| r.top())
+        .fold(f64::INFINITY, f64::min)
+        - 72.;
+    let bottom = l
+        .nodes
+        .values()
+        .map(|r| r.bottom())
+        .fold(f64::NEG_INFINITY, f64::max)
+        + 72.;
+    let left = l
+        .nodes
+        .values()
+        .map(|r| r.left())
+        .fold(f64::INFINITY, f64::min)
+        - 48.;
+    let outer = scene.nodes.len() == 4
+        && scene.edges.len() == 4
+        && scene.edges.iter().any(|e| {
+            l.ports[&port_key(e, true)].side == Side::W
+                && l.ports[&port_key(e, false)].side == Side::S
+        });
+    for (i, e) in scene.edges.iter().enumerate() {
+        let a = &l.ports[&port_key(e, true)];
+        let b = &l.ports[&port_key(e, false)];
+        let points = if a.side == Side::N
+            && b.side == Side::N
+            && scene.edges[..i].iter().any(|other| {
+                other.source.node == e.target.node && other.target.node == e.source.node
+            }) {
+            vec![
+                a.point,
+                a.stub,
+                Point::new(a.stub.x, top),
+                Point::new(b.stub.x, top),
+                b.stub,
+                b.point,
+            ]
+        } else if outer && a.side == Side::W && b.side == Side::S {
+            vec![
+                a.point,
+                a.stub,
+                Point::new(left, a.stub.y),
+                Point::new(left, bottom),
+                Point::new(b.stub.x, bottom),
+                b.stub,
+                b.point,
+            ]
+        } else if outer && a.side == Side::E && b.side == Side::W {
+            let x = (a.stub.x + b.stub.x) / 2.;
+            vec![
+                a.point,
+                a.stub,
+                Point::new(x, a.stub.y),
+                Point::new(x, b.stub.y),
+                b.stub,
+                b.point,
+            ]
+        } else {
+            continue;
+        };
+        let mut route = Route {
+            edge: e.id.clone(),
+            points,
+        };
+        route.points.dedup_by(|a, b| a.distance(*b) < 1e-7);
+        if !route_is_valid(scene, l, e, &route, o.margin) {
+            return false;
+        }
+        candidates.insert(e.id.clone(), route);
+    }
+    if candidates.is_empty() {
+        return false;
+    }
+    let routes: Vec<_> = scene
+        .edges
+        .iter()
+        .map(|e| candidates.get(&e.id).unwrap_or(&l.routes[&e.id]))
+        .collect();
+    for (i, a) in routes.iter().enumerate() {
+        for b in &routes[i + 1..] {
+            for p in a.points.windows(2) {
+                for q in b.points.windows(2) {
+                    if proper_crossing(p[0], p[1], q[0], q[1])
+                        || collinear_overlap(p[0], p[1], q[0], q[1]) > 1e-6
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    l.routes.extend(candidates);
+    true
+}
 pub fn nudge_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
     use std::collections::BTreeMap;
     #[derive(Clone)]

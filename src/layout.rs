@@ -11,7 +11,7 @@ pub(crate) fn header_height(node: &Node) -> f64 {
     24. + (node.label.split('\n').count() - 1) as f64 * 20.
 }
 fn title_width(node: &Node) -> f64 {
-    crate::labels::text_width(&node.label) * 16. / 15.
+    crate::labels::text_width(&crate::labels::node_title(node)) * 16. / 15.
         + 32.
         + crate::shapes::title_gutter(&node.shape)
 }
@@ -210,6 +210,14 @@ pub fn layout(
     options: &LayoutOptions,
     previous: Option<&Layout>,
 ) -> Result<Layout, Error> {
+    layout_pass(scene, options, previous, 1.)
+}
+fn layout_pass(
+    scene: &SceneGraph,
+    options: &LayoutOptions,
+    previous: Option<&Layout>,
+    spacing: f64,
+) -> Result<Layout, Error> {
     let o = options;
     if !o.grid.is_finite()
         || o.grid <= 0.
@@ -245,10 +253,9 @@ pub fn layout(
         cached.stability = StabilityMetrics::default();
         for label in &mut cached.labels {
             if let Some(edge) = scene.edge(&label.feature) {
-                label.text =
-                    crate::render::flow_caption(scene, edge).unwrap_or_else(|| edge.label.clone());
+                label.text = crate::labels::connection_text(scene, edge);
             } else if let Some(node) = scene.node(&label.feature) {
-                label.text = node.label.clone();
+                label.text = crate::labels::node_title(node);
             } else if let Some((node, port)) = label.feature.rsplit_once('#')
                 && let Some(p) = scene.node(node).and_then(|n| n.ports.get(port))
             {
@@ -296,7 +303,8 @@ pub fn layout(
         } else {
             (node.ports.len() as f64 + 2.) * o.grid
         };
-        h = h.max(node.label.split('\n').count() as f64 * 20. + 28.);
+        let title = crate::labels::node_title(node);
+        h = h.max(title.split('\n').count() as f64 * 20. + 28.);
         if node.shape == "sql_table" {
             for port in node.ports.values() {
                 if let PortConstraint::FixedPos { offset_grid, .. } = port.constraint {
@@ -311,9 +319,9 @@ pub fn layout(
         // Sloping sides must contain the entire text rectangle, not just its
         // center line. Keep room for ascenders/descenders at both title ends.
         if matches!(node.shape.as_str(), "diamond" | "decision") {
-            let multiline = node.label.contains('\n');
+            let multiline = title.contains('\n');
             w *= if multiline { 1.8 } else { 1.5 };
-            h = h.max(80.).max(crate::labels::text_height(&node.label) * 3.);
+            h = h.max(80.).max(crate::labels::text_height(&title) * 3.);
         }
         // Simulation nodes reserve a readable occupancy strip. An explicit
         // size lock below still wins; the viewer only paints status ink that fits.
@@ -381,6 +389,12 @@ pub fn layout(
     } else {
         None
     };
+    if spacing > 1. {
+        for r in &mut rects {
+            r.x *= spacing;
+            r.y *= spacing;
+        }
+    }
     // Size innermost containers before introducing hard containment inequalities.
     for i in (0..n).rev() {
         if scene.nodes[i].container {
@@ -506,9 +520,14 @@ pub fn layout(
         }
     }
     let mut requests = port_requests(scene, &rects, o, previous);
-    let readable_fan = concept_sides.is_some() && scene.nodes.len() > 2;
+    let readable_routes = concept_sides.is_some();
+    let readable_fan =
+        readable_routes && scene.nodes.len() > 2 && scene.edges.len() + 1 == scene.nodes.len();
     if let Some(sides) = concept_sides {
-        for (edge, (source_side, target_side)) in scene.edges.iter().zip(sides) {
+        for (edge, hint) in scene.edges.iter().zip(sides) {
+            let Some((source_side, target_side)) = hint else {
+                continue;
+            };
             for (source, side, other) in [
                 (true, source_side, &edge.target.node),
                 (false, target_side, &edge.source.node),
@@ -949,8 +968,26 @@ pub fn layout(
     crate::routing::route_all(scene, o, previous, &mut out)?;
     crate::routing::nudge_channels(scene, o, &mut out);
     let coordinated_fan = readable_fan && crate::routing::coordinate_fan(scene, o, &mut out);
-    out.labels = crate::labels::place(scene, o, &out)?;
-    if !coordinated_fan {
+    let coordinated_loops =
+        readable_routes && crate::routing::coordinate_outer_routes(scene, o, &mut out);
+    out.labels = match crate::labels::place(scene, o, &out) {
+        Ok(labels) => labels,
+        Err(Error::Layout(message))
+            if message.starts_with("no feasible label position")
+                && previous.is_none()
+                && spacing < 2.25
+                && scene.relations.is_empty()
+                && scene.layout_rules.is_empty()
+                && scene.nodes.iter().all(|n| n.annotations.is_empty())
+                && scene.edges.iter().all(|e| e.annotations.is_empty()) =>
+        {
+            // Caption space is part of fresh layout feasibility. Retry with
+            // more whitespace rather than rejecting an unconstrained graph.
+            return layout_pass(scene, options, None, spacing * 1.5);
+        }
+        Err(error) => return Err(error),
+    };
+    if !coordinated_fan && !coordinated_loops {
         crate::labels::polish_channels(scene, o, &mut out);
     }
     for zone in &scene.zones {
@@ -1223,6 +1260,45 @@ fn port_requests(
             let j = scene.index(&other.node).unwrap();
             let b = rects[j];
             let side = if source { pair.0 } else { pair.1 };
+            let other_side = if source { pair.1 } else { pair.0 };
+            let target = match other.constraint {
+                PortConstraint::FixedPos { offset_grid, .. } => {
+                    if matches!(side, Side::E | Side::W) && matches!(other_side, Side::E | Side::W)
+                    {
+                        b.top() + offset_grid * o.grid
+                    } else if matches!(side, Side::N | Side::S)
+                        && matches!(other_side, Side::N | Side::S)
+                    {
+                        b.left() + offset_grid * o.grid
+                    } else if matches!(side, Side::E | Side::W) {
+                        b.y
+                    } else {
+                        b.x
+                    }
+                }
+                PortConstraint::FixedRatio { ratio, .. } => {
+                    if matches!(side, Side::E | Side::W) && matches!(other_side, Side::E | Side::W)
+                    {
+                        b.top() + ratio * b.h
+                    } else if matches!(side, Side::N | Side::S)
+                        && matches!(other_side, Side::N | Side::S)
+                    {
+                        b.left() + ratio * b.w
+                    } else if matches!(side, Side::E | Side::W) {
+                        b.y
+                    } else {
+                        b.x
+                    }
+                }
+                _ => {
+                    if matches!(side, Side::E | Side::W) {
+                        b.y
+                    } else {
+                        b.x
+                    }
+                }
+            };
+
             let key = port_key(e, source);
             if seen.insert(key.clone()) {
                 out.push(PortRequest {
@@ -1230,11 +1306,7 @@ fn port_requests(
                     node: i,
                     side,
                     spec: ep.constraint.clone(),
-                    target: if matches!(side, Side::E | Side::W) {
-                        b.y
-                    } else {
-                        b.x
-                    },
+                    target,
                 });
             }
         }
@@ -1305,15 +1377,48 @@ fn grow_port_perimeters(
                 .filter(|p| p.node == i && p.side == side)
                 .collect();
             let mut length = ports.len().saturating_sub(1) as f64 * o.port_spacing + 2. * o.corner;
-            if ports.len() > 1 && is_parallel_bundle(scene) {
-                let caption_space = scene
-                    .edges
+            let peer_edges: Vec<_> = scene
+                .edges
+                .iter()
+                .filter(|e| {
+                    e.source.node == scene.nodes[i].id || e.target.node == scene.nodes[i].id
+                })
+                .collect();
+            let peers: BTreeSet<_> = peer_edges
+                .iter()
+                .map(|e| {
+                    if e.source.node == scene.nodes[i].id {
+                        &e.target.node
+                    } else {
+                        &e.source.node
+                    }
+                })
+                .collect();
+            let locked = effective_annotations(
+                scene,
+                &scene.nodes[i].id,
+                &scene.nodes[i].annotations,
+                o.variant.as_deref(),
+            )
+            .iter()
+            .any(|a| a.name == "pin" && a.attrs.contains_key("lock"));
+            if ports.len() > 1
+                && peers.len() == 1
+                && !locked
+                && ports.iter().all(|p| {
+                    matches!(
+                        p.spec,
+                        PortConstraint::Free | PortConstraint::FixedSide { .. }
+                    )
+                })
+            {
+                let caption_space = peer_edges
                     .iter()
                     .map(|e| {
                         if matches!(side, Side::N | Side::S) {
                             crate::labels::text_width(&e.label) + 32.
                         } else {
-                            crate::labels::text_height(&e.label)
+                            crate::labels::text_height(&crate::labels::connection_text(scene, e))
                         }
                     })
                     .fold(0., f64::max)
@@ -1626,9 +1731,22 @@ pub fn validate(scene: &SceneGraph, l: &Layout, o: &LayoutOptions) -> Result<(),
         if [ra.x, ra.y, ra.w, ra.h].iter().any(|x| !x.is_finite()) || ra.w <= 0. || ra.h <= 0. {
             return Err(Error::Layout("non-finite or empty node geometry".into()));
         }
+        let title = crate::labels::node_title(a);
+        let title_height = (title.lines().count().saturating_sub(1)) as f64 * 20.
+            + 18.
+            + if a.shape == "database" { 16. } else { 0. };
+        if !a.container
+            && !matches!(a.shape.as_str(), "sql_table" | "diamond" | "decision")
+            && (title_width(a) - 32. > ra.w + 1e-6 || title_height > ra.h + 1e-6)
+        {
+            return Err(Error::Layout(format!(
+                "title does not fit the locked size of {}",
+                a.id
+            )));
+        }
         if matches!(a.shape.as_str(), "diamond" | "decision")
             && (title_width(a) - 16.) / ra.w
-                + crate::labels::text_height(&a.label) * 16. / 15. / ra.h
+                + crate::labels::text_height(&crate::labels::node_title(a)) * 16. / 15. / ra.h
                 > 1.
         {
             return Err(Error::Layout(format!(
@@ -1759,6 +1877,7 @@ fn semantic_key(scene: &SceneGraph, options: &LayoutOptions) -> String {
             (
                 &n.id,
                 title_width(n).max(112.),
+                crate::labels::node_title(n).lines().count(),
                 &n.parent,
                 &n.shape,
                 n.container,
@@ -1786,7 +1905,8 @@ fn semantic_key(scene: &SceneGraph, options: &LayoutOptions) -> String {
                 &e.id,
                 (&e.source.node, &e.source.port, &e.source.constraint),
                 (&e.target.node, &e.target.port, &e.target.constraint),
-                crate::labels::text_width(&e.label),
+                crate::labels::text_width(&crate::labels::connection_text(scene, e)),
+                crate::labels::text_height(&crate::labels::connection_text(scene, e)),
                 e.kind,
                 attrs(&e.attrs),
                 anns(&e.annotations),
@@ -1830,6 +1950,7 @@ fn query_keys(scene: &SceneGraph, o: &LayoutOptions) -> (BTreeMap<String, String
         let key = serde_json::to_string(&(
             &n.id,
             title_width(n).max(112.),
+            crate::labels::node_title(n).lines().count(),
             &n.parent,
             &n.shape,
             n.container,
@@ -1855,7 +1976,8 @@ fn query_keys(scene: &SceneGraph, o: &LayoutOptions) -> (BTreeMap<String, String
             &e.id,
             (&e.source.node, &e.source.port, &e.source.constraint),
             (&e.target.node, &e.target.port, &e.target.constraint),
-            crate::labels::text_width(&e.label),
+            crate::labels::text_width(&crate::labels::connection_text(scene, e)),
+            crate::labels::text_height(&crate::labels::connection_text(scene, e)),
             e.kind,
             attrs(&e.attrs),
             anns(&e.annotations),
