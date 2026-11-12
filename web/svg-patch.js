@@ -1,7 +1,7 @@
 // Keep SVG elements alive during gestures; only changed ink is updated.
 function key(node){
   if(node.nodeType!==1)return null;
-  for(const name of ['data-node','data-label','data-callout-for','id'])if(node.hasAttribute(name))return `${node.localName}:${name}:${node.getAttribute(name)}`;
+  for(const name of ['data-authoring-overlay','data-authoring-overlay-guides','data-node','data-label','data-callout-for','id'])if(node.hasAttribute(name))return `${node.localName}:${name}:${node.getAttribute(name)}`;
   if(node.hasAttribute('data-edge'))return `${node.localName}:edge:${node.getAttribute('data-edge')}:${node.getAttribute('data-arrowhead')||node.getAttribute('class')||''}`;
   return null;
 }

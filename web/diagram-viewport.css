@@ -32,3 +32,5 @@ main:has(.canvas-panel){grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
 [data-draggable-label="true"] text{pointer-events:all}
 
 [data-draggable-label="true"]{cursor:grab}
+
+.snap-options{position:relative;font-size:13px}.snap-options summary{cursor:pointer;padding:8px;border:1px solid var(--sd-border);border-radius:6px;white-space:nowrap}.snap-panel{position:fixed;z-index:20;min-width:210px;padding:12px;border:1px solid var(--sd-border);border-radius:6px;background:var(--sd-bg);box-shadow:0 4px 16px #0003}.snap-panel label{display:flex;gap:8px;align-items:center;margin-bottom:10px}.snap-panel small{display:block;color:var(--sd-muted)}.snap-panel select{max-width:100px}

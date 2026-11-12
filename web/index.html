@@ -23,6 +23,7 @@ align row [client,gateway,worker,db]
 flow request { client -> gateway -> worker -> db }
 </textarea></details><p id="status" role="status">Loading Rust/Wasm…</p><pre id="metrics"></pre></section><section class="canvas-panel"><div id="canvas-controls"></div><section id="canvas" aria-label="Diagram canvas"></section><p id="simulation-legend" hidden>Queue labels and bars show occupancy. Orange outlines identify queues at or near capacity; dashed red connections are cut.</p></section></main>
 <script type="module">
+import {DiagramSnapping} from './diagram-snapping.js';
 import {patchSvg} from './svg-patch.js';
 import init,{WasmDocument} from './pkg/smarter_diagrams.js';
 import {DiagramViewport} from './diagram-viewport.js';
@@ -37,13 +38,14 @@ document.querySelector('#source-panel').open=!matchMedia('(max-width:767px)').ma
 const moveButton=document.createElement('button');moveButton.textContent='Move nodes';moveButton.setAttribute('aria-pressed','false');document.querySelector('#canvas-controls').append(moveButton);
 function toggleState(button,active,label){button.setAttribute('aria-pressed',String(active));const icon=document.createElement('span');icon.setAttribute('aria-hidden','true');icon.textContent=active?'●':'○';button.replaceChildren(icon,document.createTextNode(' '+label));}
 moveButton.onclick=()=>{dragController?.cancel();touchMove=!touchMove;toggleState(moveButton,touchMove,'Move nodes');canvas.classList.toggle('touch-edit',touchMove);view.updateHint(touchMove);};
+const snapping=new DiagramSnapping(canvas,document.querySelector('#canvas-controls'));
 let doc,worker,objectUrl,timer,dragController,focus,latestState,lastFrame=0,touchMove=false,generation=0,ingressOverride=false;let traceStep=-1;const cuts=new Set();
 function applyState(){
   const svg=canvas.querySelector('svg');if(!svg)return;
   for(const id of cuts)for(const ink of svg.querySelectorAll('[data-edge]'))if(ink.dataset.edge===id){if(ink.dataset.arrowhead)ink.style.fill='var(--sd-cut,#b33336)';else{ink.style.stroke='var(--sd-cut,#b33336)';ink.style.strokeDasharray='4 4';}}
   paintQueueState(svg,latestState);
 }
-function show(svg,bounds){const left=canvas.scrollLeft,top=canvas.scrollTop;const target=patchSvg(canvas,svg);view.attach(target,bounds);if(!view.fitted)canvas.scrollTo(left,top);applyState();}
+function show(svg,bounds){const left=canvas.scrollLeft,top=canvas.scrollTop;const target=patchSvg(canvas,svg);view.attach(target,bounds);if(!view.fitted)canvas.scrollTo(left,top);applyState();snapping.draw();}
 function syncSimulation(){latestState=undefined;lastFrame=0;document.querySelector('#metrics').textContent='';generation++;const live=new Set([...canvas.querySelectorAll('[data-edge]')].map(el=>el.dataset.edge));for(const id of cuts)if(!live.has(id))cuts.delete(id);if(worker){worker.postMessage({type:'open',source:doc.source(),cuts:[...cuts],generation});if(ingressOverride&&canvas.querySelector('[data-node="client"]'))worker.postMessage({type:'rate',node:'client',rate:Number(document.querySelector('#load').value)});}}
 function paint(){latestState=undefined;traceStep=-1;const select=document.querySelector('#trace');select.replaceChildren();for(const flow of JSON.parse(doc.flows_json())){const option=document.createElement('option');option.value=flow.id;option.textContent=flow.label;select.append(option);}show(doc.svg());source.value=doc.source();status.textContent=`${Number(doc.revision())} · source revision`;syncSimulation();}
 document.querySelector('#download').addEventListener('click',()=>{const markup=standaloneSvg(canvas.querySelector('svg'));if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(new Blob([markup],{type:'image/svg+xml'}));document.querySelector('#download').href=objectUrl;});
@@ -62,7 +64,7 @@ canvas.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse')return;cons
 canvas.addEventListener('pointerleave',()=>{if(!dragController.active&&focus){focus=undefined;show(doc.svg());}});
 dragController=new NodeDragController({canvas,view,status,getDocument:()=>doc,touchEnabled:()=>touchMove,
   beforeStart:()=>{if(source.value!==doc.source())render();if(source.value!==doc.source())return false;focus=undefined;show(doc.svg());},
-  show,onCommit:()=>{show(doc.svg());source.value=doc.source();status.textContent=`${Number(doc.revision())} · source revision`;}});
+  snapping,show,onCommit:()=>{show(doc.svg());source.value=doc.source();status.textContent=`${Number(doc.revision())} · source revision`;}});
 document.querySelector('#simulate').onclick=()=>{if(worker){worker.postMessage({type:'stop'});worker.terminate();worker=undefined;latestState=undefined;cuts.clear();show(doc.svg());document.querySelector('#simulation-legend').hidden=true;document.querySelector('#metrics').textContent='';toggleState(document.querySelector('#simulate'),false,'Run simulation');return;}worker=new Worker('./simulation-worker.js',{type:'module'});const currentWorker=worker;worker.onmessage=({data})=>{if(worker!==currentWorker||data.generation!==generation)return;if(data.type==='error'){status.textContent=data.message;return;}latestState=data.state;if(performance.now()-lastFrame<100)return;lastFrame=performance.now();document.querySelector('#metrics').textContent=Object.entries(data.state.nodes).map(([id,q])=>`${id}: queue ${q.queued.toFixed(1)}, saturation ${(q.saturation*100).toFixed(0)}%, drops ${q.dropped.toFixed(1)}`).join('\n');applyState();};syncSimulation();document.querySelector('#simulation-legend').hidden=false;toggleState(document.querySelector('#simulate'),true,'Stop simulation');};
 
 document.querySelector('#load').oninput=e=>{ingressOverride=true;if(worker)worker.postMessage({type:'rate',node:'client',rate:Number(e.target.value)});};
