@@ -116,7 +116,8 @@ fn text_content(text: &str, x: f64, height: f64) -> String {
                 escape(line)
             )
         })
-        .collect()
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 /// Fillets are bounded by half of each adjacent segment; arrow bases stay exact.
 fn rounded_path(points: &[Point]) -> String {

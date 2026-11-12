@@ -1058,6 +1058,14 @@ fn wrapping_keeps_source_text_but_uses_taller_readable_shapes() {
     assert!(!d.scene.nodes[1].label.contains('\n'));
     assert!(d.to_svg().contains("<tspan"));
     assert_eq!(Document::new(source).unwrap().source(), source);
+    let caption = "Authenticate requests using a short-lived organization access token";
+    let source = format!("hub -> a: {caption}\nhub -> b: {caption}\nhub -> c: {caption}\n");
+    let fan = compile(&source).unwrap();
+    assert!(
+        render::bounds(&fan.scene, &fan.layout).w < 1000.,
+        "spacing must use the wrapped caption width"
+    );
+    assert!(fan.layout.labels.iter().all(|l| l.text.contains('\n')));
     let scope = compile(
         "client -> api\napi -> db\napi -> kms\nzone secure around [api,db,kms] { padding: 1.5g }\n",
     )

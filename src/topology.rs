@@ -566,12 +566,12 @@ pub(crate) fn readable_concept(
     let caption_width = scene
         .edges
         .iter()
-        .map(|e| crate::labels::text_width(&e.label))
+        .map(|e| crate::labels::text_width(&crate::labels::connection_text(scene, e)))
         .fold(0., f64::max);
     let caption_height = scene
         .edges
         .iter()
-        .map(|e| crate::labels::text_height(&e.label))
+        .map(|e| crate::labels::text_height(&crate::labels::connection_text(scene, e)))
         .fold(0., f64::max);
     if n == 2 && pairs.len() >= 2 && pairs.iter().all(|p| *p == pairs[0]) {
         let (a, b) = pairs[0];
