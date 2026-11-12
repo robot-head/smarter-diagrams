@@ -82,6 +82,18 @@ module.exports=async function dropContinuity(browser,base){
     }return true;
   });assert(database,'backward Database drags must keep corridors and captions steady with fixed and automatic ports');
 
+  // Replay the recording's clear-space sweep through real pointer events.
+  grab=await begin('client');let priorCaption;
+  for(const y of [120,124,128,132,136,140,160,200,240,280])for(let x=0;x<=240;x+=8){
+    await move(grab,x,y);assert.equal(await page.locator('#canvas.invalid-drag').count(),0,'clear Client positions must remain valid');
+    const current=await read(),label=current.labels.find(l=>l[0]==='client->gateway');
+    if(priorCaption&&priorCaption.y===y&&priorCaption.x+8===x)assert(Math.hypot(label[2]-priorCaption.label[2],label[3]-priorCaption.label[3])<40,`recorded sweep must not teleport the caption at ${x},${y}: ${JSON.stringify(priorCaption.label)} -> ${JSON.stringify(label)}`);
+    priorCaption={x,y,label};
+  }
+  const swept=await read();await page.mouse.up();assert.deepEqual(await read(),swept);await page.click('#undo');
+  grab=await begin('client');for(const [x,y] of [[88,80],[100,96],[120,96],[160,104]]){await move(grab,x,y);assert.equal(await page.locator('#canvas.invalid-drag').count(),0,'separate near-box positions must not be rejected by conservative stub envelopes')}
+  const nearHeld=await read();await page.mouse.up();assert.deepEqual(await read(),nearHeld);await page.click('#undo');
+
   // A manual camera frame must not crop the exported diagram, and explicit
   // Fit must use the complete current drawing rather than that frozen frame.
   grab=await begin('client');await move(grab,-120,160);held=await read();await page.mouse.up();assert.deepEqual(await read(),held);

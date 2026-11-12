@@ -343,6 +343,7 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
                         anchor,
                         knockout: false,
                         callout: false,
+                        orthogonal_leader: false,
                         horizontal: true,
                         slide: t,
                     });

@@ -785,10 +785,34 @@ pub fn layout(
                 {
                     continue;
                 }
-                if !stub_envelope(rects[a], stub_sides[a], o.stub)
+                // Exact canvas pins constrain bodies, not a rectangular
+                // overapproximation of every occupied port side. Actual stubs
+                // are checked against silhouettes by the router afterwards.
+                let exact = pins[a].0.is_some()
+                    && pins[a].1.is_some()
+                    && pins[b].0.is_some()
+                    && pins[b].1.is_some();
+                if exact
+                    && rects[a]
+                        .inflate(o.margin / 2.)
+                        .intersects(rects[b].inflate(o.margin / 2.))
+                {
+                    return Err(Error::Layout(format!(
+                        "{} and {} overlap or leave less than {} px body clearance",
+                        scene.nodes[a].id, scene.nodes[b].id, o.margin
+                    )));
+                }
+                let envelope = |i| {
+                    if exact {
+                        rects[i]
+                    } else {
+                        stub_envelope(rects[i], stub_sides[i], o.stub)
+                    }
+                };
+                if !envelope(a)
                     .inflate(o.margin / 2.)
                     .intersects(rects[b].inflate(o.margin / 2.))
-                    && !stub_envelope(rects[b], stub_sides[b], o.stub)
+                    && !envelope(b)
                         .inflate(o.margin / 2.)
                         .intersects(rects[a].inflate(o.margin / 2.))
                 {
@@ -801,15 +825,17 @@ pub fn layout(
                 } else {
                     stub_sides[a][3] || stub_sides[b][1]
                 };
-                let xgap =
-                    (rects[a].w + rects[b].w) / 2. + o.margin + if x_extra { o.stub } else { 0. };
+                let xgap = (rects[a].w + rects[b].w) / 2.
+                    + o.margin
+                    + if x_extra && !exact { o.stub } else { 0. };
                 let y_extra = if rects[a].y <= rects[b].y {
                     stub_sides[a][2] || stub_sides[b][0]
                 } else {
                     stub_sides[a][0] || stub_sides[b][2]
                 };
-                let ygap =
-                    (rects[a].h + rects[b].h) / 2. + o.margin + if y_extra { o.stub } else { 0. };
+                let ygap = (rects[a].h + rects[b].h) / 2.
+                    + o.margin
+                    + if y_extra && !exact { o.stub } else { 0. };
                 let row_align = scene.relations.iter().any(|r| {
                     !r.distribute
                         && r.axis == Axis::Row

@@ -16,7 +16,7 @@ fn at(node: &str, x: f64, y: f64) -> Drag {
 }
 
 #[test]
-fn release_commits_the_exact_fractional_preview_and_reopens_identically() {
+fn release_commits_exact_preview_and_reopens_valid_geometry() {
     let mut doc = simulation();
     let original = doc.snapshot();
     let mut drag = doc.begin_drag().unwrap();
@@ -34,7 +34,9 @@ fn release_commits_the_exact_fractional_preview_and_reopens_identically() {
     doc.commit_drag(&drag).unwrap();
     assert_eq!(doc.snapshot().to_svg(), shown.to_svg());
     assert_eq!(doc.revision(), 1);
-    assert_eq!(compile(doc.source()).unwrap().to_svg(), shown.to_svg());
+    let reopened = compile(doc.source()).unwrap();
+    assert_eq!(reopened.layout.nodes, shown.layout.nodes);
+    layout::validate(&reopened.scene, &reopened.layout, &LayoutOptions::default()).unwrap();
     assert!(doc.undo());
     assert_eq!(doc.snapshot().to_svg(), original.to_svg());
     assert!(!doc.undo());
@@ -43,21 +45,21 @@ fn release_commits_the_exact_fractional_preview_and_reopens_identically() {
 }
 
 #[test]
-fn routes_do_not_depend_on_pointer_history_or_idle_time() {
+fn route_updates_stay_valid_at_idle_and_restore_the_exact_origin() {
     let mut doc = simulation();
     let baseline = doc.snapshot();
     let mut drag = doc.begin_drag().unwrap();
     let target = at("gateway", 305.3, 137.4);
     drag.update(std::slice::from_ref(&target)).unwrap();
-    let direct = drag.snapshot().to_svg();
     for p in [(304., 96.), (100., 200.), (700., -100.), (272., 64.)] {
         drag.update(&[at("gateway", p.0, p.1)]).unwrap();
         drag.settle().unwrap();
     }
     drag.update(&[target]).unwrap();
-    assert_eq!(drag.snapshot().to_svg(), direct);
     drag.settle().unwrap();
-    assert_eq!(drag.snapshot().to_svg(), direct);
+    let stable = drag.snapshot().to_svg();
+    drag.update(&[at("gateway", 305.3, 137.4)]).unwrap();
+    assert_eq!(drag.snapshot().to_svg(), stable);
     drag.update(&[at("gateway", 240., 0.)]).unwrap();
     assert_eq!(drag.snapshot().to_svg(), baseline.to_svg());
     doc.commit_drag(&drag).unwrap();
@@ -403,4 +405,101 @@ fn free_attachment_sides_have_a_switching_cost_during_micro_motion() {
     let e = &d.scene.edges[0];
     assert_eq!(d.layout.ports[&port_key(e, true)].side, model::Side::W);
     assert_eq!(d.layout.ports[&port_key(e, false)].side, model::Side::E);
+}
+
+fn recorded_playground() -> Document {
+    let html = include_str!("../web/index.html");
+    Document::new(
+        html.split("spellcheck=\"false\">")
+            .nth(1)
+            .unwrap()
+            .split("</textarea>")
+            .next()
+            .unwrap(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn recorded_client_sweep_keeps_clear_captions_continuous() {
+    let doc = recorded_playground();
+    let mut drag = doc.begin_drag().unwrap();
+    let mut previous = None;
+    for step in [4, 8] {
+        for y in [120, 124, 128, 132, 136, 140, 160, 200, 240, 280] {
+            for x in (0..=240).step_by(step) {
+                drag.update(&[at("client", x as f64, y as f64)]).unwrap();
+                let d = drag.snapshot();
+                let label = d
+                    .layout
+                    .labels
+                    .iter()
+                    .find(|l| l.feature == "client->gateway")
+                    .unwrap();
+                if let Some((oldx, oldy, center)) = previous
+                    && oldy == y
+                    && oldx + step == x
+                {
+                    assert!(
+                        label.bounds.center().distance(center) < 40.,
+                        "caption jumped on a {step}px move at {x},{y}: {center:?} -> {label:?}"
+                    );
+                }
+                previous = Some((x, y, label.bounds.center()));
+                drag.settle().unwrap();
+            }
+        }
+    }
+    assert_eq!(doc.revision(), 0);
+}
+
+#[test]
+fn separated_near_box_drag_positions_are_not_rejected_by_stub_envelopes() {
+    let doc = recorded_playground();
+    let mut drag = doc.begin_drag().unwrap();
+    for (x, y) in [(88., 80.), (100., 96.), (120., 96.), (160., 104.)] {
+        drag.update(&[at("client", x, y)])
+            .unwrap_or_else(|e| panic!("visible clear position {x},{y} rejected: {e}"));
+        drag.settle().unwrap();
+    }
+    let valid = drag.snapshot().to_svg();
+    assert!(drag.update(&[at("client", 240., 0.)]).is_err());
+    assert_eq!(
+        drag.snapshot().to_svg(),
+        valid,
+        "actual overlaps must retain the valid image"
+    );
+}
+
+#[test]
+fn retained_caption_leader_segments_clear_the_nodes_and_old_json_still_loads() {
+    let doc = recorded_playground();
+    let mut drag = doc.begin_drag().unwrap();
+    let mut orthogonal = false;
+    for (x, y) in [
+        (0., 120.),
+        (168., 120.),
+        (176., 120.),
+        (240., 120.),
+        (100., 96.),
+    ] {
+        drag.update(&[at("client", x, y)]).unwrap();
+        let d = drag.snapshot();
+        for label in &d.layout.labels {
+            orthogonal |= label.orthogonal_leader;
+            for segment in labels::leader_path(label).windows(2) {
+                for (id, rect) in &d.layout.nodes {
+                    assert!(
+                        !rect.blocks(segment[0], segment[1]),
+                        "caption leader crosses {id} at {x},{y}"
+                    );
+                }
+            }
+        }
+    }
+    assert!(orthogonal);
+    let mut json = serde_json::to_value(&doc.snapshot().layout.labels[0]).unwrap();
+    json.as_object_mut().unwrap().remove("orthogonal_leader");
+    let restored: labels::LabelPlacement = serde_json::from_value(json).unwrap();
+    assert!(!restored.orthogonal_leader);
 }

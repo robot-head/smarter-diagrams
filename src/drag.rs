@@ -155,11 +155,120 @@ impl DragSession {
         // Compile the anchored geometry with the last validated layout supplying
         // attachment switching costs and checked route reuse.
         let mut candidate = compile_with(&source, &self.options, Some(&self.prepared.layout))?;
+        // Evaluate an attachment change as a complete route/caption candidate.
+        // A side-pair estimate alone must not cause a costly visual transition.
+        if let Ok(labels) = crate::labels::place_with_prior(
+            &candidate.scene,
+            &self.options,
+            &candidate.layout,
+            Some(&self.prepared.layout),
+        ) {
+            candidate.layout.labels = labels;
+        }
+        let fresh_layout = candidate.layout.clone();
+        let attachment_changed = candidate.layout.ports.iter().any(|(key, p)| {
+            self.prepared
+                .layout
+                .ports
+                .get(key)
+                .is_some_and(|old| old.side != p.side)
+        });
+        if attachment_changed {
+            for mask in [3, 1, 2] {
+                let mut locked = candidate.scene.clone();
+                let mut changed = false;
+                for edge in &mut locked.edges {
+                    for source in [true, false] {
+                        let key = port_key(edge, source);
+                        let ep = if source {
+                            &mut edge.source
+                        } else {
+                            &mut edge.target
+                        };
+                        if ep.constraint.side().is_none()
+                            && let Some(old) = self.prepared.layout.ports.get(&key)
+                        {
+                            let side = if mask & if source { 1 } else { 2 } != 0 {
+                                old.side
+                            } else {
+                                fresh_layout.ports[&key].side
+                            };
+                            changed |= side != fresh_layout.ports[&key].side;
+                            ep.constraint = PortConstraint::FixedSide { side };
+                        }
+                    }
+                }
+                if !changed {
+                    continue;
+                }
+                if let Ok(mut alternative) =
+                    crate::layout::layout(&locked, &self.options, Some(&self.prepared.layout))
+                    && let Ok(labels) = crate::labels::place_with_prior(
+                        &candidate.scene,
+                        &self.options,
+                        &alternative,
+                        Some(&self.prepared.layout),
+                    )
+                {
+                    alternative.labels = labels;
+                    let length = |l: &Layout| {
+                        l.routes
+                            .values()
+                            .flat_map(|r| r.points.windows(2))
+                            .map(|p| p[0].distance(p[1]))
+                            .sum::<f64>()
+                    };
+                    let cost = |l: &Layout| {
+                        length(l)
+                            + l.routes
+                                .values()
+                                .map(|r| {
+                                    crate::routing::coalesced(&r.points).len().saturating_sub(2)
+                                        as f64
+                                        * self.options.weights.bend
+                                })
+                                .sum::<f64>()
+                            + l.labels
+                                .iter()
+                                .filter_map(|label| {
+                                    self.prepared
+                                        .layout
+                                        .labels
+                                        .iter()
+                                        .find(|old| old.feature == label.feature)
+                                        .map(|old| {
+                                            8. * old.bounds.center().distance(label.bounds.center())
+                                        })
+                                })
+                                .sum::<f64>()
+                            + l.ports
+                                .iter()
+                                .filter(|(key, p)| {
+                                    self.prepared
+                                        .layout
+                                        .ports
+                                        .get(*key)
+                                        .is_some_and(|old| old.side != p.side)
+                                })
+                                .count() as f64
+                                * 8.
+                                * self.options.grid
+                    };
+                    if length(&alternative) <= length(&fresh_layout) * 1.25 + 64.
+                        && cost(&alternative) <= cost(&candidate.layout)
+                        && crate::layout::validate(&candidate.scene, &alternative, &self.options)
+                            .is_ok()
+                        && crate::labels::placements_clear(&candidate.scene, &alternative)
+                    {
+                        candidate.layout = alternative;
+                    }
+                }
+            }
+        }
         // Prefer the immutable gesture baseline for stationary connections.
         // Moving obstacles must still invalidate an old path. Stateful detour
         // retention below has separate validity and excess-length bounds.
         let mut stable = candidate.layout.clone();
-        let mut changed = false;
         for edge in &candidate.scene.edges {
             let source = port_key(edge, true);
             let target = port_key(edge, false);
@@ -176,10 +285,8 @@ impl DragSession {
                 && stable.routes.get(&edge.id) != Some(route)
             {
                 stable.routes.insert(edge.id.clone(), route.clone());
-                changed = true;
             }
         }
-        let mut retained = std::collections::BTreeSet::new();
         for edge in &candidate.scene.edges {
             if effective_annotations(
                 &candidate.scene,
@@ -200,67 +307,21 @@ impl DragSession {
                 self.options.margin,
             ) {
                 stable.routes.insert(edge.id.clone(), route);
-                retained.insert(edge.id.clone());
-                changed = true;
             }
         }
-        if changed {
-            // Refit captions to the retained paths. If that cannot be done
-            // safely, the fully validated canonical candidate remains available.
-            if let Ok(labels) = crate::labels::place(&candidate.scene, &self.options, &stable) {
-                stable.labels = labels;
-                // Keep a detour caption's slot until it is actually obstructed,
-                // instead of reranking equally good slots every pointer frame.
-                for old in &self.prepared.layout.labels {
-                    if !retained.contains(&old.feature) {
-                        continue;
-                    }
-                    if let Some(edge) = candidate.scene.edge(&old.feature)
-                        && effective_annotations(
-                            &candidate.scene,
-                            &edge.id,
-                            &edge.annotations,
-                            self.options.variant.as_deref(),
-                        )
-                        .iter()
-                        .any(|a| a.name == "label")
-                    {
-                        continue;
-                    }
-
-                    let Some(index) = stable.labels.iter().position(|l| l.feature == old.feature)
-                    else {
-                        continue;
-                    };
-                    let route = &stable.routes[&old.feature];
-                    let anchor = route
-                        .points
-                        .windows(2)
-                        .map(|p| {
-                            let dx = p[1].x - p[0].x;
-                            let dy = p[1].y - p[0].y;
-                            let t = (((old.anchor.x - p[0].x) * dx + (old.anchor.y - p[0].y) * dy)
-                                / (dx * dx + dy * dy))
-                                .clamp(0., 1.);
-                            Point::new(p[0].x + t * dx, p[0].y + t * dy)
-                        })
-                        .min_by(|a, b| a.distance(old.anchor).total_cmp(&b.distance(old.anchor)))
-                        .unwrap();
-                    let mut label = old.clone();
-                    label.bounds.x += anchor.x - old.anchor.x;
-                    label.bounds.y += anchor.y - old.anchor.y;
-                    label.anchor = anchor;
-                    let fresh = std::mem::replace(&mut stable.labels[index], label);
-                    if !crate::labels::placements_clear(&candidate.scene, &stable) {
-                        stable.labels[index] = fresh;
-                    }
-                }
-
-                if crate::layout::validate(&candidate.scene, &stable, &self.options).is_ok()
-                    && crate::labels::placements_clear(&candidate.scene, &stable)
-                {
-                    candidate.layout = stable;
-                }
+        // Caption continuity is part of the complete candidate, including
+        // straight routes and simple elbows, not only retained detours.
+        if let Ok(labels) = crate::labels::place_with_prior(
+            &candidate.scene,
+            &self.options,
+            &stable,
+            Some(&self.prepared.layout),
+        ) {
+            stable.labels = labels;
+            if crate::layout::validate(&candidate.scene, &stable, &self.options).is_ok()
+                && crate::labels::placements_clear(&candidate.scene, &stable)
+            {
+                candidate.layout = stable;
             }
         }
         for (id, position) in moved {

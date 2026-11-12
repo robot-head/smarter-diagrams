@@ -681,11 +681,17 @@ pub(crate) fn svg_with_decorations(
     // Keep callout ink behind flow badges so leaders cannot strike through
     // their step numbers when a label anchors at the route midpoint.
     for label in &l.labels {
-        if let Some((a, b)) = crate::labels::leader(label) {
+        let points = crate::labels::leader_path(label);
+        if points.len() > 1 {
+            let d = points
+                .iter()
+                .enumerate()
+                .map(|(i, p)| format!("{} {} {}", if i == 0 { "M" } else { "L" }, p.x, p.y))
+                .collect::<Vec<_>>()
+                .join(" ");
             let _ = write!(
                 s,
-                "<path data-callout=\"true\" d=\"M {} {} L {} {}\" stroke=\"var(--sd-muted,#73869b)\" fill=\"none\"/>",
-                a.x, a.y, b.x, b.y
+                "<path data-callout=\"true\" d=\"{d}\" stroke=\"var(--sd-muted,#73869b)\" stroke-linejoin=\"round\" fill=\"none\"/>"
             );
         }
     }
