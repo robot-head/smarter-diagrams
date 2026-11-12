@@ -1,5 +1,4 @@
 # Version-control branch, merge, and rebase history (after Fossil & Pikchr).
-c0: C0
 c1: C1
 c2: C2
 c4: C4
@@ -10,45 +9,50 @@ c5: C5
 c3p: "C3'"
 c5p: "C5'"
 
-c0.E -> c1.W
 c1.E -> c2.W
 c2.E -> c4.W
 c4.E -> c6.W
 c6.E -> c7.W
 
 c2.N -> c3.W: fork
-c3.E -> c5.W
+c3.E -> c5.W: branch
 c5.E -> c7.N: merge
 
-c6.S -> c3p.W: rebase
+c4.S -> c3p.W: rebase
 c3p.E -> c5p.W
 
-align row [c0, c1, c2, c4, c6, c7]
 align row [c3, c5]
+align row [c1, c2, c4, c6, c7]
 align row [c3p, c5p]
+align col [c3, c4]
+distribute col [c3, c4] [gap: 4g]
+align col [c5, c6, c3p]
+distribute col [c5, c6, c3p] [gap: 4g]
+align col [c7, c5p]
+distribute col [c7, c5p] [gap: 4g]
 
-zone trunk_lane "trunk" around [c0, c1, c2, c4, c6, c7] {
-  padding: 1.25g
-  tint: oklch(0.80 0.07 230 / 0.16)
-}
 zone feature_lane "feature branch" around [c3, c5] {
-  padding: 1.25g
+  padding: 1.1g
   tint: oklch(0.80 0.09 165 / 0.16)
 }
+zone trunk_lane "trunk" around [c1, c2, c4, c6, c7] {
+  padding: 1.1g
+  tint: oklch(0.80 0.07 230 / 0.16)
+}
 zone rebased_lane "replayed branch" around [c3p, c5p] {
-  padding: 1.25g
+  padding: 1.1g
   tint: oklch(0.82 0.10 75 / 0.16)
 }
 
 view merge_history {
-  include c0 -> c1 -> c2 -> c4 -> c6 -> c7
+  include c1 -> c2 -> c4 -> c6 -> c7
   include c2 -> c3 -> c5 -> c7
 }
 view rebase_history {
-  include c0 -> c1 -> c2 -> c4 -> c6
+  include c1 -> c2 -> c4 -> c6
   include c2 -> c3 -> c5
-  include c6 -> c3p -> c5p
+  include c4 -> c3p -> c5p
 }
 flow ancestry "True merge lineage" {
-  c0 -> c1 -> c2 -> c3 -> c5 -> c7
+  c2 -> c3 -> c5 -> c7
 }

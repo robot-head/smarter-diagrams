@@ -1,8 +1,8 @@
 # Multi-domain institutional trading & risk topology (inspired by D2 TALA Bank Securities).
 reference: "Reference Data" {
   clients: "Client Master" [shape: sql_table] {
-    port party_id: uuid [side: E, pos: 1]
-    port limits: tier [side: E, pos: 2]
+    port limits: tier [side: E, pos: 1]
+    port party_id: uuid [side: E, pos: 2]
   }
   securities: "Security Master" [shape: sql_table] {
     port isin: text [side: E, pos: 1]
@@ -20,21 +20,20 @@ risk: "Risk & Margin" {
   credit: "Credit Guard"
   greeks: "Global Greeks"
   ledger: "Settlement Bus" [shape: queue]
-  credit -> greeks: approved
-  greeks -> ledger: exposure
+  credit -> ledger: "margin ok"
+  greeks -> ledger: "VaR"
 }
 
+reference.clients#limits -> risk.credit.N: limits
 reference.clients#party_id -> desks.equities: accounts
-reference.clients#limits -> risk.credit: "limit check"
-reference.securities#isin -> desks.fixed_inc: instruments
-reference.securities#curve -> risk.greeks: "yield curves"
-desks.equities -> risk.credit: orders
-desks.alloc -> risk.ledger: trades
+reference.securities#isin -> desks.fixed_inc: isin
+reference.securities#curve -> risk.greeks: curves
+desks.alloc -> risk.credit: trades
 
-zone audit "Regulatory trade surveillance" around [desks.alloc, risk.credit, risk.ledger] {
-  padding: 1.5g
-  tint: oklch(0.79 0.08 185 / 0.15)
+zone audit "Regulatory trade surveillance" around [risk.credit, risk.ledger] {
+  padding: 1.25g
+  tint: oklch(0.79 0.08 185 / 0.16)
 }
 flow order_lifecycle "Order to settlement" {
-  reference.clients#party_id -> desks.equities -> risk.credit -> risk.greeks -> risk.ledger
+  reference.clients#party_id -> desks.equities -> desks.alloc -> risk.credit -> risk.ledger
 }

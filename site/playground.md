@@ -13,6 +13,6 @@ Edit the text or drag a node. On a touchscreen, swipe to pan and enable **Move n
 
 The Rust compiler runs locally in your browser. Changes stay in memory until you download or copy them. For another starting point, open an [example](/examples). The [spatial tools](/demo/advanced.html) demonstrate stratum tilt and branch morphs.
 
-</div>
+<p class="playground-note">Diagrams start at a readable scale (at least 55% on touchscreens and 70% on desktop). Pan to explore wide graphs, or choose <strong>Fit</strong> to see everything. Pinch to zoom on touchscreens. In the source editor, <strong>Tab</strong> and <strong>Shift+Tab</strong> indent by two spaces; <strong>Escape</strong>, then <strong>Tab</strong> moves focus out. SVG downloads include the current theme background for consistent viewing.</p>
 
-Diagrams start at a readable scale (at least 55% on touchscreens and 70% on desktop). Pan to explore wide graphs, or choose **Fit** to see everything. Pinch to zoom on touchscreens. In the source editor, **Tab** and **Shift+Tab** indent by two spaces; **Escape**, then **Tab** moves focus out. SVG downloads include the current theme background for consistent viewing.
+</div>

@@ -36,8 +36,6 @@ Modeled after Pikchr's self-documenting Markdown pipeline: fenced `diagram` bloc
 
 <<< ../examples/architecture.diagram
 
----
-
 ## Domain demonstrations
 
 See [Domain demonstrations](/guide/demonstrations) for the accompanying Rust binaries (`kube_operator_reconcile`, `nmts_fragment`, and `grafana_service_graph`).
@@ -49,52 +47,49 @@ Level-triggered controller reconciling `PostgresCluster CR` `#spec` and `#status
 [Open in the editor](/demo/?example=kube-operator) · [Download source](/examples/kube-operator.diagram) · [Walkthrough](/guide/demonstrations#_1-kubernetes-operator-reconciliation-loop)
 
 ```diagram views=control_loop,owned_resources
-kubectl: "kubectl / GitOps" [shape: person]
+kubectl: "kubectl / GitOps" [shape: actor] @sim(rate: 45, service_rate: 160)
 
 apiserver: "kube-apiserver" {
+  sts: "StatefulSet & Svc"
   cr: "PostgresCluster CR" [shape: sql_table] {
-    port spec: "generation: 7" [side: W, pos: 1]
-    port status: "observedGen: 7" [side: E, pos: 2]
+    port spec: DesiredSpec [side: W, pos: 1]
+    port status: ReadyStatus [side: E, pos: 2]
   }
-  sts: "StatefulSet + PVC\n(ownerRef)"
-  etcd: "etcd" [shape: database]
-  cr -- etcd: "watch RV"
-  sts -> etcd: "persist"
+  etcd: "etcd Quorum" [shape: database] @sim(service_rate: 180)
+  sts -> etcd: "store"
+  cr -> etcd: "RAFT"
 }
 
 operator: "Operator Controller" {
-  informer: "ListWatch Informer" @sim(rate: 36, service_rate: 120)
-  cache: "Indexer Cache" [shape: cache] @sim(service_rate: 200)
-  workqueue: "RateLimitingQueue" [shape: queue] @sim(service_rate: 90, queue_cap: 120)
-  reconciler: "Reconciler" @sim(service_rate: 45, queue_cap: 60, retry: exp_backoff(0.4, 0.25))
-  converged: "Converged?" [shape: diamond]
+  informer: "ListWatch Informer" @sim(service_rate: 150, queue_cap: 160)
+  workqueue: "RateLimitingQueue" [shape: queue] @sim(service_rate: 95, queue_cap: 140)
+  cache: "Indexer Cache" [shape: cache]
+  reconciler: "Reconciler" @sim(service_rate: 65, queue_cap: 90, retry: exp_backoff(0.4, 0.25))
 
-  informer -> cache: "ResourceVersion"
-  informer -> workqueue: "enqueue ns/name"
-  cache -> reconciler: "Get(key)"
-  workqueue -> reconciler: "Pop(key)"
-  reconciler -> converged: "diff spec"
-  converged -> workqueue: "RequeueAfter"
+  informer -> workqueue: "key"
+  informer -> cache: "sync"
+  workqueue -> reconciler: "pop"
+  cache -> reconciler: "get"
+  reconciler -> workqueue: "requeue"
 }
 
-kubectl -> apiserver.cr#spec: "apply spec"
-apiserver.cr -> operator.informer: "MODIFIED"
-operator.converged -> apiserver.sts: "SSA apply"
-operator.converged -> apiserver.cr#status: "patch status"
+kubectl -> apiserver.cr#spec: "apply"
+apiserver.cr -> operator.informer: "watch"
+operator.reconciler -> apiserver.cr#status: "status"
+operator.reconciler -> apiserver.sts: "SSA patch"
 
-zone rbac "ClusterRole: postgresclusters/finalizers" around [operator.reconciler, apiserver.cr, apiserver.sts] {
-  padding: 1.5g
-  tint: oklch(0.76 0.11 165 / 0.14)
+zone rbac "Controller RBAC scope" around [apiserver.sts, apiserver.cr] {
+  padding: 1.15g
+  tint: oklch(0.79 0.08 175 / 0.16)
 }
 view control_loop {
-  include apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> operator.converged -> apiserver.cr
+  include apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> apiserver.cr
 }
 view owned_resources {
-  include kubectl -> apiserver.cr -> apiserver.etcd
-  include operator.converged -> apiserver.sts -> apiserver.etcd
+  include kubectl -> apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> apiserver.sts -> apiserver.etcd
 }
-flow reconcile_pass "Level-triggered reconcile" {
-  kubectl -> apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> operator.converged -> apiserver.cr
+flow converge "Converged reconciliation" {
+  kubectl -> apiserver.cr#spec -> operator.informer -> operator.workqueue -> operator.reconciler -> apiserver.sts -> apiserver.etcd
 }
 ```
 
@@ -108,15 +103,13 @@ Temporospatial `nmts.v1.Fragment` entity-relationship graph spanning `GS Arlingt
 strata [logical, physical]
 
 gs_arlington: "GS Arlington (EK_PLATFORM)" {
-  sdn_gs: "Ground Agent\n(EK_SDN_AGENT)" [stratum: logical]
+  sdn_gs: "Spacetime SDN\n(EK_SDN_AGENT)" [stratum: logical]
   gs_node: "Gateway Router\n(EK_NETWORK_NODE)" [stratum: logical]
-  intf_gse: "gse0\n(EK_INTERFACE)" [stratum: logical]
   mod_ka: "DVB-S2X Mod\n(EK_MODULATOR)" [stratum: physical]
   ant_gs: "4.5m Ka Dish\n(EK_ANTENNA)" [stratum: physical]
 
-  sdn_gs -> gs_node: "RK_CONTROLS"
-  gs_node -> intf_gse: "RK_ORIGINATES"
-  intf_gse -> mod_ka: "RK_TRAVERSES"
+  sdn_gs -> mod_ka: "RK_CONTROLS"
+  gs_node -> mod_ka: "RK_TRAVERSES"
   mod_ka -> ant_gs: "RK_SIGNAL_TRANSITS"
 }
 
@@ -130,25 +123,22 @@ leo_142: "LEO-142 Sat (EK_PLATFORM)" {
 
   ant_sat -> demod_ka: "RK_SIGNAL_TRANSITS"
   demod_ka -> sat_node: "RK_TRAVERSES"
-  sat_node -> isl_port: "RK_TRAVERSES"
+  demod_ka -> isl_port: "RK_SIGNAL_TRANSITS"
 }
 
 gs_arlington.ant_gs -> ka_uplink: "RK_SIGNAL_TRANSITS"
 ka_uplink -> leo_142.ant_sat: "RK_SIGNAL_TRANSITS"
 
-zone contact_window "Contact window T+120s..540s" around [gs_arlington.ant_gs, ka_uplink, leo_142.ant_sat] {
-  padding: 1.5g
-  tint: oklch(0.80 0.09 205 / 0.16)
+zone contact_window "Contact window T+120s..540s" around [ka_uplink] {
+  padding: 1.4g
+  tint: oklch(0.80 0.09 205 / 0.18)
 }
 view rf_chain {
   include gs_arlington.mod_ka -> gs_arlington.ant_gs -> ka_uplink -> leo_142.ant_sat -> leo_142.demod_ka
 }
 view logical_bearer {
-  include gs_arlington.sdn_gs -> gs_arlington.gs_node -> gs_arlington.intf_gse
-  include leo_142.sat_node -> leo_142.isl_port
-}
-flow bearer "Scheduled Ka-band bearer" {
-  gs_arlington.gs_node -> gs_arlington.intf_gse -> gs_arlington.mod_ka -> gs_arlington.ant_gs -> ka_uplink -> leo_142.ant_sat -> leo_142.demod_ka -> leo_142.sat_node -> leo_142.isl_port
+  include gs_arlington.gs_node
+  include leo_142.sat_node
 }
 ```
 
@@ -164,20 +154,20 @@ frontend: "shop-frontend" @sim(service_rate: 300, queue_cap: 220) @bind(otel: "s
 catalog: "catalog-api" @sim(service_rate: 240, queue_cap: 160) @bind(otel: "service.name=catalog-api")
 checkout: "checkout-api" @sim(service_rate: 95, queue_cap: 120, retry: exp_backoff(0.3, 0.2)) @bind(otel: "service.name=checkout-api")
 redis: "redis-cart" [shape: cache] @sim(service_rate: 520) @bind(otel: "service.name=redis-cart")
-payments: "payment-gw\n(virtual)" @sim(service_rate: 55, queue_cap: 80) @bind(otel: "service.name=payment-gw")
 orders_db: "postgres-orders" [shape: database] @sim(service_rate: 150) @bind(otel: "service.name=postgres-orders")
 kafka: "kafka-orders" [shape: queue] @sim(service_rate: 200, queue_cap: 240) @bind(otel: "service.name=kafka-orders")
+payments: "payment-gw\n(virtual)" @sim(service_rate: 55, queue_cap: 80) @bind(otel: "service.name=payment-gw")
 
 ingress -> frontend: "240 rps"
 frontend -> catalog: "165 rps"
 frontend -> checkout: "1.9% err"
 catalog -> redis: "1ms"
-checkout -> payments: "p95 184ms"
 checkout -> orders_db: "14ms"
 checkout -> kafka: "60 rps"
+checkout -> payments: "p95 184ms"
 
-zone slo_burn "SLO error budget burn" around [checkout, payments] {
-  padding: 1.5g
+zone slo_burn "SLO error budget burn" around [payments] {
+  padding: 1.15g
   tint: oklch(0.76 0.12 35 / 0.16)
 }
 view slo_hotpath {
@@ -189,18 +179,15 @@ flow tail_latency "p95 checkout trace" {
 }
 ```
 
----
-
 ## Version-control histories & swimlanes
 
 ### Fossil branch, merge, and rebase commit DAG
 
-Modeled after Fossil's branching and *Rebase Considered Harmful* diagrams: trunk check-ins `C0..C7`, concurrent feature branch `C3..C5`, and replayed check-ins `C3'..C5'` projected into `merge_history` and `rebase_history` views.
+Modeled after Fossil's branching and *Rebase Considered Harmful* diagrams: trunk check-ins `C1..C7`, concurrent feature branch `C3..C5`, and replayed check-ins `C3'..C5'` projected into `merge_history` and `rebase_history` views.
 
 [Open in the editor](/demo/?example=fossil-branches) · [Download source](/examples/fossil-branches.diagram)
 
 ```diagram views=merge_history,rebase_history
-c0: C0
 c1: C1
 c2: C2
 c4: C4
@@ -211,46 +198,52 @@ c5: C5
 c3p: "C3'"
 c5p: "C5'"
 
-c0.E -> c1.W
 c1.E -> c2.W
 c2.E -> c4.W
 c4.E -> c6.W
 c6.E -> c7.W
 
 c2.N -> c3.W: fork
-c3.E -> c5.W
+c3.E -> c5.W: branch
 c5.E -> c7.N: merge
 
-c6.S -> c3p.W: rebase
+c4.S -> c3p.W: rebase
 c3p.E -> c5p.W
 
-align row [c0, c1, c2, c4, c6, c7]
 align row [c3, c5]
+align row [c1, c2, c4, c6, c7]
 align row [c3p, c5p]
+align col [c3, c4]
+distribute col [c3, c4] [gap: 4g]
+align col [c5, c6, c3p]
+distribute col [c5, c6, c3p] [gap: 4g]
+align col [c7, c5p]
+distribute col [c7, c5p] [gap: 4g]
 
-zone trunk_lane "trunk" around [c0, c1, c2, c4, c6, c7] {
-  padding: 1.25g
-  tint: oklch(0.80 0.07 230 / 0.16)
-}
 zone feature_lane "feature branch" around [c3, c5] {
-  padding: 1.25g
+  padding: 1.1g
   tint: oklch(0.80 0.09 165 / 0.16)
 }
+zone trunk_lane "trunk" around [c1, c2, c4, c6, c7] {
+  padding: 1.1g
+  tint: oklch(0.80 0.07 230 / 0.16)
+}
 zone rebased_lane "replayed branch" around [c3p, c5p] {
-  padding: 1.25g
+  padding: 1.1g
   tint: oklch(0.82 0.10 75 / 0.16)
 }
+
 view merge_history {
-  include c0 -> c1 -> c2 -> c4 -> c6 -> c7
+  include c1 -> c2 -> c4 -> c6 -> c7
   include c2 -> c3 -> c5 -> c7
 }
 view rebase_history {
-  include c0 -> c1 -> c2 -> c4 -> c6
+  include c1 -> c2 -> c4 -> c6
   include c2 -> c3 -> c5
-  include c6 -> c3p -> c5p
+  include c4 -> c3p -> c5p
 }
 flow ancestry "True merge lineage" {
-  c0 -> c1 -> c2 -> c3 -> c5 -> c7
+  c2 -> c3 -> c5 -> c7
 }
 ```
 
@@ -261,8 +254,6 @@ Four autonomous repositories sync, branch offline, and merge without a central l
 [Open in the editor](/demo/?example=fossil-swimlanes) · [Download source](/examples/fossil-swimlanes.diagram)
 
 <<< ../examples/fossil-swimlanes.diagram
-
----
 
 ## Multi-tier & TALA-style domain architectures
 
@@ -289,8 +280,6 @@ Four autonomous repositories sync, branch offline, and merge without a central l
 [Open in the editor](/demo/?example=sqlite-layers) · [Download source](/examples/sqlite-layers.diagram)
 
 <<< ../examples/sqlite-layers.diagram
-
----
 
 ## Simulation, strata & planar routing studies
 

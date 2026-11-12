@@ -4,20 +4,20 @@ frontend: "shop-frontend" @sim(service_rate: 300, queue_cap: 220) @bind(otel: "s
 catalog: "catalog-api" @sim(service_rate: 240, queue_cap: 160) @bind(otel: "service.name=catalog-api")
 checkout: "checkout-api" @sim(service_rate: 95, queue_cap: 120, retry: exp_backoff(0.3, 0.2)) @bind(otel: "service.name=checkout-api")
 redis: "redis-cart" [shape: cache] @sim(service_rate: 520) @bind(otel: "service.name=redis-cart")
-payments: "payment-gw\n(virtual)" @sim(service_rate: 55, queue_cap: 80) @bind(otel: "service.name=payment-gw")
 orders_db: "postgres-orders" [shape: database] @sim(service_rate: 150) @bind(otel: "service.name=postgres-orders")
 kafka: "kafka-orders" [shape: queue] @sim(service_rate: 200, queue_cap: 240) @bind(otel: "service.name=kafka-orders")
+payments: "payment-gw\n(virtual)" @sim(service_rate: 55, queue_cap: 80) @bind(otel: "service.name=payment-gw")
 
 ingress -> frontend: "240 rps"
 frontend -> catalog: "165 rps"
 frontend -> checkout: "1.9% err"
 catalog -> redis: "1ms"
-checkout -> payments: "p95 184ms"
 checkout -> orders_db: "14ms"
 checkout -> kafka: "60 rps"
+checkout -> payments: "p95 184ms"
 
-zone slo_burn "SLO error budget burn" around [checkout, payments] {
-  padding: 1.5g
+zone slo_burn "SLO error budget burn" around [ payments ] {
+  padding: 1.15g
   tint: oklch(0.76 0.12 35 / 0.16)
 }
 view slo_hotpath {

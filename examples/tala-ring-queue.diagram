@@ -1,21 +1,20 @@
 # Producer-consumer ring buffer and worker pool (inspired by D2 TALA Golang Queue).
-p1: "Producer 01" @sim(rate: 35, service_rate: 120)
-p2: "Producer 02" @sim(rate: 35, service_rate: 120)
-p3: "Producer 03" @sim(rate: 35, service_rate: 120)
-api: "Task Ingress" @sim(service_rate: 140, queue_cap: 180)
+p1: "Producer 01" @sim(rate: 40, service_rate: 120)
+p2: "Producer 02" @sim(rate: 40, service_rate: 120)
+p3: "Producer 03" @sim(rate: 40, service_rate: 120)
+api: "Task Ingress" @sim(service_rate: 150, queue_cap: 180)
 
 queue_lib: "Queue Runtime" {
-  writer: "Slot Writer"
-  ring: "Ring Buffer" [shape: queue] @sim(service_rate: 110, queue_cap: 160)
-  disp: "Dispatcher" @sim(service_rate: 120, queue_cap: 100)
+  writer: "Slot Writer" [shape: rect]
+  ring: "Ring Buffer" [shape: queue] @sim(service_rate: 130, queue_cap: 160)
+  disp: "Dispatcher" [shape: rect] @sim(service_rate: 135, queue_cap: 100)
   writer -> ring: enqueue
   ring -> disp: claim
 }
 
-w1: "Worker 01" @sim(service_rate: 35, queue_cap: 40)
-w2: "Worker 02" @sim(service_rate: 35, queue_cap: 40)
-w3: "Worker 03" @sim(service_rate: 35, queue_cap: 40)
-w4: "Worker 04" @sim(service_rate: 35, queue_cap: 40)
+w1: "Worker 01" @sim(service_rate: 45, queue_cap: 40)
+w2: "Worker 02" @sim(service_rate: 45, queue_cap: 40)
+w3: "Worker 03" @sim(service_rate: 45, queue_cap: 40)
 
 p1 -> api: submit
 p2 -> api: submit
@@ -24,10 +23,3 @@ api -> queue_lib.writer: batch
 queue_lib.disp -> w1: dispatch
 queue_lib.disp -> w2: dispatch
 queue_lib.disp -> w3: dispatch
-queue_lib.disp -> w4: dispatch
-
-align col [p1, p2, p3]
-align col [w1, w2, w3, w4]
-flow task_path "Ring buffer dispatch" {
-  p1 -> api -> queue_lib.writer -> queue_lib.ring -> queue_lib.disp -> w1
-}

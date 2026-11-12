@@ -12,7 +12,7 @@ const active = ref(0), zoom = ref(1), showGrid = ref(false), viewport = ref<HTML
 const id = useId(), current = computed(() => props.examples[active.value])
 const bounds = computed(() => current.value.viewBox)
 const imageStyle = computed(() => ({ width:`${bounds.value[2]*zoom.value}px`, height:`${bounds.value[3]*zoom.value}px` }))
-const fitScale = computed(() => Math.max(readable.value ? coarse.value ? .55 : .7 : .05, Math.min(1, viewportWidth.value / bounds.value[2], 440 / bounds.value[3])))
+const fitScale = computed(() => Math.max(readable.value ? coarse.value ? .55 : .7 : .05, Math.min(1, viewportWidth.value / bounds.value[2], 520 / bounds.value[3])))
 const percent = computed(() => `${Math.round(zoom.value*100)}%`)
 const gridLines = computed(() => {
   const [x,y,w,h]=bounds.value, grid=current.value.grid

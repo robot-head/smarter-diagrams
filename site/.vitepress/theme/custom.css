@@ -1,4 +1,5 @@
 :root {
+  --vp-layout-max-width: 1520px;
   --vp-c-brand-1: #146c5f;
   --vp-c-brand-2: #117a6b;
   --vp-c-brand-3: #168c7b;
@@ -13,8 +14,18 @@
   --vp-c-brand-1: #64d7bc;
   --vp-c-brand-2: #54c8af;
   --vp-c-brand-3: #168c7b;
+  --vp-c-brand-soft: rgba(100, 215, 188, 0.12);
   --vp-home-hero-name-color: var(--vp-c-text-1);
   --vp-home-hero-name-background: none;
+}
+
+.VPHomeHero .container {
+  gap: 32px;
+  align-items: center;
+}
+
+.VPHomeHero .main {
+  min-width: 0;
 }
 
 .VPHomeHero .name,
@@ -23,18 +34,44 @@
 }
 
 .VPHomeHero .text {
-  font-size: clamp(1.75rem, 3.1vw, 2.55rem) !important;
-  line-height: 1.18 !important;
-  max-width: 19ch;
+  font-size: clamp(1.75rem, 2.8vw, 2.4rem) !important;
+  line-height: 1.16 !important;
+  max-width: 18.5ch;
 }
 
 .VPHomeHero .tagline {
-  max-width: 54ch;
-  line-height: 1.6;
+  max-width: 39ch;
+  font-size: clamp(0.98rem, 1.18vw, 1.08rem) !important;
+  line-height: 1.62 !important;
+  padding-top: 12px !important;
+}
+
+.VPHomeHero .actions {
+  padding-top: 24px !important;
+  gap: 10px;
+}
+
+.VPHome .image-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .VPHome .image-container .image-bg {
   display: none;
+}
+
+/* Override VitePress absolute centering on hero image so it never collides with hero copy. */
+@media (min-width: 960px) {
+  .VPHomeHero .image-container {
+    transform: none !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+  .VPHomeHero .image-src {
+    position: static !important;
+    transform: none !important;
+  }
 }
 
 .VPHome .image-src,
@@ -51,13 +88,17 @@
   height: auto;
   border: 1px solid var(--vp-c-divider);
   border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 10px 30px rgba(15, 28, 38, 0.06);
+  padding: 18px;
+  box-shadow: 0 12px 32px rgba(15, 28, 38, 0.06);
+}
+
+.dark .VPHome .image-src {
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
 }
 
 /* Expand home document showcase so source and live diagrams read side-by-side cleanly on desktop. */
 .VPHome .vp-doc.container {
-  max-width: 1152px !important;
+  max-width: 1368px !important;
   padding-top: 8px;
 }
 
@@ -100,7 +141,7 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--vp-c-text-2);
-  margin: 44px 0 6px !important;
+  margin: 48px 0 6px !important;
 }
 
 .VPHome .vp-doc h2 {
@@ -116,7 +157,7 @@
 }
 
 .VPHome .vp-doc h3 {
-  margin-top: 32px;
+  margin-top: 34px;
   letter-spacing: -0.015em;
 }
 
@@ -128,10 +169,10 @@
 
 .sd-split {
   display: grid;
-  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 0.76fr) minmax(0, 1.24fr);
+  gap: 22px;
   align-items: start;
-  margin: 16px 0 32px;
+  margin: 16px 0 34px;
 }
 
 .sd-split > div[class*='language-'],
@@ -142,8 +183,14 @@
   border-radius: 10px;
 }
 
+.sd-split > div[class*='language-'] pre,
+.sd-wide > div[class*='language-'] pre {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .sd-split > div[class*='language-'] pre {
-  max-height: 500px;
+  max-height: 540px;
   overflow: auto;
 }
 
@@ -156,7 +203,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
-  margin: 16px 0 36px;
+  margin: 16px 0 38px;
 }
 
 .sd-wide > div[class*='language-'] pre {
@@ -200,6 +247,7 @@
 
 .playground-note {
   font-size: 14px;
+  color: var(--vp-c-text-2);
 }
 
 /* Figures use native text scale; pan and explicit Fit preserve readability. */
@@ -228,11 +276,17 @@
   background: var(--vp-c-bg-soft);
   color: var(--vp-c-text-1);
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 6px 11px;
   font: inherit;
   font-size: 13px;
   min-height: 34px;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.diagram-controls button:hover,
+.diagram-tabs button:hover {
+  border-color: var(--vp-c-brand-1);
 }
 
 .diagram-controls button:focus-visible,
@@ -245,12 +299,14 @@
 
 .diagram-tabs button[aria-selected=true] {
   border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
   color: var(--vp-c-brand-1);
   font-weight: 650;
 }
 
 .diagram-controls output {
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
   min-width: 44px;
   text-align: center;
 }
@@ -268,7 +324,7 @@
 }
 
 .diagram-viewport {
-  max-height: 480px;
+  max-height: 560px;
   overflow: auto;
   border: 1px solid var(--vp-c-divider);
   border-radius: 10px;
@@ -336,9 +392,9 @@
 }
 
 .diagram-diagnostic {
-  border-left: 4px solid #a64732;
+  border: 1px solid rgba(166, 71, 50, 0.42);
   background: var(--vp-c-bg-soft);
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 16px;
   margin: 20px 0;
 }
@@ -357,9 +413,9 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--vp-c-brand-1);
-  padding: 3px 7px;
-  background: var(--vp-c-bg-soft);
-  border-radius: 4px;
+  padding: 3px 8px;
+  background: var(--vp-c-brand-soft);
+  border-radius: 5px;
 }
 
 .table-scroll {
@@ -409,8 +465,16 @@
 
 @media (min-width: 1280px) {
   .VPHome .image-src {
-    max-width: 560px;
+    max-width: 550px;
     padding: 18px;
+  }
+  .VPDoc.has-aside .content-container {
+    max-width: 860px !important;
+  }
+  .VPDoc .vp-doc > div > p,
+  .VPDoc .vp-doc > div > ul,
+  .VPDoc .vp-doc > div > ol {
+    max-width: 74ch;
   }
 }
 
@@ -474,7 +538,7 @@
 
 @media (max-width: 640px) {
   .VPHome .image-src {
-    max-width: 320px;
+    max-width: 340px;
     padding: 14px;
   }
   .sd-pillars {

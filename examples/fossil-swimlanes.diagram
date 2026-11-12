@@ -1,10 +1,10 @@
 # Distributed peer check-in swimlanes (after Fossil's branching & syncing paper).
 alan: "Alan (origin)" {
   a1: "check-in 1"
-  a2: "check-in 2"
   a3: "fork 3"
+  a2: "check-in 2"
+  a1 -> a3: fork
   a1 -> a2: trunk
-  a1 -> a3: "fork!"
 }
 betty: "Betty (peer)" {
   b3: "pull 3"
@@ -14,7 +14,7 @@ betty: "Betty (peer)" {
 charlie: "Charlie (offline)" {
   c2: "clone 2"
   c5: "offline 5"
-  c2 -> c5: local
+  c2 -> c5
 }
 darlene: "Darlene (merge)" {
   d4: "pull 3,4"
@@ -24,10 +24,10 @@ darlene: "Darlene (merge)" {
   d5 -> d6: merge
 }
 
-alan.a3.E -> betty.b3.W: sync
-alan.a2.E -> charlie.c2.W: clone
-betty.b4.E -> darlene.d4.W: push
-charlie.c5.E -> darlene.d5.W: push
+alan.a3 -> betty.b3: sync
+alan.a2 -> charlie.c2: clone
+betty.b4 -> darlene.d4: push
+charlie.c5 -> darlene.d5: push
 
 flow converge "Distributed convergence" {
   alan.a1 -> alan.a2 -> charlie.c2 -> charlie.c5 -> darlene.d5 -> darlene.d6

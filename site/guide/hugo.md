@@ -47,13 +47,16 @@ Tag any fenced Markdown code block with `diagram` or `smarter-diagrams` and pass
 
 ```markdown
 ~~~diagram {view="control_loop" caption="Operator watch and status loop" showSource="details"}
-kubectl: "kubectl / GitOps" [shape: person]
+kubectl: "kubectl / GitOps" [shape: actor]
 apiserver: "kube-apiserver"
 reconciler: "Operator Reconciler"
 
-kubectl -> apiserver: "apply CR"
-apiserver -> reconciler: "watch event"
-reconciler -> apiserver: "patch status"
+kubectl.E -> apiserver.W: "apply CR"
+apiserver.E -> reconciler.W: "watch event"
+reconciler.N -> apiserver.N: "patch status"
+
+align row [kubectl, apiserver, reconciler]
+distribute row [kubectl, apiserver, reconciler] [gap: 8g]
 
 view control_loop {
   include apiserver -> reconciler -> apiserver
@@ -64,13 +67,16 @@ view control_loop {
 The block above compiles to the same canonical graph and `control_loop` projection shown below:
 
 ```diagram views=control_loop
-kubectl: "kubectl / GitOps" [shape: person]
+kubectl: "kubectl / GitOps" [shape: actor]
 apiserver: "kube-apiserver"
 reconciler: "Operator Reconciler"
 
-kubectl -> apiserver: "apply CR"
-apiserver -> reconciler: "watch event"
-reconciler -> apiserver: "patch status"
+kubectl.E -> apiserver.W: "apply CR"
+apiserver.E -> reconciler.W: "watch event"
+reconciler.N -> apiserver.N: "patch status"
+
+align row [kubectl, apiserver, reconciler]
+distribute row [kubectl, apiserver, reconciler] [gap: 8g]
 
 view control_loop {
   include apiserver -> reconciler -> apiserver

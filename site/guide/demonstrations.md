@@ -6,63 +6,58 @@ Three end-to-end demonstrations pair declarative `.diagram` models with runnable
 2. **Outernet Council NMTS fragment** — lowering [`nmts.v1.Fragment`](https://github.com/outernetcouncil/nmts) entities (`EK_*`) and relationships (`RK_*`) into nested platforms, logical/physical strata, and temporospatial contact-window diffs.
 3. **Grafana service graph and OTLP drift** — converting Tempo `traces_service_graph_request_*` RED span metrics into an annotated topology and reconciling live OpenTelemetry spans to surface undeclared calls.
 
----
-
 ## 1. Kubernetes operator reconciliation loop
 
 [Open in the editor](/demo/?example=kube-operator) · [Download `kube-operator.diagram`](/examples/kube-operator.diagram)
 
-Kubernetes controllers act as level-triggered feedback loops rather than linear request pipelines. `PostgresCluster CR` declares separate `#spec` and `#status` record ports on `kube-apiserver`; `ListWatch Informer` populates `Indexer Cache` and enqueues keys into `RateLimitingQueue`; `Reconciler` reads cached state without hitting `etcd`, applies owned `StatefulSet` resources via server-side apply, and requeues transient `409 Conflict` errors with exponential backoff.
+Kubernetes controllers act as level-triggered feedback loops rather than linear request pipelines. `PostgresCluster CR` declares separate `#spec` and `#status` record ports on `kube-apiserver`; `ListWatch Informer` populates `Indexer Cache` and enqueues keys into `RateLimitingQueue`; `Reconciler` reads cached state without hitting `etcd`, patches owned `StatefulSet & Svc` resources via server-side apply, and requeues transient `409 Conflict` errors with exponential backoff.
 
 Switch between **Canonical graph**, **View: control_loop**, and **View: owned_resources** below:
 
 ```diagram views=control_loop,owned_resources
-kubectl: "kubectl / GitOps" [shape: person]
+kubectl: "kubectl / GitOps" [shape: actor] @sim(rate: 45, service_rate: 160)
 
 apiserver: "kube-apiserver" {
+  sts: "StatefulSet & Svc"
   cr: "PostgresCluster CR" [shape: sql_table] {
-    port spec: "generation: 7" [side: W, pos: 1]
-    port status: "observedGen: 7" [side: E, pos: 2]
+    port spec: DesiredSpec [side: W, pos: 1]
+    port status: ReadyStatus [side: E, pos: 2]
   }
-  sts: "StatefulSet + PVC\n(ownerRef)"
-  etcd: "etcd" [shape: database]
-  cr -- etcd: "watch RV"
-  sts -> etcd: "persist"
+  etcd: "etcd Quorum" [shape: database] @sim(service_rate: 180)
+  sts -> etcd: "store"
+  cr -> etcd: "RAFT"
 }
 
 operator: "Operator Controller" {
-  informer: "ListWatch Informer" @sim(rate: 36, service_rate: 120)
-  cache: "Indexer Cache" [shape: cache] @sim(service_rate: 200)
-  workqueue: "RateLimitingQueue" [shape: queue] @sim(service_rate: 90, queue_cap: 120)
-  reconciler: "Reconciler" @sim(service_rate: 45, queue_cap: 60, retry: exp_backoff(0.4, 0.25))
-  converged: "Converged?" [shape: diamond]
+  informer: "ListWatch Informer" @sim(service_rate: 150, queue_cap: 160)
+  workqueue: "RateLimitingQueue" [shape: queue] @sim(service_rate: 95, queue_cap: 140)
+  cache: "Indexer Cache" [shape: cache]
+  reconciler: "Reconciler" @sim(service_rate: 65, queue_cap: 90, retry: exp_backoff(0.4, 0.25))
 
-  informer -> cache: "ResourceVersion"
-  informer -> workqueue: "enqueue ns/name"
-  cache -> reconciler: "Get(key)"
-  workqueue -> reconciler: "Pop(key)"
-  reconciler -> converged: "diff spec"
-  converged -> workqueue: "RequeueAfter"
+  informer -> workqueue: "key"
+  informer -> cache: "sync"
+  workqueue -> reconciler: "pop"
+  cache -> reconciler: "get"
+  reconciler -> workqueue: "requeue"
 }
 
-kubectl -> apiserver.cr#spec: "apply spec"
-apiserver.cr -> operator.informer: "MODIFIED"
-operator.converged -> apiserver.sts: "SSA apply"
-operator.converged -> apiserver.cr#status: "patch status"
+kubectl -> apiserver.cr#spec: "apply"
+apiserver.cr -> operator.informer: "watch"
+operator.reconciler -> apiserver.cr#status: "status"
+operator.reconciler -> apiserver.sts: "SSA patch"
 
-zone rbac "ClusterRole: postgresclusters/finalizers" around [operator.reconciler, apiserver.cr, apiserver.sts] {
-  padding: 1.5g
-  tint: oklch(0.76 0.11 165 / 0.14)
+zone rbac "Controller RBAC scope" around [apiserver.sts, apiserver.cr] {
+  padding: 1.15g
+  tint: oklch(0.79 0.08 175 / 0.16)
 }
 view control_loop {
-  include apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> operator.converged -> apiserver.cr
+  include apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> apiserver.cr
 }
 view owned_resources {
-  include kubectl -> apiserver.cr -> apiserver.etcd
-  include operator.converged -> apiserver.sts -> apiserver.etcd
+  include kubectl -> apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> apiserver.sts -> apiserver.etcd
 }
-flow reconcile_pass "Level-triggered reconcile" {
-  kubectl -> apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> operator.converged -> apiserver.cr
+flow converge "Converged reconciliation" {
+  kubectl -> apiserver.cr#spec -> operator.informer -> operator.workqueue -> operator.reconciler -> apiserver.sts -> apiserver.etcd
 }
 ```
 
@@ -123,29 +118,25 @@ Run the full example (pass an optional output directory to write both SVGs):
 cargo run --locked --all-features --example kube_operator_reconcile
 ```
 
----
-
 ## 2. Outernet Council NMTS fragment
 
 [Open in the editor](/demo/?example=nmts-fragment) · [Download `nmts-fragment.diagram`](/examples/nmts-fragment.diagram)
 
-The [Outernet Council Network Modeling for Temporospatial Systems (NMTS)](https://github.com/outernetcouncil/nmts) protobuf schema (`nmts.v1.Fragment`) models terrestrial, submarine, aviation, and orbital networks as typed `Entity` vertices (`EK_PLATFORM`, `EK_NETWORK_NODE`, `EK_INTERFACE`, `EK_MODULATOR`, `EK_ANTENNA`, `EK_PHYSICAL_MEDIUM_LINK`, `EK_SDN_AGENT`) connected by typed `Relationship` edges (`RK_CONTAINS`, `RK_ORIGINATES`, `RK_TRAVERSES`, `RK_SIGNAL_TRANSITS`, `RK_CONTROLS`).
+The [Outernet Council Network Modeling for Temporospatial Systems (NMTS)](https://github.com/outernetcouncil/nmts) protobuf schema (`nmts.v1.Fragment`) models terrestrial, submarine, aviation, and orbital networks as typed `Entity` vertices (`EK_PLATFORM`, `EK_NETWORK_NODE`, `EK_MODULATOR`, `EK_ANTENNA`, `EK_PHYSICAL_MEDIUM_LINK`, `EK_SDN_AGENT`, `EK_PORT`) connected by typed `Relationship` edges (`RK_CONTAINS`, `RK_TRAVERSES`, `RK_SIGNAL_TRANSITS`, `RK_CONTROLS`).
 
-Mapping `RK_CONTAINS` into scoped containers and separating `logical` packet entities from `physical` RF/optical hardware produces a multi-stratum model where `rf_chain` isolates the 29.5 GHz Ka-band carrier path and `logical_bearer` collapses the physical RF chain into a single summary hop between `GS Arlington` and `LEO-142 Sat`:
+Mapping `RK_CONTAINS` into scoped containers and separating `logical` packet entities from `physical` RF/optical hardware produces a multi-stratum model where `rf_chain` isolates the 29.5 GHz Ka-band carrier path and `logical_bearer` collapses the physical RF chain into a single `via` summary hop between `Gateway Router` and `Onboard Switch`:
 
 ```diagram views=rf_chain,logical_bearer
 strata [logical, physical]
 
 gs_arlington: "GS Arlington (EK_PLATFORM)" {
-  sdn_gs: "Ground Agent\n(EK_SDN_AGENT)" [stratum: logical]
+  sdn_gs: "Spacetime SDN\n(EK_SDN_AGENT)" [stratum: logical]
   gs_node: "Gateway Router\n(EK_NETWORK_NODE)" [stratum: logical]
-  intf_gse: "gse0\n(EK_INTERFACE)" [stratum: logical]
   mod_ka: "DVB-S2X Mod\n(EK_MODULATOR)" [stratum: physical]
   ant_gs: "4.5m Ka Dish\n(EK_ANTENNA)" [stratum: physical]
 
-  sdn_gs -> gs_node: "RK_CONTROLS"
-  gs_node -> intf_gse: "RK_ORIGINATES"
-  intf_gse -> mod_ka: "RK_TRAVERSES"
+  sdn_gs -> mod_ka: "RK_CONTROLS"
+  gs_node -> mod_ka: "RK_TRAVERSES"
   mod_ka -> ant_gs: "RK_SIGNAL_TRANSITS"
 }
 
@@ -159,25 +150,22 @@ leo_142: "LEO-142 Sat (EK_PLATFORM)" {
 
   ant_sat -> demod_ka: "RK_SIGNAL_TRANSITS"
   demod_ka -> sat_node: "RK_TRAVERSES"
-  sat_node -> isl_port: "RK_TRAVERSES"
+  demod_ka -> isl_port: "RK_SIGNAL_TRANSITS"
 }
 
 gs_arlington.ant_gs -> ka_uplink: "RK_SIGNAL_TRANSITS"
 ka_uplink -> leo_142.ant_sat: "RK_SIGNAL_TRANSITS"
 
-zone contact_window "Contact window T+120s..540s" around [gs_arlington.ant_gs, ka_uplink, leo_142.ant_sat] {
-  padding: 1.5g
-  tint: oklch(0.80 0.09 205 / 0.16)
+zone contact_window "Contact window T+120s..540s" around [ka_uplink] {
+  padding: 1.4g
+  tint: oklch(0.80 0.09 205 / 0.18)
 }
 view rf_chain {
   include gs_arlington.mod_ka -> gs_arlington.ant_gs -> ka_uplink -> leo_142.ant_sat -> leo_142.demod_ka
 }
 view logical_bearer {
-  include gs_arlington.sdn_gs -> gs_arlington.gs_node -> gs_arlington.intf_gse
-  include leo_142.sat_node -> leo_142.isl_port
-}
-flow bearer "Scheduled Ka-band bearer" {
-  gs_arlington.gs_node -> gs_arlington.intf_gse -> gs_arlington.mod_ka -> gs_arlington.ant_gs -> ka_uplink -> leo_142.ant_sat -> leo_142.demod_ka -> leo_142.sat_node -> leo_142.isl_port
+  include gs_arlington.gs_node
+  include leo_142.sat_node
 }
 ```
 
@@ -218,36 +206,34 @@ Run the NMTS fragment pipeline:
 cargo run --locked --all-features --example nmts_fragment
 ```
 
----
-
 ## 3. Grafana service graph and OTLP trace drift
 
 [Open in the editor](/demo/?example=grafana-service-graph) · [Download `grafana-service-graph.diagram`](/examples/grafana-service-graph.diagram)
 
 Grafana Tempo and Grafana Alloy's `servicegraph` connector pair client and server spans into Prometheus series (`traces_service_graph_request_total`, `traces_service_graph_request_failed_total`, `traces_service_graph_request_server_seconds_sum`, and `connection_type="database" | "messaging_system" | "virtual_node"`). Lowering those RED metrics into `.diagram` source attaches `@bind(otel: "service.name=...")` and `@sim(...)` capacities to every node while highlighting error-budget burn zones.
 
-Switch between the full mesh, **View: slo_hotpath**, and **Focus: checkout (1 hop)** below:
+Switch between **Canonical graph** and **View: slo_hotpath** below:
 
-```diagram views=slo_hotpath focus=checkout
+```diagram views=slo_hotpath
 ingress: "ingress-nginx" @sim(rate: 240, service_rate: 420) @bind(otel: "service.name=ingress-nginx")
 frontend: "shop-frontend" @sim(service_rate: 300, queue_cap: 220) @bind(otel: "service.name=shop-frontend")
 catalog: "catalog-api" @sim(service_rate: 240, queue_cap: 160) @bind(otel: "service.name=catalog-api")
 checkout: "checkout-api" @sim(service_rate: 95, queue_cap: 120, retry: exp_backoff(0.3, 0.2)) @bind(otel: "service.name=checkout-api")
 redis: "redis-cart" [shape: cache] @sim(service_rate: 520) @bind(otel: "service.name=redis-cart")
-payments: "payment-gw\n(virtual)" @sim(service_rate: 55, queue_cap: 80) @bind(otel: "service.name=payment-gw")
 orders_db: "postgres-orders" [shape: database] @sim(service_rate: 150) @bind(otel: "service.name=postgres-orders")
 kafka: "kafka-orders" [shape: queue] @sim(service_rate: 200, queue_cap: 240) @bind(otel: "service.name=kafka-orders")
+payments: "payment-gw\n(virtual)" @sim(service_rate: 55, queue_cap: 80) @bind(otel: "service.name=payment-gw")
 
 ingress -> frontend: "240 rps"
 frontend -> catalog: "165 rps"
 frontend -> checkout: "1.9% err"
 catalog -> redis: "1ms"
-checkout -> payments: "p95 184ms"
 checkout -> orders_db: "14ms"
 checkout -> kafka: "60 rps"
+checkout -> payments: "p95 184ms"
 
-zone slo_burn "SLO error budget burn" around [checkout, payments] {
-  padding: 1.5g
+zone slo_burn "SLO error budget burn" around [payments] {
+  padding: 1.15g
   tint: oklch(0.76 0.12 35 / 0.16)
 }
 view slo_hotpath {

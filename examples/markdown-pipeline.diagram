@@ -3,8 +3,12 @@ markdown: "Markdown\nsource"
 formatter: "Site engine\n(Hugo / VitePress)"
 compiler: "Smarter Diagrams\n(CLI or Wasm)"
 output: "HTML + SVG\ndocument"
-markdown.E -> formatter.W: "fenced diagram"
-formatter.E -> output.W: "accessible SVG"
-formatter.S <-> compiler.N: "compile / source"
+
+markdown.E -> formatter.W: "fenced block"
+formatter.E -> output.W: "inline SVG"
+formatter.S <-> compiler.N: "compile"
+
 align row [markdown, formatter, output]
+distribute row [markdown, formatter, output] [gap: 8g]
 align col [formatter, compiler]
+distribute col [formatter, compiler] [gap: 5.5g]
