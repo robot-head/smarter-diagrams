@@ -334,7 +334,7 @@ pub fn layout(
         }
         rects.push(r);
     }
-    let requests = port_requests(scene, &rects);
+    let requests = port_requests(scene, &rects, o, previous);
     for (i, rect) in rects.iter_mut().enumerate() {
         for side in [Side::N, Side::E, Side::S, Side::W] {
             let ps: Vec<_> = requests
@@ -500,7 +500,7 @@ pub fn layout(
             break;
         }
     }
-    let requests = port_requests(scene, &rects);
+    let requests = port_requests(scene, &rects, o, previous);
     grow_port_perimeters(&requests, &mut rects, o)?;
     // Absolute child pins can enlarge an auto-sized container; explicit size locks stay hard.
     for i in (0..n).rev() {
@@ -1067,26 +1067,106 @@ fn check_pin_cycles(scene: &SceneGraph, anns: &[Vec<Annotation>]) -> Result<(), 
     }
     Ok(())
 }
-fn port_requests(scene: &SceneGraph, rects: &[Rect]) -> Vec<PortRequest> {
+// Select free attachment sides jointly. Center-vector heuristics alone can
+// choose a side whose outward stub points into another node or forces a loop.
+fn attachment_pair(
+    scene: &SceneGraph,
+    rects: &[Rect],
+    e: &Edge,
+    o: &LayoutOptions,
+    prior: Option<&Layout>,
+) -> (Side, Side) {
+    let ai = scene.index(&e.source.node).unwrap();
+    let bi = scene.index(&e.target.node).unwrap();
+    if ai == bi {
+        return (
+            e.source.constraint.side().unwrap_or(Side::E),
+            e.target.constraint.side().unwrap_or(Side::N),
+        );
+    }
+    let point = |r: Rect, s: Side| match s {
+        Side::N => Point::new(r.x, r.top()),
+        Side::E => Point::new(r.right(), r.y),
+        Side::S => Point::new(r.x, r.bottom()),
+        Side::W => Point::new(r.left(), r.y),
+    };
+    let mut best = (f64::INFINITY, Side::E, Side::W);
+    let sides = [Side::E, Side::W, Side::S, Side::N];
+    for sa in sides {
+        for sb in sides {
+            if e.source.constraint.side().is_some_and(|s| s != sa)
+                || e.target.constraint.side().is_some_and(|s| s != sb)
+            {
+                continue;
+            }
+            let a = point(rects[ai], sa);
+            let b = point(rects[bi], sb);
+            let (ax, ay) = sa.normal();
+            let (bx, by) = sb.normal();
+            let u = a.offset(ax * o.stub, ay * o.stub);
+            let v = b.offset(bx * o.stub, by * o.stub);
+            for corner in [Point::new(u.x, v.y), Point::new(v.x, u.y)] {
+                let path = [a, u, corner, v, b];
+                let mut cost = path.windows(2).map(|p| p[0].distance(p[1])).sum::<f64>();
+                cost += crate::routing::coalesced(&path).len().saturating_sub(2) as f64
+                    * o.weights.bend;
+                for (index, p) in path.windows(2).enumerate() {
+                    if p[0].distance(p[1]) < 1e-6 {
+                        continue;
+                    }
+                    for (i, r) in rects.iter().enumerate() {
+                        if i == ai && index == 0 || i == bi && index == 3 {
+                            continue;
+                        }
+                        if scene.nodes[i].container {
+                            continue;
+                        }
+                        if r.inflate(o.margin).blocks(p[0], p[1]) {
+                            cost += 100000.;
+                        }
+                    }
+                }
+                // Penalize departures and arrivals that immediately reverse their
+                // mandatory outward stubs, including zero-length corner legs.
+                let after = if u.distance(corner) > 1e-6 { corner } else { v };
+                let before = if v.distance(corner) > 1e-6 { corner } else { u };
+                if (after.x - u.x) * ax + (after.y - u.y) * ay < -1e-6 {
+                    cost += 100000.;
+                }
+                if (before.x - v.x) * bx + (before.y - v.y) * by < -1e-6 {
+                    cost += 100000.;
+                }
+                if let Some(prior) = prior {
+                    for (key, side) in [(port_key(e, true), sa), (port_key(e, false), sb)] {
+                        if prior.ports.get(&key).is_some_and(|p| p.side != side) {
+                            cost += 2. * o.grid;
+                        }
+                    }
+                }
+                if cost < best.0 - 1e-6 {
+                    best = (cost, sa, sb);
+                }
+            }
+        }
+    }
+    (best.1, best.2)
+}
+
+fn port_requests(
+    scene: &SceneGraph,
+    rects: &[Rect],
+    o: &LayoutOptions,
+    prior: Option<&Layout>,
+) -> Vec<PortRequest> {
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
     for e in &scene.edges {
+        let pair = attachment_pair(scene, rects, e, o, prior);
         for (source, ep, other) in [(true, &e.source, &e.target), (false, &e.target, &e.source)] {
             let i = scene.index(&ep.node).unwrap();
             let j = scene.index(&other.node).unwrap();
-            let a = rects[i];
             let b = rects[j];
-            let side = ep.constraint.side().unwrap_or_else(|| {
-                if i == j {
-                    if source { Side::E } else { Side::N }
-                } else if (b.x - a.x).abs() >= (b.y - a.y).abs() {
-                    if b.x >= a.x { Side::E } else { Side::W }
-                } else if b.y >= a.y {
-                    Side::S
-                } else {
-                    Side::N
-                }
-            });
+            let side = if source { pair.0 } else { pair.1 };
             let key = port_key(e, source);
             if seen.insert(key.clone()) {
                 out.push(PortRequest {

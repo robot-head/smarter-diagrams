@@ -66,6 +66,22 @@ module.exports=async function dropContinuity(browser,base){
     const held=preview.svg();d.commit_drag(preview);const exact=d.svg()===held;preview.free();d.free();return exact;
   });assert(obstacle,'constrained detours and captions must resist jitter and commit the exact preview');
 
+  const database=await page.evaluate(async()=>{
+    const{WasmDocument}=await import(new URL('./pkg/smarter_diagrams.js',location.href));
+    for(const fixed of [true,false]){
+      const source='client @pin(grid: 0,0)\ngateway @pin(grid: 15,0)\nworker @pin(grid: 30,0)\ndb @pin(grid: 10,25)\nclient.E -> gateway.W: HTTPS\ngateway.E -> worker.W: jobs\n'+(fixed?'worker.E -> db.W':'worker -> db')+': writes\nflow request { client -> gateway -> worker -> db }\n';
+      const d=new WasmDocument(source),preview=d.begin_drag();let first;
+      for(let i=0;i<80;i++){
+        const delta=i%2?.1:-.1;preview.update(JSON.stringify([{node:'db',position:{x:160+delta,y:400+delta}}]));
+        const root=new DOMParser().parseFromString(preview.svg(),'image/svg+xml'),path=root.querySelector('path.edge[data-edge="worker->db"]'),label=root.querySelector('[data-label="worker->db"] text');
+        const now={path:path.getAttribute('d').match(/-?\d+(?:\.\d+)?/g).map(Number),label:[Number(label.getAttribute('x')),Number(label.getAttribute('y'))]};
+        if(first&&(now.path.length!==first.path.length||now.path.some((v,j)=>Math.abs(v-first.path[j])>1)||now.label.some((v,j)=>Math.abs(v-first.label[j])>1))) {preview.free();d.free();return false;}
+        first??=now;
+      }
+      const held=preview.svg();d.commit_drag(preview);if(d.svg()!==held){preview.free();d.free();return false;}preview.free();d.free();
+    }return true;
+  });assert(database,'backward Database drags must keep corridors and captions steady with fixed and automatic ports');
+
   // A manual camera frame must not crop the exported diagram, and explicit
   // Fit must use the complete current drawing rather than that frozen frame.
   grab=await begin('client');await move(grab,-120,160);held=await read();await page.mouse.up();assert.deepEqual(await read(),held);
