@@ -9,16 +9,23 @@ export class DiagramViewport {
     const button=(text,name,action)=>{const b=document.createElement('button');b.textContent=text;b.setAttribute('aria-label',name);b.addEventListener('click',action);controls.append(b);return b};
     button('−','Zoom out',()=>this.setZoom(this.zoom/1.25));
     this.output=document.createElement('output');this.output.setAttribute('aria-live','polite');this.output.setAttribute('aria-label','Diagram scale');button('','Actual size (100%)',()=>this.setZoom(1)).append(this.output);
-    button('+','Zoom in',()=>this.setZoom(this.zoom*1.25));button('Fit','Fit diagram',()=>{this.fitted=true;this.readable=false;this.fit()});
+    button('+','Zoom in',()=>this.setZoom(this.zoom*1.25));button('Fit','Fit diagram',()=>{this.fitted=true;this.readable=false;this.fit(true)});
     this.hint=document.createElement('span');this.hint.className='diagram-pan-hint';controls.append(this.hint);this.updateHint();
     touchGestures(viewport,{getZoom:()=>this.zoom,setZoom:value=>this.setZoom(value),enabled:()=>!viewport.classList.contains('touch-edit')});
     viewport.addEventListener('wheel',event=>{if(!event.ctrlKey&&!event.metaKey)return;event.preventDefault();this.setZoom(this.zoom*Math.exp(-Math.max(-100,Math.min(100,event.deltaY))*.005))},{passive:false});
     this.observer=new ResizeObserver(()=>{if(this.fitted)this.fit()});this.observer.observe(viewport);this.apply();
   }
   updateHint(moving=false){this.hint.textContent=moving?'Drag a node to move it':matchMedia('(pointer: coarse)').matches?'Pinch to zoom · drag to pan':'Ctrl/⌘ + scroll to zoom · swipe to pan'}
-  attach(target,bounds) {this.target=target;this.bounds=bounds||target.getAttribute('viewBox').split(/\s+/).map(Number);this.fitted?this.fit():this.apply()}
+  lockFrame(bounds){this.frame=[...bounds];this.fitted=false;}
+  attach(target,bounds) {
+    this.target=target;const native=target.dataset.nativeViewBox||target.getAttribute('viewBox');this.naturalBounds=native?native.split(/\s+/).map(Number):bounds;
+    this.bounds=this.frame||bounds||this.naturalBounds;
+    if(native){target.dataset.nativeViewBox=this.naturalBounds.join(' ');target.setAttribute('viewBox',this.bounds.join(' '))}
+    this.fitted?this.fit():this.apply();
+  }
   setZoom(value){this.fitted=false;this.zoom=Math.max(.05,Math.min(4,value));this.apply()}
-  fit(){
+  fit(resetFrame=false){
+    if(resetFrame){this.frame=undefined;this.bounds=this.naturalBounds;if(this.target?.hasAttribute('viewBox'))this.target.setAttribute('viewBox',this.bounds.join(' '))}
     if(!this.bounds)return;
     const style=getComputedStyle(this.viewport),number=value=>Number.parseFloat(value)||0;
     const width=this.viewport.clientWidth-number(style.paddingLeft)-number(style.paddingRight);

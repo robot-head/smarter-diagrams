@@ -54,4 +54,6 @@ The plain leaf-label incremental path verifies declaration identity and shifts s
 
 `edit::synthesize_drag` consumes `Drag { node, position }` values in **pixel coordinates**. It prefers peer snaps within 6 px, container-relative anchors within 6 grid units, then a rounded 16 px grid pin. A 24 px breakaway removes conflicting alignment membership in the same transaction. Apply the resulting operation list with `Document::edit`.
 
-The [browser playground](/playground) uses the same operation synthesis through `WasmDocument.drag`, so text and canvas share a single model.
+For a continuous canvas gesture, use `Document::begin_drag()`, update its `DragSession` with precise pixel coordinates, and display `session.snapshot()`. `Document::commit_drag(&session)` saves that exact validated snapshot in one undo step. A stale session or invalid placement cannot commit. Returning to the starting position is a no-op.
+
+The [browser playground](/playground) uses this transaction through `WasmDocument.begin_drag()` and `commit_drag(preview)`. Automatic positions are captured in an `@layout` block, preserving existing relative anchors and locks; canvas placement has no hidden grid/peer snap on release. The router builds each candidate from the current geometry, so taking a node around a loop cannot accumulate stretched detours. The camera remains fixed until **Fit** is chosen. The semantic snapping helper above remains available to hosts that explicitly want those gestures.

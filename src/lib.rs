@@ -12,7 +12,6 @@
 //! # Ok::<(), smarter_diagrams::Error>(())
 //! ```
 pub mod document;
-#[cfg(any(feature = "wasm", test))]
 mod drag;
 pub mod drift;
 pub mod edit;
@@ -38,6 +37,7 @@ mod wasm;
 mod zones;
 
 pub use document::Document;
+pub use drag::DragSession;
 pub use layout::{Layout, LayoutOptions};
 pub use model::{Diagnostic, SceneGraph};
 pub use syntax::Parse;

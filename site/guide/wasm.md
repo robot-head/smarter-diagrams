@@ -41,7 +41,7 @@ document.free();
 | `edit_source(source, operations_json)` | New source after a typed operation batch |
 | `WasmDocument` | Stateful source, revision, SVG, edits and undo/redo |
 
-`WasmDocument` also exposes `drag(drags_json)`, `focus_svg(node, hops)`, `flows_json()` and `flow_frame_svg(id, step)`. Drag coordinates are pixels; flow steps are zero-based. JSON payloads use the Rust types' Serde representation. Errors cross the boundary as JavaScript exceptions.
+`WasmDocument` also exposes `drag(drags_json)`, `focus_svg(node, hops)`, `flows_json()` and `flow_frame_svg(id, step)`. For continuous dragging, call `const preview = document.begin_drag()`, `preview.update(drags_json)` and display `preview.svg()`. Commit with `document.commit_drag(preview)`, then `preview.free()`. Failed updates retain the last valid preview and prevent commit until a valid update succeeds. Dropping commits the displayed layout; it does not rerun layout or snap coordinates. `preview.settle()` validates without changing the image. `drag(drags_json)` remains the explicit semantic snapping helper. Drag coordinates are pixels; flow steps are zero-based. JSON payloads use the Rust types' Serde representation. Errors cross the boundary as JavaScript exceptions.
 
 ## Lazy runtime exports
 

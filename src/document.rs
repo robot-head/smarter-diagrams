@@ -45,6 +45,24 @@ impl Document {
     pub fn revision(&self) -> u64 {
         self.revision
     }
+    /// Begin a source-preserving canvas gesture. Only valid candidates can commit.
+    pub fn begin_drag(&self) -> Result<crate::DragSession, Error> {
+        crate::DragSession::new(self.current.clone(), self.revision, self.options.clone())
+    }
+    /// Save precisely the candidate shown during the gesture, with one undo step.
+    pub fn commit_drag(&mut self, gesture: &crate::DragSession) -> Result<(), Error> {
+        self.check_revision(gesture.revision)?;
+        if !Arc::ptr_eq(&self.current, &gesture.baseline) {
+            return Err(Error::Edit(
+                "drag belongs to a different document snapshot".into(),
+            ));
+        }
+        gesture.settle()?;
+        if gesture.prepared.parse.source == self.current.parse.source {
+            return Ok(());
+        }
+        self.commit((*gesture.prepared).clone())
+    }
     fn commit(&mut self, next: Diagram) -> Result<(), Error> {
         #[cfg(feature = "verification")]
         let checks = self.run_verifiers(&next.scene)?;
