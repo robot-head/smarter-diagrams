@@ -724,43 +724,99 @@ pub(crate) fn readable_concept(
             }
         }
     }
+    if let Some(hints) = crate::presentation::mesh(scene, rects, o, place_nodes) {
+        return Some(hints);
+    }
+    if let Some(hints) = crate::presentation::tree(scene, rects, o, place_nodes) {
+        return Some(hints);
+    }
+    let backbone = crate::presentation::backbone(scene);
+    if backbone.is_some() {
+        crate::presentation::reserve_perimeters(scene, rects, o);
+    }
     if !place_nodes
-        || n < 7
-        || pairs.len() != n - 1
-        || incoming.iter().any(|&v| v > 1)
-        || outgoing.iter().any(|&v| v > 1)
+        || (backbone.is_none()
+            && (n < 7
+                || pairs.len() != n - 1
+                || incoming.iter().any(|&v| v > 1)
+                || outgoing.iter().any(|&v| v > 1)))
     {
         return None;
     }
-    let start = (0..n).find(|&i| incoming[i] == 0)?;
-    let mut order = vec![start];
-    while let Some(&(_, next)) = pairs.iter().find(|(a, _)| Some(a) == order.last()) {
-        if order.contains(&next) {
+    let order = if let Some(order) = backbone {
+        order
+    } else {
+        let start = (0..n).find(|&i| incoming[i] == 0)?;
+        let mut order = vec![start];
+        while let Some(&(_, next)) = pairs.iter().find(|(a, _)| Some(a) == order.last()) {
+            if order.contains(&next) {
+                return None;
+            }
+            order.push(next);
+        }
+        if order.len() != n {
             return None;
         }
-        order.push(next);
-    }
-    if order.len() != n {
-        return None;
-    }
-    let width = rects.iter().map(|r| r.w).fold(0., f64::max) + caption_width + 96.;
-    let height = rects.iter().map(|r| r.h).fold(0., f64::max) + caption_height + 80.;
-    let columns = (2..n)
-        .min_by(|&a, &b| {
-            let score = |c: usize| {
-                ((c as f64 * width / (n.div_ceil(c) as f64 * height))
-                    / o.target_aspect_ratio.max(0.1))
-                .ln()
-                .abs()
+        order
+    };
+    // Size each track from its own occupants. A wide decision must not make
+    // every column wide, or a tall wrapped title stretch every row.
+    let plan = |columns: usize| {
+        let rows = n.div_ceil(columns);
+        let mut widths = vec![0.0f64; columns];
+        let mut heights = vec![0.0f64; rows];
+        for (index, &i) in order.iter().enumerate() {
+            let row = index / columns;
+            let col = if row.is_multiple_of(2) {
+                index % columns
+            } else {
+                columns - 1 - index % columns
             };
-            score(a).total_cmp(&score(b))
-        })
+            widths[col] = widths[col].max(rects[i].w);
+            heights[row] = heights[row].max(rects[i].h);
+        }
+        let mut xs = vec![0.; columns];
+        let mut ys = vec![0.; rows];
+        for col in 1..columns {
+            xs[col] = xs[col - 1] + (widths[col - 1] + widths[col]) / 2. + caption_width + 64.;
+        }
+        for row in 1..rows {
+            ys[row] = ys[row - 1] + (heights[row - 1] + heights[row]) / 2. + caption_height + 64.;
+        }
+        let w = xs[columns - 1] + (widths[0] + widths[columns - 1]) / 2. + 48.;
+        let h = ys[rows - 1] + (heights[0] + heights[rows - 1]) / 2. + 48.;
+        let score = (450. * o.target_aspect_ratio / w).min(450. / h).min(1.);
+        (score, xs, ys)
+    };
+    let columns = (2..n)
+        .max_by(|&a, &b| plan(a).0.total_cmp(&plan(b).0))
         .unwrap();
+    let mut sequence_rank = vec![0; n];
+    for (rank, &i) in order.iter().enumerate() {
+        sequence_rank[i] = rank;
+    }
+    if pairs
+        .iter()
+        .any(|&(a, b)| sequence_rank[a] >= sequence_rank[b])
+    {
+        let current = rects.iter().copied().reduce(Rect::union).unwrap();
+        let current_score = (450. * o.target_aspect_ratio / (current.w + 48.))
+            .min(450. / (current.h + 48.))
+            .min(1.);
+        if plan(columns).0 < current_score * 1.1 {
+            return None;
+        }
+    }
+    let (_, xs, ys) = plan(columns);
     for (index, &i) in order.iter().enumerate() {
         let row = index / columns;
-        let col = index % columns;
-        rects[i].x = if row % 2 == 0 { col } else { columns - 1 - col } as f64 * width;
-        rects[i].y = row as f64 * height;
+        let col = if row.is_multiple_of(2) {
+            index % columns
+        } else {
+            columns - 1 - index % columns
+        };
+        rects[i].x = xs[col];
+        rects[i].y = ys[row];
     }
     None
 }

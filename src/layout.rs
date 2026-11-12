@@ -210,6 +210,10 @@ pub fn layout(
     options: &LayoutOptions,
     previous: Option<&Layout>,
 ) -> Result<Layout, Error> {
+    // Replacing an entire source has no mental map to preserve. Treat it as a
+    // fresh layout so topology presentation also works in a running editor.
+    let previous =
+        previous.filter(|prior| scene.nodes.iter().any(|n| prior.nodes.contains_key(&n.id)));
     layout_pass(scene, options, previous, 1.)
 }
 fn layout_pass(
@@ -972,6 +976,10 @@ fn layout_pass(
     crate::routing::route_all(scene, o, previous, &mut out)?;
     crate::routing::nudge_channels(scene, o, &mut out);
     let coordinated_fan = readable_fan && crate::routing::coordinate_fan(scene, o, &mut out);
+    let coordinated_tree =
+        readable_routes && crate::presentation::coordinate_tree(scene, o, &mut out);
+    let coordinated_mesh =
+        readable_routes && crate::presentation::coordinate_mesh(scene, o, &mut out);
     let coordinated_loops =
         readable_routes && crate::routing::coordinate_outer_routes(scene, o, &mut out);
     out.labels = match crate::labels::place(scene, o, &out) {
@@ -991,7 +999,7 @@ fn layout_pass(
         }
         Err(error) => return Err(error),
     };
-    if !coordinated_fan && !coordinated_loops {
+    if !coordinated_fan && !coordinated_loops && !coordinated_tree && !coordinated_mesh {
         crate::labels::polish_channels(scene, o, &mut out);
     }
     for zone in &scene.zones {
@@ -1374,6 +1382,8 @@ fn grow_port_perimeters(
     rects: &mut [Rect],
     o: &LayoutOptions,
 ) -> Result<(), Error> {
+    let mesh =
+        crate::presentation::mesh_layers(scene).is_some_and(|(a, b)| a.len() != 3 || b.len() != 3);
     for (i, r) in rects.iter_mut().enumerate() {
         for side in [Side::N, Side::E, Side::S, Side::W] {
             let ports: Vec<_> = requests
@@ -1407,7 +1417,7 @@ fn grow_port_perimeters(
             .iter()
             .any(|a| a.name == "pin" && a.attrs.contains_key("lock"));
             if ports.len() > 1
-                && peers.len() == 1
+                && (peers.len() == 1 || mesh)
                 && !locked
                 && ports.iter().all(|p| {
                     matches!(

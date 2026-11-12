@@ -608,48 +608,10 @@
     "03-fan-out": "infeasible layout: no feasible label position for bus->c2"
   },
   "currentReview": {
-    "coverage": "All 64 updated layouts inspected across 11 contact sheets; recovered cycle/tree cases inspected again after whitespace recovery.",
+    "coverage": "All 64 updated layouts reviewed across 11 contact sheets, with mesh, folded backbones, trees and trust titles inspected again at full size. Native, Wasm, desktop/mobile and drag/reopen checks cover the changed presentations.",
     "allCasesRender": true,
-    "minimumFittedTextBelow8px": 17,
-    "remainingPriorities": [
-      {
-        "priority": "P1",
-        "problem": "Many-to-many route and caption congestion",
-        "cases": [
-          "13-mesh",
-          "fuzz-parallel-7"
-        ],
-        "nextStep": "Plan shared corridors jointly, retain distinguishable lanes, reduce crossings where topology allows, and keep captions associated with the relevant source/target."
-      },
-      {
-        "priority": "P1",
-        "problem": "Thin shortcut-bearing DAGs and parallel backbones",
-        "cases": [
-          "fuzz-dag-4",
-          "fuzz-parallel-0",
-          "fuzz-parallel-6"
-        ],
-        "nextStep": "Extend aspect-aware placement to a main backbone plus bypasses; use a readable zoom floor and panning rather than shrinking every detail."
-      },
-      {
-        "priority": "P1",
-        "problem": "Tree hierarchy hidden by return bends and mixed depths",
-        "cases": [
-          "fuzz-tree-0",
-          "fuzz-tree-1",
-          "fuzz-tree-5"
-        ],
-        "nextStep": "Use stable depth ranks, sibling ordering and subtree centering before metric routing; preserve existing drag geometry."
-      },
-      {
-        "priority": "P2",
-        "problem": "Duplicate named-port and edge captions",
-        "cases": [
-          "21-ports"
-        ],
-        "nextStep": "Distinguish port identity from connection semantics, or suppress redundant visible captions while preserving accessible metadata."
-      }
-    ],
+    "minimumFittedTextBelow8px": 2,
+    "remainingPriorities": [],
     "cases": [
       {
         "id": "01-pipeline",
@@ -660,7 +622,7 @@
       {
         "id": "02-long-pipeline",
         "review": "Folded three-row sequence is readable; fitted text is about 14.3 px.",
-        "minFitTextPx": 14.3,
+        "minFitTextPx": 15,
         "paintFailures": []
       },
       {
@@ -725,8 +687,8 @@
       },
       {
         "id": "13-mesh",
-        "review": "The K3,3 center is still congested; repeated access captions do not make individual dependencies easy to trace. Some crossings are unavoidable, but the presentation can be clearer.",
-        "minFitTextPx": 15,
+        "review": "Perimeter embedding with exactly one unavoidable crossing; nine distinct routes, local captions, compact shapes, and stable body sizes after drag/reopen.",
+        "minFitTextPx": 10.4,
         "paintFailures": []
       },
       {
@@ -761,8 +723,8 @@
       },
       {
         "id": "19-zone",
-        "review": "A single root-level enclosure makes shared membership clear while keeping Browser outside.",
-        "minFitTextPx": 14.8,
+        "review": "One contiguous enclosure excludes Browser. The title stays beside its own boundary, and member branches remain distinct.",
+        "minFitTextPx": 15,
         "paintFailures": []
       },
       {
@@ -773,7 +735,7 @@
       },
       {
         "id": "21-ports",
-        "review": "Opposite ratio ordering removes the weave. Port and edge ack captions remain redundant and could use clearer visual hierarchy.",
+        "review": "Distinct publish/input semantics remain visible; repeated ack is shown once. Named-port identity and accessible metadata are preserved.",
         "minFitTextPx": 15,
         "paintFailures": []
       },
@@ -797,55 +759,55 @@
       },
       {
         "id": "fuzz-dag-0",
-        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
-        "minFitTextPx": 7.5,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 11.5,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-1",
-        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
-        "minFitTextPx": 6.5,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 12.1,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-2",
-        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
-        "minFitTextPx": 7.3,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 11.3,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-3",
-        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
-        "minFitTextPx": 6.6,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 10.6,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-4",
-        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
-        "minFitTextPx": 5.4,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 8.7,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-5",
-        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
-        "minFitTextPx": 6.6,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 10.4,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-6",
-        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
-        "minFitTextPx": 5.5,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 10.0,
         "paintFailures": []
       },
       {
         "id": "fuzz-dag-7",
-        "review": "Primary flow remains recognizable, but the shortcut-bearing DAG is a thin horizontal strip at Fit. Wrapping helps titles; aspect-aware backbone placement and clearer bypass channels remain needed.",
-        "minFitTextPx": 7.6,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 15,
         "paintFailures": []
       },
       {
         "id": "fuzz-cycle-0",
-        "review": "Wrapping improves long node titles and keeps the main cycle readable. Secondary reciprocal edges and remote callouts can still be clearer.",
+        "review": "Finite, nonoverlapping cyclic routing with some dense feedback paths. Fully fitting into the audit thumbnail yields about 7.4 px text; use the default readable scale with panning for details.",
         "minFitTextPx": 7.4,
         "paintFailures": []
       },
@@ -875,8 +837,8 @@
       },
       {
         "id": "fuzz-cycle-5",
-        "review": "Wrapping improves long node titles and keeps the main cycle readable. Secondary reciprocal edges and remote callouts can still be clearer.",
-        "minFitTextPx": 9.6,
+        "review": "Folded cyclic main sequence improves fitted text to about 11.8 px. Other cyclic arrangements are retained when folding would reduce clarity.",
+        "minFitTextPx": 11.8,
         "paintFailures": []
       },
       {
@@ -887,56 +849,56 @@
       },
       {
         "id": "fuzz-cycle-7",
-        "review": "Whitespace recovery now renders the graph. Its large frame still reduces fitted text to about 7.1 px.",
+        "review": "Finite, nonoverlapping cyclic routing with some dense feedback paths. Fully fitting into the audit thumbnail yields about 7.1 px text; use the default readable scale with panning for details.",
         "minFitTextPx": 7.1,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-0",
-        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
-        "minFitTextPx": 5.0,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 8.5,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-1",
-        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
-        "minFitTextPx": 5.1,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 9.8,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-2",
-        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
-        "minFitTextPx": 6.4,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 11.2,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-3",
-        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
-        "minFitTextPx": 8.5,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 12.6,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-4",
-        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
-        "minFitTextPx": 5.7,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 11.1,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-5",
-        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
-        "minFitTextPx": 5.6,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 9.4,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-6",
-        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
-        "minFitTextPx": 5.1,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 9.9,
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-7",
-        "review": "The long backbone and many end-directed routes still compress fitted text. Distinct bypass rails, caption locality and an aspect-aware arrangement remain priorities.",
-        "minFitTextPx": 8.5,
+        "review": "Compact main sequence with per-track sizes, distinct bypasses and separated captions. Text remains at least 8 px even in the fully fitted audit panel; normal on-load scale preserves larger type.",
+        "minFitTextPx": 10.4,
         "paintFailures": []
       },
       {
@@ -989,52 +951,79 @@
       },
       {
         "id": "fuzz-tree-0",
-        "review": "Wrapping makes the former failure render, but backward-looking parent-to-child routes still obscure depth.",
-        "minFitTextPx": 10.3,
+        "review": "Clear depth ranks, stable left-to-right siblings and contiguous subtrees. Branches run forward, avoid crossings, and use local captions.",
+        "minFitTextPx": 11.0,
         "paintFailures": []
       },
       {
         "id": "fuzz-tree-1",
-        "review": "Wrapped titles improve shape proportions. Sibling grouping, subtree centering and avoiding backward-looking child routes remain the main quality criteria.",
-        "minFitTextPx": 8.8,
+        "review": "Clear depth ranks, stable left-to-right siblings and contiguous subtrees. Branches run forward, avoid crossings, and use local captions.",
+        "minFitTextPx": 9.2,
         "paintFailures": []
       },
       {
         "id": "fuzz-tree-2",
-        "review": "Wrapped titles improve shape proportions. Sibling grouping, subtree centering and avoiding backward-looking child routes remain the main quality criteria.",
-        "minFitTextPx": 10.0,
+        "review": "Clear depth ranks, stable left-to-right siblings and contiguous subtrees. Branches run forward, avoid crossings, and use local captions.",
+        "minFitTextPx": 8.8,
         "paintFailures": []
       },
       {
         "id": "fuzz-tree-3",
-        "review": "Wrapped titles improve shape proportions. Sibling grouping, subtree centering and avoiding backward-looking child routes remain the main quality criteria.",
-        "minFitTextPx": 13.9,
+        "review": "Clear depth ranks, stable left-to-right siblings and contiguous subtrees. Branches run forward, avoid crossings, and use local captions.",
+        "minFitTextPx": 11.2,
         "paintFailures": []
       },
       {
         "id": "fuzz-tree-4",
-        "review": "Wrapped titles improve shape proportions. Sibling grouping, subtree centering and avoiding backward-looking child routes remain the main quality criteria.",
-        "minFitTextPx": 13.3,
+        "review": "Clear depth ranks, stable left-to-right siblings and contiguous subtrees. Branches run forward, avoid crossings, and use local captions.",
+        "minFitTextPx": 12.7,
         "paintFailures": []
       },
       {
         "id": "fuzz-tree-5",
-        "review": "Whitespace recovery renders it; sideways and backward routes leave the hierarchy unclear, with about 7.9 px fitted text.",
-        "minFitTextPx": 7.9,
+        "review": "Clear depth ranks, stable left-to-right siblings and contiguous subtrees. Branches run forward, avoid crossings, and use local captions.",
+        "minFitTextPx": 10.7,
         "paintFailures": []
       },
       {
         "id": "fuzz-tree-6",
-        "review": "Whitespace recovery renders it; the tree is traceable at full size but still dense at Fit.",
-        "minFitTextPx": 8.1,
+        "review": "Clear depth ranks, stable left-to-right siblings and contiguous subtrees. Branches run forward, avoid crossings, and use local captions.",
+        "minFitTextPx": 9.5,
         "paintFailures": []
       },
       {
         "id": "fuzz-tree-7",
-        "review": "Wrapped titles improve shape proportions. Sibling grouping, subtree centering and avoiding backward-looking child routes remain the main quality criteria.",
-        "minFitTextPx": 12.5,
+        "review": "Clear depth ranks, stable left-to-right siblings and contiguous subtrees. Branches run forward, avoid crossings, and use local captions.",
+        "minFitTextPx": 11.7,
         "paintFailures": []
       }
+    ],
+    "previousMinimumFittedTextBelow8px": 17,
+    "resolvedPriorities": [
+      {
+        "problem": "Many-to-many route and caption congestion",
+        "change": "The complete three-by-three graph uses six perimeter connections, an exterior bypass and two interior chords: exactly one unavoidable crossing, with separate attachments and no merged segments. Other complete bipartite meshes use bounded joint lane ordering and captions near their source."
+      },
+      {
+        "problem": "Thin shortcut-bearing DAGs and parallel backbones",
+        "change": "Recognize a declared main sequence with shortcuts or parallel sends; choose folded rows with per-track body sizes and caption space. Cyclic main sequences fold only when predicted frame fit improves. All 16 seeded DAG/parallel cases fit text at 8 px or more in the audit panel."
+      },
+      {
+        "problem": "Tree hierarchy hidden by return bends and mixed depths",
+        "change": "Use depth bands, stable sibling order and centered subtree intervals; select orientation by fitted body size. Joint branch channels avoid crossings, and the eight seeded trees retain a coherent hierarchy."
+      },
+      {
+        "problem": "Duplicate named-port and edge captions",
+        "change": "Suppress a visible named-port caption only when every connection at the port repeats it verbatim. Preserve named-port hit targets, source, descriptions, distinct captions and record fields."
+      },
+      {
+        "problem": "Trust title detached from its boundary",
+        "change": "Search horizontal title positions along the zone boundary before climbing upward. The trusted-boundary fixture no longer places its title above the unrelated browser."
+      }
+    ],
+    "fitLimitations": [
+      "Two dense cyclic stress cases remain below 8 px only when explicitly fitted completely into the 730 by 450 px audit panel. The site and Playground start at a readable zoom floor with panning; Fit remains an explicit whole-graph overview.",
+      "This fixed corpus does not prove that arbitrary user graphs are crossing-minimal or always readable. Explicit ports, pins and ownership constraints can require detours."
     ]
   }
 }
