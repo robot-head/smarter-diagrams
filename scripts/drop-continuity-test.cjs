@@ -54,6 +54,18 @@ module.exports=async function dropContinuity(browser,base){
     const returned=preview.svg();preview.free();d.free();return initial===returned;
   });assert(history,'reversals and loops must not accumulate stretched routes');
 
+  const obstacle=await page.evaluate(async()=>{
+    const{WasmDocument}=await import(new URL('./pkg/smarter_diagrams.js',location.href));
+    const d=new WasmDocument('a @pin(grid: 0,0)\nb @pin(grid: 20,0)\nblock @pin(grid: 10,0)\na.E -> b.W: transit\nflow request { a -> b }\n'),preview=d.begin_drag();
+    const read=()=>{const root=new DOMParser().parseFromString(preview.svg(),'image/svg+xml');const path=root.querySelector('path.edge'),text=root.querySelector('[data-label="a->b"] text');return {path:path.getAttribute('d').match(/-?\d+(?:\.\d+)?/g).map(Number),label:[Number(text.getAttribute('x')),Number(text.getAttribute('y'))]}};
+    let first;
+    for(let i=0;i<80;i++){
+      preview.update(JSON.stringify([{node:'a',position:{x:0,y:i%2?-.1:.1}}]));const now=read();if(!first)first=now;
+      if(now.path.length!==first.path.length||now.path.some((v,j)=>Math.abs(v-first.path[j])>1)||now.label.some((v,j)=>Math.abs(v-first.label[j])>1)){preview.free();d.free();return false}
+    }
+    const held=preview.svg();d.commit_drag(preview);const exact=d.svg()===held;preview.free();d.free();return exact;
+  });assert(obstacle,'constrained detours and captions must resist jitter and commit the exact preview');
+
   // A manual camera frame must not crop the exported diagram, and explicit
   // Fit must use the complete current drawing rather than that frozen frame.
   grab=await begin('client');await move(grab,-120,160);held=await read();await page.mouse.up();assert.deepEqual(await read(),held);
