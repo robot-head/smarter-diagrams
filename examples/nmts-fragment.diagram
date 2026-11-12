@@ -1,0 +1,46 @@
+# Outernet Council NMTS (nmts.v1.Fragment): LEO-to-Ground temporospatial bearer & TS-SDN control.
+strata [logical, physical]
+
+gs_arlington: "GS Arlington (EK_PLATFORM)" {
+  sdn_gs: "Ground Agent\n(EK_SDN_AGENT)" [stratum: logical]
+  gs_node: "Gateway Router\n(EK_NETWORK_NODE)" [stratum: logical]
+  intf_gse: "gse0\n(EK_INTERFACE)" [stratum: logical]
+  mod_ka: "DVB-S2X Mod\n(EK_MODULATOR)" [stratum: physical]
+  ant_gs: "4.5m Ka Dish\n(EK_ANTENNA)" [stratum: physical]
+
+  sdn_gs -> gs_node: "RK_CONTROLS"
+  gs_node -> intf_gse: "RK_ORIGINATES"
+  intf_gse -> mod_ka: "RK_TRAVERSES"
+  mod_ka -> ant_gs: "RK_SIGNAL_TRANSITS"
+}
+
+ka_uplink: "Ka Uplink 29.5 GHz\n(EK_PHYSICAL_MEDIUM_LINK)" [shape: queue, stratum: physical]
+
+leo_142: "LEO-142 Sat (EK_PLATFORM)" {
+  ant_sat: "Phased Array\n(EK_ANTENNA)" [stratum: physical]
+  demod_ka: "Ka Demod\n(EK_DEMODULATOR)" [stratum: physical]
+  sat_node: "Onboard Switch\n(EK_NETWORK_NODE)" [stratum: logical]
+  isl_port: "Optical ISL0\n(EK_PORT)" [stratum: physical]
+
+  ant_sat -> demod_ka: "RK_SIGNAL_TRANSITS"
+  demod_ka -> sat_node: "RK_TRAVERSES"
+  sat_node -> isl_port: "RK_TRAVERSES"
+}
+
+gs_arlington.ant_gs -> ka_uplink: "RK_SIGNAL_TRANSITS"
+ka_uplink -> leo_142.ant_sat: "RK_SIGNAL_TRANSITS"
+
+zone contact_window "Contact window T+120s..540s" around [gs_arlington.ant_gs, ka_uplink, leo_142.ant_sat] {
+  padding: 1.5g
+  tint: oklch(0.80 0.09 205 / 0.16)
+}
+view rf_chain {
+  include gs_arlington.mod_ka -> gs_arlington.ant_gs -> ka_uplink -> leo_142.ant_sat -> leo_142.demod_ka
+}
+view logical_bearer {
+  include gs_arlington.sdn_gs -> gs_arlington.gs_node -> gs_arlington.intf_gse
+  include leo_142.sat_node -> leo_142.isl_port
+}
+flow bearer "Scheduled Ka-band bearer" {
+  gs_arlington.gs_node -> gs_arlington.intf_gse -> gs_arlington.mod_ka -> gs_arlington.ant_gs -> ka_uplink -> leo_142.ant_sat -> leo_142.demod_ka -> leo_142.sat_node -> leo_142.isl_port
+}

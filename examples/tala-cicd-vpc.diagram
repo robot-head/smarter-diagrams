@@ -1,0 +1,29 @@
+# CI/CD rollout into an isolated cloud VPC (inspired by D2 TALA Lambda Infra).
+github: "GitHub" {
+  repo: "Service Repo"
+  workflow: "Actions Runner\n(OIDC deploy)"
+  repo -> workflow: "push main"
+}
+vpc: "Production Cloud VPC" {
+  apigw: "API Gateway"
+  fn_auth: "Auth Handler"
+  fn_orders: "Order Handler"
+  fn_events: "Audit Handler"
+  ledger: "State Table" [shape: database]
+  apigw -> fn_auth: verify
+  apigw -> fn_orders: execute
+  fn_orders -> ledger: commit
+  fn_events -> ledger: append
+}
+
+github.workflow -> vpc.fn_auth: "update bundle"
+github.workflow -> vpc.fn_orders: "update bundle"
+github.workflow -> vpc.fn_events: "update bundle"
+
+zone oidc "Short-lived OIDC deploy scope" around [github.workflow, vpc.fn_auth, vpc.fn_orders, vpc.fn_events] {
+  padding: 1.5g
+  tint: oklch(0.80 0.08 165 / 0.14)
+}
+flow rollout "Zero-secret release path" {
+  github.repo -> github.workflow -> vpc.fn_orders -> vpc.ledger
+}

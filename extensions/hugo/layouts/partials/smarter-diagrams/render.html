@@ -1,0 +1,97 @@
+{{- $cfg := site.Params.smarterDiagrams | default dict -}}
+{{- $attrs := .Attributes | default dict -}}
+
+{{- $mode := default (default "auto" (index $cfg "mode")) (index $attrs "mode") -}}
+{{- $view := default "" (index $attrs "view") -}}
+{{- $focus := default "" (index $attrs "focus") -}}
+{{- $hopsRaw := default "" (index $attrs "hops") -}}
+{{- $hops := cond (ne (printf "%v" $hopsRaw) "") (printf "%v" $hopsRaw) (cond (ne $focus "") "1" "") -}}
+{{- $caption := default "" (index $attrs "caption") -}}
+{{- $showSourceAttr := default (index $attrs "showsource") (index $attrs "showSource") -}}
+{{- $showSource := printf "%v" (default (default "false" (index $cfg "showSource")) $showSourceAttr) -}}
+{{- $figureId := default "" (index $attrs "id") -}}
+{{- $extraClass := default "" (index $attrs "class") -}}
+{{- $wasmModuleUrl := default "/smarter-diagrams/pkg/smarter_diagrams.js" (index $cfg "wasmModuleUrl") -}}
+
+{{- $normalized := replaceRE "\r\n" "\n" .Inner -}}
+{{- $source := strings.TrimSpace $normalized -}}
+{{- $keyInput := printf "smarter-diagrams:v1\nview=%s\nfocus=%s\nhops=%s\n---\n%s" $view $focus $hops $source -}}
+{{- $hash := sha256 $keyInput -}}
+
+{{- partial "smarter-diagrams/head.html" . -}}
+
+{{- $assetPath := printf "smarter-diagrams/%s.svg" $hash -}}
+{{- $staticSvg := resources.Get $assetPath -}}
+{{- $useStatic := and (ne $mode "wasm") (ne $staticSvg nil) -}}
+
+{{- if and (eq $mode "static") (eq $staticSvg nil) -}}
+  {{- errorf "smarter-diagrams (%s): missing pre-rendered SVG assets/%s; run `node extensions/hugo/scripts/prerender.mjs` before building with mode=\"static\"" .Position $assetPath -}}
+{{- end -}}
+
+<figure class="smarter-diagram{{ with $extraClass }} {{ . }}{{ end }}"{{ with $figureId }} id="{{ . }}"{{ end }} data-sd-mode="{{ cond $useStatic "static" "wasm" }}" data-sd-hash="{{ $hash }}">
+  {{- if $useStatic }}
+  <div class="smarter-diagram-canvas">{{ $staticSvg.Content | safeHTML }}</div>
+  {{- else }}
+  {{- $payload := dict "source" $source "view" $view "focus" $focus "hops" $hops -}}
+  <div class="smarter-diagram-canvas" data-sd-wasm="pending" data-sd-payload="{{ $payload | jsonify }}">
+    <noscript><pre class="smarter-diagram-error">JavaScript and WebAssembly are required to render this diagram in browser mode, or pre-render SVGs at build time with prerender.mjs.</pre></noscript>
+  </div>
+  {{- if not (.Page.Store.Get "hasSmarterDiagramsWasm") }}
+    {{- .Page.Store.Set "hasSmarterDiagramsWasm" true }}
+    {{- $resolvedWasmUrl := cond (or (hasPrefix $wasmModuleUrl "http://") (hasPrefix $wasmModuleUrl "https://") (hasPrefix $wasmModuleUrl "//")) $wasmModuleUrl ((strings.TrimPrefix "/" $wasmModuleUrl) | relURL) }}
+  <script type="module">
+    import init, { render_svg, WasmDocument } from {{ $resolvedWasmUrl | jsonify | safeJS }};
+    const targets = document.querySelectorAll('[data-sd-wasm="pending"]');
+    if (targets.length) {
+      try {
+        await init();
+        for (const el of targets) {
+          try {
+            const payload = JSON.parse(el.dataset.sdPayload || '{}');
+            let svg;
+            if (payload.focus) {
+              const doc = new WasmDocument(payload.source);
+              svg = doc.focus_svg(payload.focus, Math.max(1, Number.parseInt(payload.hops || '1', 10) || 1));
+              doc.free();
+            } else {
+              svg = render_svg(payload.source);
+            }
+            el.innerHTML = svg.replace(/width="[^"]+" height="[^"]+" role="img"/, 'width="100%" height="auto" role="img"');
+            el.dataset.sdWasm = 'ready';
+          } catch (err) {
+            const pre = document.createElement('pre');
+            pre.className = 'smarter-diagram-error';
+            pre.setAttribute('role', 'alert');
+            pre.textContent = String(err);
+            el.replaceChildren(pre);
+            el.dataset.sdWasm = 'error';
+          }
+        }
+      } catch (err) {
+        for (const el of targets) {
+          const pre = document.createElement('pre');
+          pre.className = 'smarter-diagram-error';
+          pre.setAttribute('role', 'alert');
+          pre.textContent = `Unable to load Smarter Diagrams Wasm module: ${err}`;
+          el.replaceChildren(pre);
+          el.dataset.sdWasm = 'error';
+        }
+      }
+    }
+  </script>
+  {{- end }}
+  {{- end }}
+  {{- with $caption }}
+  <figcaption class="smarter-diagram-caption">{{ . | $.Page.RenderString }}</figcaption>
+  {{- end }}
+  {{- if eq $showSource "details" }}
+  <details class="smarter-diagram-source">
+    <summary>Diagram source</summary>
+    <pre><code>{{ $source }}</code></pre>
+  </details>
+  {{- else if eq $showSource "true" }}
+  <div class="smarter-diagram-source">
+    <pre><code>{{ $source }}</code></pre>
+  </div>
+  {{- end }}
+</figure>

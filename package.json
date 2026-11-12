@@ -13,7 +13,8 @@
     "test:layout-explore": "node scripts/layout-audit.cjs --explore",
     "test:layout-preflight": "node scripts/layout-quality-preflight.cjs",
     "test:layout-quality": "node scripts/layout-quality-rounds.cjs",
-    "test:layout-review": "node scripts/check-layout-review.cjs"
+    "test:layout-review": "node scripts/check-layout-review.cjs",
+    "test:hugo": "node scripts/hugo-plugin-test.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1",

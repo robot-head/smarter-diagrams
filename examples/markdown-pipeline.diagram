@@ -1,0 +1,10 @@
+# Fenced diagram blocks inside technical Markdown, inspired by Pikchr's homepage.
+markdown: "Markdown\nsource"
+formatter: "Site engine\n(Hugo / VitePress)"
+compiler: "Smarter Diagrams\n(CLI or Wasm)"
+output: "HTML + SVG\ndocument"
+markdown.E -> formatter.W: "fenced diagram"
+formatter.E -> output.W: "accessible SVG"
+formatter.S <-> compiler.N: "compile / source"
+align row [markdown, formatter, output]
+align col [formatter, compiler]

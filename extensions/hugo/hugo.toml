@@ -1,0 +1,8 @@
+[hugoVersion]
+  extended = false
+  min = "0.112.0"
+
+[params.smarterDiagrams]
+  mode = "auto"
+  wasmModuleUrl = "/smarter-diagrams/pkg/smarter_diagrams.js"
+  showSource = "false"

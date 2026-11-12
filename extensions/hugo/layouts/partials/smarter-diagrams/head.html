@@ -1,0 +1,4 @@
+{{- if not (.Page.Store.Get "hasSmarterDiagramsStyles") -}}
+  {{- .Page.Store.Set "hasSmarterDiagramsStyles" true -}}
+  {{- partial "smarter-diagrams/styles.html" . -}}
+{{- end -}}

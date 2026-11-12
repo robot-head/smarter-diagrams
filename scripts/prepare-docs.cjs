@@ -35,7 +35,7 @@ for (const file of ['architecture', 'performance', 'verification']) {
 }
 const languageSamples = new Map();
 const comparisons = [];
-const samplePages=['site/index.md',...['language','guide'].flatMap(dir=>fs.readdirSync(path.join(root,'site',dir)).filter(f=>f.endsWith('.md')).map(f=>`site/${dir}/${f}`))];
+const samplePages=['site/index.md','site/examples.md',...['language','guide'].flatMap(dir=>fs.readdirSync(path.join(root,'site',dir)).filter(f=>f.endsWith('.md')).map(f=>`site/${dir}/${f}`))];
 for (const file of samplePages) {
   const text = fs.readFileSync(path.join(root, file), 'utf8');
   for (const match of text.matchAll(/^```(diagram[^\n]*)\n([\s\S]*?)^```/gm)) {

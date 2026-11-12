@@ -1,0 +1,47 @@
+# Kubernetes operator reconciliation loop with watch cache, rate-limited workqueue, and SSA status patching.
+gitops: "kubectl / GitOps" @sim(rate: 45, service_rate: 160)
+
+apiserver: "kube-apiserver" {
+  cr: "PostgresCluster CR" [shape: sql_table] {
+    port spec: DesiredSpec [side: W, pos: 1]
+    port status: ReadyCondition [side: E, pos: 2]
+  }
+  owned: "StatefulSet & Svc"
+  etcd: "etcd Quorum" [shape: database] @sim(service_rate: 180)
+  cr -> etcd: "RAFT"
+  owned -> etcd: "store"
+}
+
+operator: "Operator Controller" {
+  informer: "ListWatch Informer" @sim(service_rate: 150, queue_cap: 160)
+  cache: "Indexer Cache" [shape: cache]
+  workqueue: "RateLimitingQueue" [shape: queue] @sim(service_rate: 95, queue_cap: 140)
+  reconciler: "Reconciler" @sim(service_rate: 65, queue_cap: 90, retry: exp_backoff(0.4, 0.25))
+  diff: "Converged?" [shape: diamond]
+
+  informer -> cache: "sync"
+  informer -> workqueue: "key"
+  workqueue -> reconciler: "pop"
+  cache -> reconciler: "read"
+  reconciler -> diff: "diff"
+  reconciler -> workqueue: "requeue"
+}
+
+gitops -> apiserver.cr#spec: "apply"
+apiserver.cr -> operator.informer: "watch"
+operator.diff -> apiserver.owned: "SSA patch"
+operator.diff -> apiserver.cr#status: "status"
+
+zone rbac "Controller RBAC scope" around [operator.reconciler, apiserver.cr, apiserver.owned] {
+  padding: 1.5g
+  tint: oklch(0.79 0.08 175 / 0.15)
+}
+view control_loop {
+  include apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> operator.diff
+}
+view owned_resources {
+  include gitops -> apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> operator.diff -> apiserver.owned -> apiserver.etcd
+}
+flow converge "Converged reconciliation" {
+  gitops -> apiserver.cr#spec -> operator.informer -> operator.workqueue -> operator.reconciler -> operator.diff -> apiserver.owned -> apiserver.etcd
+}

@@ -92,6 +92,18 @@ require('smarter_diagrams').setup({ binary = 'smarter-diagrams' })
 
 Neovim 0.11+ and Node are required for that preview transport.
 
+For static publishing in [Hugo](https://gohugo.io/), the [Hugo codeblock plugin](extensions/hugo) renders ```` ```diagram ```` and ```` ```smarter-diagrams ```` fences either as zero-JS build-time SVGs (`node extensions/hugo/scripts/prerender.mjs`) or in-browser via WebAssembly.
+
+### Domain demonstrations
+
+Three runnable Rust examples pair `.diagram` models with simulation, SAT safety checking, temporospatial strata, and OpenTelemetry trace reconciliation:
+
+```sh
+cargo run --locked --all-features --example kube_operator_reconcile
+cargo run --locked --all-features --example nmts_fragment
+cargo run --locked --all-features --example grafana_service_graph
+```
+
 ## Wasm and executable extensions
 
 ```sh

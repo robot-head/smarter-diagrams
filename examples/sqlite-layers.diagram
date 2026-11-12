@@ -1,0 +1,26 @@
+# Layered embedded database engine (after Pikchr's SQLite architecture diagram).
+core: Core {
+  iface: "C API\nInterface"
+  cmd: "SQL Command\nProcessor"
+  vm: "Virtual\nMachine"
+  iface -> cmd -> vm
+}
+compiler: "SQL Compiler" {
+  tok: Tokenizer
+  parser: Parser
+  codegen: "Bytecode\nGenerator"
+  tok -> parser -> codegen
+}
+backend: "Storage Backend" {
+  btree: "B-Tree\nCursor"
+  pager: "Page Cache" [shape: cache]
+  vfs: "OS VFS" [shape: database]
+  btree -> pager -> vfs
+}
+
+core.cmd -> compiler.tok: "SQL text"
+compiler.codegen -> core.vm: "prepared VDBE"
+core.vm -> backend.btree: "row ops"
+flow query "Prepared query execution" {
+  core.iface -> core.cmd -> compiler.tok -> compiler.parser -> compiler.codegen -> core.vm -> backend.btree -> backend.pager -> backend.vfs
+}

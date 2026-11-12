@@ -8,6 +8,7 @@ process.env.VITE_EXTRA_EXTENSIONS = 'diagram,wasm'
 
 const guide = [
   ['Getting started', 'getting-started'], ['Core concepts', 'concepts'],
+  ['Domain demonstrations', 'demonstrations'], ['Hugo fenced blocks', 'hugo'],
   ['Using Rust', 'rust'], ['Structured editing', 'editing'],
   ['CLI and export', 'cli'], ['WebAssembly', 'wasm'],
   ['Editor previews', 'editors'], ['MCP tools', 'mcp'],
@@ -93,13 +94,16 @@ export default defineConfig({
     logo: '/logo.svg',
     siteTitle: 'Smarter Diagrams',
     nav: [
-      { text: 'Guide', link: '/guide/getting-started', activeMatch: '/guide/' },
+      { text: 'Examples', link: '/examples' },
+      { text: 'Demonstrations', link: '/guide/demonstrations' },
+      { text: 'Hugo', link: '/guide/hugo' },
+      { text: 'Guide', link: '/guide/getting-started', activeMatch: '/guide/(?!(demonstrations|hugo))' },
       { text: 'Language', link: '/language/basics', activeMatch: '/language/' },
       { text: 'Playground', link: '/playground' },
       { text: 'Rust API', link: 'https://robot-head.github.io/smarter-diagrams/api/smarter_diagrams/index.html', target: '_blank', rel: 'noopener' },
     ],
     sidebar: [
-      { text: 'Start here', items: [{ text: 'Overview', link: '/' }, { text: 'Playground', link: '/playground' }, { text: 'Examples', link: '/examples' }] },
+      { text: 'Start here', items: [{ text: 'Overview', link: '/' }, { text: 'Examples gallery', link: '/examples' }, { text: 'Domain demonstrations', link: '/guide/demonstrations' }, { text: 'Hugo fenced blocks', link: '/guide/hugo' }, { text: 'Playground', link: '/playground' }] },
       { text: 'Build with the library', collapsed: false, items: guide },
       { text: 'Diagram language', collapsed: false, items: language },
       { text: 'Executable diagrams', collapsed: true, items: runtime },
