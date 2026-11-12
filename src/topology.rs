@@ -514,13 +514,14 @@ pub fn coffman_graham(scene: &SceneGraph, width: usize) -> Vec<usize> {
     ranks
 }
 
-/// Readable fresh placements for elementary concepts. Explicit constraints and
-/// previous geometry are handled by the caller; drag layouts never use this.
 pub(crate) type SideHints = Vec<Option<(Side, Side)>>;
+/// Recognize elementary concepts. Fresh placement may move nodes; route-only
+/// planning reuses existing pinned or dragged geometry without changing it.
 pub(crate) fn readable_concept(
     scene: &SceneGraph,
     rects: &mut [Rect],
     o: &LayoutOptions,
+    place_nodes: bool,
 ) -> Option<SideHints> {
     let n = scene.nodes.len();
     if o.shape_budget == 0
@@ -536,13 +537,25 @@ pub(crate) fn readable_concept(
                     o.variant.as_deref(),
                 )
                 .iter()
-                .any(|a| a.name == "pin")
+                .any(|a| a.name == "pin" && (place_nodes || a.attrs.contains_key("lock")))
         })
-        || !scene.relations.is_empty()
+        || place_nodes && !scene.relations.is_empty()
         || scene.edges.iter().any(|e| {
             !matches!(e.source.constraint, PortConstraint::Free)
                 || !matches!(e.target.constraint, PortConstraint::Free)
-                || !e.annotations.is_empty()
+                || {
+                    let annotations = crate::layout::effective_annotations(
+                        scene,
+                        &e.id,
+                        &e.annotations,
+                        o.variant.as_deref(),
+                    );
+                    if place_nodes {
+                        !annotations.is_empty()
+                    } else {
+                        annotations.iter().any(|a| a.name == "route")
+                    }
+                }
         })
     {
         return None;
@@ -578,14 +591,19 @@ pub(crate) fn readable_concept(
         if a == b {
             return None;
         }
-        let spacing = o.port_spacing.max(caption_height + 12.);
-        let height = (pairs.len() + 1) as f64 * spacing;
-        rects[a].h = rects[a].h.max(height);
-        rects[b].h = rects[b].h.max(height);
-        rects[a].x = 0.;
-        rects[a].y = 0.;
-        rects[b].y = 0.;
-        rects[b].x = (rects[a].w + rects[b].w) / 2. + caption_width + 96.;
+        if place_nodes {
+            let spacing = o.port_spacing.max(caption_height + 12.);
+            let height = (pairs.len() + 1) as f64 * spacing;
+            rects[a].h = rects[a].h.max(height);
+            rects[b].h = rects[b].h.max(height);
+            rects[a].x = 0.;
+            rects[a].y = 0.;
+            rects[b].y = 0.;
+            rects[b].x = (rects[a].w + rects[b].w) / 2. + caption_width + 96.;
+        }
+        if rects[a].right() + 2. * o.stub >= rects[b].left() {
+            return None;
+        }
         return Some(vec![Some((Side::E, Side::W)); pairs.len()]);
     }
     let sources: Vec<_> = (0..n)
@@ -595,15 +613,26 @@ pub(crate) fn readable_concept(
         .filter(|&i| outgoing[i] == 0 && incoming[i] == 2)
         .collect();
     if n == 4 && pairs.len() == 4 && sources.len() == 2 && sinks.len() == 2 {
-        let step = rects.iter().map(|r| r.h).fold(0., f64::max) + caption_height + 96.;
-        let gap = rects.iter().map(|r| r.w).fold(0., f64::max) + 2. * caption_width + 160.;
-        for (row, &i) in sources.iter().enumerate() {
-            rects[i].x = 0.;
-            rects[i].y = row as f64 * step;
+        if place_nodes {
+            let step = rects.iter().map(|r| r.h).fold(0., f64::max) + caption_height + 96.;
+            let gap = rects.iter().map(|r| r.w).fold(0., f64::max) + 2. * caption_width + 160.;
+            for (row, &i) in sources.iter().enumerate() {
+                rects[i].x = 0.;
+                rects[i].y = row as f64 * step;
+            }
+            for (row, &i) in sinks.iter().enumerate() {
+                rects[i].x = gap;
+                rects[i].y = row as f64 * step;
+            }
         }
-        for (row, &i) in sinks.iter().enumerate() {
-            rects[i].x = gap;
-            rects[i].y = row as f64 * step;
+        if sources.iter().any(|&a| {
+            sinks
+                .iter()
+                .any(|&b| rects[a].right() + 2. * o.stub >= rects[b].left())
+        }) || rects[sources[0]].y >= rects[sources[1]].y
+            || rects[sinks[0]].y >= rects[sinks[1]].y
+        {
+            return None;
         }
         return Some(
             pairs
@@ -627,6 +656,27 @@ pub(crate) fn readable_concept(
         if returns.len() == 1 {
             let (index, &(a, b)) = returns[0];
             let forward = pairs.iter().position(|p| *p == (b, a)).unwrap();
+            if !place_nodes {
+                if (rects[a].x - rects[b].x).abs() < (rects[a].y - rects[b].y).abs() {
+                    return None;
+                }
+                let top = rects.iter().map(|r| r.top()).fold(f64::INFINITY, f64::min) - 72.;
+                for node in [a, b] {
+                    let corridor = Rect::new(
+                        rects[node].x,
+                        (top + rects[node].top()) / 2.,
+                        2. * o.margin,
+                        rects[node].top() - top,
+                    );
+                    if rects
+                        .iter()
+                        .enumerate()
+                        .any(|(i, r)| i != a && i != b && r.intersects(corridor))
+                    {
+                        return None;
+                    }
+                }
+            }
             let mut hints = vec![None; pairs.len()];
             hints[index] = Some((Side::N, Side::N));
             hints[forward] = Some(if rects[b].x < rects[a].x {
@@ -651,22 +701,31 @@ pub(crate) fn readable_concept(
                 }
             }) {
                 let leaves: Vec<_> = (0..n).filter(|&i| i != hub).collect();
-                let leaf_width = leaves.iter().map(|&i| rects[i].w).fold(0., f64::max);
-                let step = leaves.iter().map(|&i| rects[i].h).fold(0., f64::max)
-                    + caption_height.max(24.)
-                    + 48.;
-                let gap = (rects[hub].w + leaf_width) / 2. + 2. * caption_width + 160.;
-                rects[hub].x = if fan_out { 0. } else { gap };
-                rects[hub].y = 0.;
-                for (row, &i) in leaves.iter().enumerate() {
-                    rects[i].x = if fan_out { gap } else { 0. };
-                    rects[i].y = (row as f64 - (leaves.len() - 1) as f64 / 2.) * step;
+                if place_nodes {
+                    let leaf_width = leaves.iter().map(|&i| rects[i].w).fold(0., f64::max);
+                    let step = leaves.iter().map(|&i| rects[i].h).fold(0., f64::max)
+                        + caption_height.max(24.)
+                        + 48.;
+                    let gap = (rects[hub].w + leaf_width) / 2. + 2. * caption_width + 160.;
+                    rects[hub].x = if fan_out { 0. } else { gap };
+                    rects[hub].y = 0.;
+                    for (row, &i) in leaves.iter().enumerate() {
+                        rects[i].x = if fan_out { gap } else { 0. };
+                        rects[i].y = (row as f64 - (leaves.len() - 1) as f64 / 2.) * step;
+                    }
+                }
+                if pairs
+                    .iter()
+                    .any(|&(a, b)| rects[a].right() + 2. * o.stub >= rects[b].left())
+                {
+                    return None;
                 }
                 return Some(vec![Some((Side::E, Side::W)); pairs.len()]);
             }
         }
     }
-    if n < 7
+    if !place_nodes
+        || n < 7
         || pairs.len() != n - 1
         || incoming.iter().any(|&v| v > 1)
         || outgoing.iter().any(|&v| v > 1)
