@@ -1,9 +1,14 @@
 // Reproducible native-layout stress corpus and browser-painted geometry audit.
 // Build first: cargo build --locked --all-features
 // Run: npm run test:layout-audit  (outputs artifacts/layout-audit/index.html)
+// Larger mixed-feature corpus: npm run test:layout-explore -- --strict
+// Exploration reports known open defects and intentionally exits nonzero.
 const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process'),{performance}=require('node:perf_hooks');
 const {chromium}=require('playwright'),browserOptions=require('./browser-options.cjs'),checkSvg=require('./check-rendered-svg.cjs');
-const root=path.resolve(__dirname,'..'),out=path.join(root,'artifacts/layout-audit'),binary=path.join(root,'target/debug/smarter-diagrams');
+const exploration=process.argv.includes('--explore'),extended=exploration?require('./layout-exploration-cases.cjs')():null;
+const root=path.resolve(__dirname,'..'),out=path.join(root,exploration?'artifacts/layout-exploration':'artifacts/layout-audit'),binary=path.join(root,'target/debug/smarter-diagrams');
+{const built=spawnSync('cargo',['build','--locked','--all-features','--example','layout-audit'],{cwd:root,encoding:'utf8',timeout:120000});if(built.status!==0)throw Error(built.stderr||'Audit helper build failed');}
+const detailIds=exploration?['a11ce002-sparse-mesh','5eed1203-sparse-mesh','09-many-record-slots','10-many-named-ports','02-planar-mesh','03-dense-mesh','c0ffee01-dag','08-cross-ownership']:[];
 const cases=[];
 const add=(id,concept,source)=>cases.push({id,concept,source:source.trim()+'\n'});
 add('01-pipeline','A request moves through four distinct stages',`client: Browser\napi: Public API\nworker: Order worker\ndb: Ledger\nclient -> api: HTTPS\napi -> worker: jobs\nworker -> db: writes`);
@@ -44,6 +49,7 @@ for(let f=0;f<5;f++)for(let s=0;s<8;s++){
  if(f===3){edge(0,n-1);edge(2,n-2)}
  add(`fuzz-${family}-${s}`,`${family} grammar sample ${s}; seed 0x5eedc0de`,lines.join('\n'));
 }
+if(extended)cases.splice(0,cases.length,...extended.cases);
 (async()=>{
  fs.rmSync(out,{recursive:true,force:true});fs.mkdirSync(out,{recursive:true});const results=[];
  for(const c of cases){
@@ -53,13 +59,18 @@ for(let f=0;f<5;f++)for(let s=0;s<8;s++){
   const result={id:c.id,concept:c.concept,ms:Math.round(ms*100)/100,status:r.error?.code==='ETIMEDOUT'?'timeout':r.status===0?'rendered':'diagnostic'};
   if(r.status!==0){result.diagnostic=(r.stderr||r.error?.message||'unknown error').trim();results.push(result);continue}
   fs.writeFileSync(path.join(out,c.id+'.svg'),r.stdout);
+  {
+   const geometry=spawnSync(path.join(root,'target/debug/examples/layout-audit'),[],{input:c.source,encoding:'utf8',timeout:8000,maxBuffer:8*1024*1024});
+   if(geometry.status!==0)throw Error(`${c.id}: SVG rendered but layout JSON failed: ${geometry.stderr}`);
+   const metadata=JSON.parse(geometry.stdout);result.routeMetrics=require('./layout-audit-metrics.cjs')(metadata.layout);result.semanticFailures=metadata.semanticFailures;
+  }
   result.deterministic=render(c.source).stdout===r.stdout;
   const mutated=render('# harmless comment\n'+c.source.replaceAll('\n','\r\n'));
   result.triviaInvariant=mutated.status===0&&mutated.stdout===r.stdout;
   result.svg=r.stdout;results.push(result);
  }
  const browser=await chromium.launch(browserOptions('http://127.0.0.1')),page=await browser.newPage({viewport:{width:1600,height:1700},deviceScaleFactor:1});
- await page.setContent('<!doctype html><style>body{margin:0;font:15px system-ui;background:#eef2f6}*{box-sizing:border-box}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px}article{height:540px;background:white;border:1px solid #ccd5df;border-radius:8px;padding:14px;overflow:hidden}h2{font-size:16px;margin:0 0 4px}p{font-size:12px;color:#4b5d70;margin:0 0 10px}.figure{height:450px;display:flex;align-items:center;justify-content:center}.figure svg{width:100%;height:100%;object-fit:contain}</style><main class="grid"></main>');
+ await page.setContent('<!doctype html><style>body{margin:0;font:15px system-ui;background:#eef2f6}*{box-sizing:border-box}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px}article{height:540px;background:white;border:1px solid #ccd5df;border-radius:8px;padding:14px;overflow:hidden}h2{font-size:16px;margin:0 0 4px}p{font-size:12px;color:#4b5d70;margin:0 0 10px}.figure pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 monospace;max-width:100%}.figure{height:450px;display:flex;align-items:center;justify-content:center}.figure svg{width:100%;height:100%;object-fit:contain}</style><main class="grid"></main>');
  for(const r of results.filter(r=>r.svg)){
   r.paintFailures=await page.evaluate(checkSvg,r.svg);
   r.metrics=await page.evaluate(markup=>{
@@ -78,7 +89,7 @@ for(let f=0;f<5;f++)for(let s=0;s<8;s++){
  }
  // Isolate the four unpinned caption failures without changing topology.
  const controls=[];
- for(const id of ['03-fan-out','fuzz-cycle-7','fuzz-tree-0','fuzz-tree-6','03-fan-out-spaced']){
+ for(const id of (exploration?[]:['03-fan-out','fuzz-cycle-7','fuzz-tree-0','fuzz-tree-6','03-fan-out-spaced'])){
   const original=id.replace('-spaced',''),base=cases.find(c=>c.id===original).source;
   const source=id.endsWith('-spaced')?base+'\nalign col [c0,c1,c2,c3,c4]\ndistribute col [c0,c1,c2,c3,c4] [gap: 8g]\n':base.split('\n').map(line=>line.includes(' -> ')?line.replace(/:[^\n]*$/,''):line).join('\n');
   const r=spawnSync(binary,[],{input:source,encoding:'utf8',timeout:8000,maxBuffer:8*1024*1024});
@@ -86,19 +97,21 @@ for(let f=0;f<5;f++)for(let s=0;s<8;s++){
   fs.writeFileSync(path.join(out,control.id+'.diagram'),source);if(control.svg){fs.writeFileSync(path.join(out,control.id+'.svg'),control.svg);control.paintFailures=await page.evaluate(checkSvg,control.svg)}controls.push(control);
  }
  const esc=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
- const report=JSON.parse(fs.readFileSync(path.join(root,'docs/layout-audit.json'),'utf8')),reviews=new Map((report.currentReview?.cases||[]).map(r=>[r.id,r.review]));
+ const reportPath=path.join(root,exploration?'docs/layout-exploration.json':'docs/layout-audit.json');
+ const report=fs.existsSync(reportPath)?JSON.parse(fs.readFileSync(reportPath,'utf8')):{knownDiagnostics:{},currentReview:{cases:[]}},reviews=new Map((report.currentReview?.cases||[]).map(r=>[r.id,(r.beauty==null?'':`Beauty ${r.beauty}/5; clarity ${r.clarity}/5. `)+r.review]));
  const cards=results.map(r=>`<article><h2>${esc(r.id)}</h2><p>${esc(r.concept)}</p><div class="figure">${r.svg||`<pre>${esc(r.diagnostic)}</pre>`}</div></article>`);
  const controlCards=controls.map(r=>`<article><h2>${esc(r.id)}</h2><p>${esc(r.concept)}</p><div class="figure">${r.svg||esc(r.diagnostic)}</div></article>`);
  for(let i=0;i<results.length;i+=6){await page.locator('main').evaluate((e,html)=>e.innerHTML=html,cards.slice(i,i+6).join(''));await page.screenshot({path:path.join(out,`sheet-${String(i/6+1).padStart(2,'0')}.png`),fullPage:true})}
- await page.locator('main').evaluate((e,html)=>e.innerHTML=html,controlCards.join(''));await page.screenshot({path:path.join(out,'control-sheet.png'),fullPage:true});
+ if(controlCards.length){await page.locator('main').evaluate((e,html)=>e.innerHTML=html,controlCards.join(''));await page.screenshot({path:path.join(out,'control-sheet.png'),fullPage:true});}
+ if(detailIds.length){const detail=await browser.newPage({viewport:{width:2400,height:1600}});for(const id of detailIds){const r=results.find(r=>r.id===id);if(!r?.svg)continue;await detail.setContent('<style>body{margin:20px;background:white}</style>'+r.svg);await detail.evaluate(()=>document.fonts.ready);await detail.locator('svg').screenshot({path:path.join(out,'detail-'+id+'.png')});}await detail.close();}
  for(const r of [...results,...controls]){delete r.svg}
- fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({revision:spawnSync('git',['rev-parse','HEAD'],{encoding:'utf8',cwd:root}).stdout.trim(),seed:'0x5eedc0de',cases:results,controls},null,2));
+ fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({revision:spawnSync('git',['rev-parse','HEAD'],{encoding:'utf8',cwd:root}).stdout.trim(),seed:extended?.seeds||'0x5eedc0de',cases:results,controls},null,2));
  const shell=await page.content(),style=shell.match(/<style>([\s\S]*?)<\/style>/)[1];
- fs.writeFileSync(path.join(out,'index.html'),`<!doctype html><meta charset="utf-8"><title>Layout audit</title><style>${style}article{height:auto;min-height:580px}.links{font-size:12px}.review-note{font-size:14px;line-height:1.5;color:#24364b;margin:12px 0}.review-summary{margin:16px;padding:20px;background:white;border-radius:8px}.review-summary li{margin:12px 0}</style><section class="review-summary"><h1>Layout audit: ${cases.length} concepts and seeded graphs</h1><p>Current visual pass: ${report.currentReview?.minimumFittedTextBelow8px??"—"} cases have text below 8 px only when fully fitted into this thumbnail. Normal viewers retain a readable starting scale with panning. Geometry checks and visual clarity are reviewed separately.</p><ul>${(report.currentReview?.remainingPriorities||[]).map(f=>`<li><strong>${esc(f.priority+": "+f.problem)}</strong> — ${esc(f.nextStep)}<br>Cases: ${esc(f.cases.join(", "))}</li>`).join("")}</ul></section><p>Each source and SVG is saved beside this gallery. Full measurements: <a href="results.json">results.json</a>.</p><main class="grid">${cards.map((c,i)=>c.replace('</article>',`<p class="review-note">${esc(reviews.get(results[i].id)||"")}</p><div class="links"><a href="${results[i].id}.diagram">Source</a> · <a href="${results[i].id}.svg">Full SVG</a></div></article>`)).join('')}</main><h1>Diagnostic isolation controls</h1><main class="grid">${controlCards.join('')}</main>`);
+ fs.writeFileSync(path.join(out,'index.html'),`<!doctype html><meta charset="utf-8"><title>Layout audit</title><style>${style}article{height:auto;min-height:580px}.links{font-size:12px}.review-note{font-size:14px;line-height:1.5;color:#24364b;margin:12px 0}.review-summary{margin:16px;padding:20px;background:white;border-radius:8px}.review-summary li{margin:12px 0}</style><section class="review-summary"><h1>Layout audit: ${cases.length} concepts and seeded graphs</h1>${exploration?`<p>${report.counts?.rendered??"—"} rendered; ${report.counts?.diagnostics??"—"} diagnostics; ${report.counts?.missingCaptions??"—"} missing connection captions in ${report.counts?.semanticFailureCases??"—"} cases. Geometry checks alone do not establish visual or semantic correctness.</p>`:""}<p>Current visual pass: ${report.currentReview?.minimumFittedTextBelow8px??"—"} cases have text below 8 px only when fully fitted into this thumbnail. Normal viewers retain a readable starting scale with panning. Geometry checks and visual clarity are reviewed separately.</p><ul>${(report.currentReview?.remainingPriorities||[]).map(f=>`<li><strong>${esc(f.priority+": "+f.problem)}</strong> — ${esc(f.nextStep)}<br>Cases: ${esc(f.cases.join(", "))}</li>`).join("")}</ul></section><p>Each source and SVG is saved beside this gallery. Full measurements: <a href="results.json">results.json</a>.</p><main class="grid">${cards.map((c,i)=>c.replace('</article>',`<p class="review-note">${esc(reviews.get(results[i].id)||"")}</p><div class="links"><a href="${results[i].id}.diagram">Source</a> · ${results[i].status==='rendered'?`<a href="${results[i].id}.svg">Full SVG</a>`:'<span>No SVG emitted</span>'}${detailIds.includes(results[i].id)?` · <a href="detail-${results[i].id}.png">Native-size inspection</a>`:''}</div></article>`)).join('')}</main><h1>Diagnostic isolation controls</h1><main class="grid">${controlCards.join('')}</main>`);
  await browser.close();
- console.log(JSON.stringify({cases:results.length,rendered:results.filter(r=>r.status==='rendered').length,diagnostics:results.filter(r=>r.status==='diagnostic').map(r=>({id:r.id,error:r.diagnostic})),timeouts:results.filter(r=>r.status==='timeout').length,nonDeterministic:results.filter(r=>r.deterministic===false).map(r=>r.id),triviaDifferences:results.filter(r=>r.triviaInvariant===false).map(r=>r.id),presentationFailures:results.filter(r=>r.presentationFailures?.length).map(r=>({id:r.id,failures:r.presentationFailures})),paintFailures:results.filter(r=>r.paintFailures?.length).map(r=>({id:r.id,failures:r.paintFailures})),overlaps:results.filter(r=>r.metrics&&(r.metrics.nodeOverlaps.length||r.metrics.captionOverlaps.length)).map(r=>({id:r.id,nodes:r.metrics.nodeOverlaps,captions:r.metrics.captionOverlaps})),gallery:path.relative(root,path.join(out,'index.html'))},null,2));
+ console.log(JSON.stringify({cases:results.length,rendered:results.filter(r=>r.status==='rendered').length,diagnostics:results.filter(r=>r.status==='diagnostic').map(r=>({id:r.id,error:r.diagnostic})),timeouts:results.filter(r=>r.status==='timeout').length,nonDeterministic:results.filter(r=>r.deterministic===false).map(r=>r.id),triviaDifferences:results.filter(r=>r.triviaInvariant===false).map(r=>r.id),semanticFailures:results.filter(r=>r.semanticFailures?.length).map(r=>({id:r.id,failures:r.semanticFailures})),presentationFailures:results.filter(r=>r.presentationFailures?.length).map(r=>({id:r.id,failures:r.presentationFailures})),paintFailures:results.filter(r=>r.paintFailures?.length).map(r=>({id:r.id,failures:r.paintFailures})),overlaps:results.filter(r=>r.metrics&&(r.metrics.nodeOverlaps.length||r.metrics.captionOverlaps.length)).map(r=>({id:r.id,nodes:r.metrics.nodeOverlaps,captions:r.metrics.captionOverlaps})),gallery:path.relative(root,path.join(out,'index.html'))},null,2));
  const baseline=report.knownDiagnostics;
- const failures=results.filter(r=>r.status==='timeout'||r.deterministic===false||r.triviaInvariant===false||r.paintFailures?.length||r.presentationFailures?.length||r.metrics?.finiteGeometry===false||r.metrics?.nodeOverlaps.length||r.metrics?.captionOverlaps.length||(r.status==='diagnostic'&&(process.argv.includes('--strict')||baseline[r.id]!==r.diagnostic)));
+ const failures=results.filter(r=>r.status==='timeout'||r.deterministic===false||r.triviaInvariant===false||r.paintFailures?.length||r.presentationFailures?.length||r.semanticFailures?.length||r.metrics?.finiteGeometry===false||r.metrics?.nodeOverlaps.length||r.metrics?.captionOverlaps.length||(r.status==='diagnostic'&&(process.argv.includes('--strict')||baseline[r.id]!==r.diagnostic)));
  if(controls.some(r=>r.status!=='rendered'||r.paintFailures?.length))throw Error('Diagnostic-isolation control regression');
  if(failures.length){console.error('New regression or strict diagnostic:',failures.map(r=>r.id).join(', '));process.exitCode=1} else console.log('Audit checks passed; known diagnostics are recorded in docs/layout-audit.json. Use --strict to fail on those too.');
 })().catch(e=>{console.error(e);process.exit(1)});
