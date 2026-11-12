@@ -58,7 +58,10 @@ impl Document {
             ));
         }
         gesture.settle()?;
-        if gesture.prepared.parse.source == self.current.parse.source {
+        if Arc::ptr_eq(&gesture.prepared, &self.current)
+            || gesture.prepared.parse.source == self.current.parse.source
+                && gesture.prepared.to_svg() == self.current.to_svg()
+        {
             return Ok(());
         }
         self.commit((*gesture.prepared).clone())

@@ -15,7 +15,7 @@ export class DiagramViewport {
     viewport.addEventListener('wheel',event=>{if(!event.ctrlKey&&!event.metaKey)return;event.preventDefault();this.setZoom(this.zoom*Math.exp(-Math.max(-100,Math.min(100,event.deltaY))*.005))},{passive:false});
     this.observer=new ResizeObserver(()=>{if(this.fitted)this.fit()});this.observer.observe(viewport);this.apply();
   }
-  updateHint(moving=false){this.hint.textContent=moving?'Drag a node to move it':matchMedia('(pointer: coarse)').matches?'Pinch to zoom · drag to pan':'Ctrl/⌘ + scroll to zoom · swipe to pan'}
+  updateHint(moving=false){this.hint.textContent=moving?'Drag nodes or connection labels':matchMedia('(pointer: coarse)').matches?'Pinch to zoom · drag to pan':'Ctrl/⌘ + scroll to zoom · swipe to pan'}
   lockFrame(bounds){this.frame=[...bounds];this.fitted=false;}
   attach(target,bounds) {
     this.target=target;const native=target.dataset.nativeViewBox||target.getAttribute('viewBox');this.naturalBounds=native?native.split(/\s+/).map(Number):bounds;
@@ -34,5 +34,5 @@ export class DiagramViewport {
     const floor=this.readable?(matchMedia('(pointer: coarse)').matches ? .55 : .7):.05;
     this.zoom=Math.max(floor,Math.min(1,Math.max(1,width)/this.bounds[2],Math.max(1,Math.min(440,height))/this.bounds[3]));this.apply();this.viewport.scrollTo(0,0);
   }
-  apply(){this.output.textContent=`${Math.round(this.zoom*100)}%`;if(!this.target||!this.bounds)return;Object.assign(this.target.style,{width:`${this.bounds[2]*this.zoom}px`,height:`${this.bounds[3]*this.zoom}px`,maxWidth:'none',maxHeight:'none',display:'block',margin:'auto'});}
+  apply(){const percent=`${Math.round(this.zoom*100)}%`;if(this.output.textContent!==percent)this.output.textContent=percent;if(!this.target||!this.bounds)return;for(const [name,value]of Object.entries({width:`${this.bounds[2]*this.zoom}px`,height:`${this.bounds[3]*this.zoom}px`,maxWidth:'none',maxHeight:'none',display:'block',margin:'auto'}))if(this.target.style[name]!==value)this.target.style[name]=value;}
 }

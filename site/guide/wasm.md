@@ -43,6 +43,8 @@ document.free();
 
 `WasmDocument` also exposes `drag(drags_json)`, `focus_svg(node, hops)`, `flows_json()` and `flow_frame_svg(id, step)`. For continuous dragging, call `const preview = document.begin_drag()`, `preview.update(drags_json)` and display `preview.svg()`. Commit with `document.commit_drag(preview)`, then `preview.free()`. Failed updates retain the last valid preview and prevent commit until a valid update succeeds. Dropping commits the displayed layout; it does not rerun layout or snap coordinates. `preview.settle()` validates without changing the image. `drag(drags_json)` remains the explicit semantic snapping helper. Drag coordinates are pixels; flow steps are zero-based. JSON payloads use the Rust types' Serde representation. Errors cross the boundary as JavaScript exceptions.
 
+For direct caption editing, use `preview.update_label(edge_id, x, y)` with a pixel-coordinate center, then commit with `document.commit_drag(preview)`. `preview.reset_label(edge_id)` restores automatic placement. Both operations preserve node and route geometry and use the same cancellation/history rules. The Playground updates SVG objects in place and reuses valid caption solutions during node motion to avoid rebuilding the canvas each frame.
+
 ## Lazy runtime exports
 
 The separate runtime bundle adds `WasmSimulation`, `check_safety(model_json, invariant_json, horizon)`, `stack_json(source, theta)` and `branch_diff_svg(base, proposal, tau)`. It also enables document verification methods `verify(zone, system_json, horizon)` and `verification_results()`.

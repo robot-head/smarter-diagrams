@@ -691,7 +691,8 @@ pub(crate) fn svg_with_decorations(
                 .join(" ");
             let _ = write!(
                 s,
-                "<path data-callout=\"true\" d=\"{d}\" stroke=\"var(--sd-muted,#73869b)\" stroke-linejoin=\"round\" fill=\"none\"/>"
+                "<path data-callout=\"true\" data-callout-for=\"{}\" d=\"{d}\" stroke=\"var(--sd-muted,#73869b)\" stroke-linejoin=\"round\" fill=\"none\"/>",
+                escape(&label.feature)
             );
         }
     }
@@ -737,8 +738,11 @@ pub(crate) fn svg_with_decorations(
     for label in &l.labels {
         let _ = write!(
             s,
-            "<g data-label=\"{}\" data-knockout=\"{}\">",
+            "<g data-label=\"{}\" data-draggable-label=\"{}\" data-label-x=\"{}\" data-label-y=\"{}\" data-knockout=\"{}\">",
             escape(&label.feature),
+            scene.edge(&label.feature).is_some(),
+            label.bounds.x,
+            label.bounds.y,
             label.knockout && !label.callout
         );
         let r = label.bounds;
