@@ -1,0 +1,543 @@
+{
+  "baselineRevision": "38f82451164e8132c40ffd5012628725e2a36b54",
+  "seed": "0x5eedc0de",
+  "method": "24 authored concepts and 40 bounded seeded grammar graphs; every initial result visually reviewed using 11 contact sheets, with corrected Unicode fixture reviewed again. Successful sources compiled three times (original, repeat, comment plus CRLF). Chromium checked actual painted geometry and text bounds. Subjective beauty/clarity scores are 1–5, not automated assertions. Five diagnostic-isolation control variants were rendered and visually reviewed separately; compilation success alone does not make those controls ideal presentations.",
+  "rendered": 58,
+  "diagnostics": 6,
+  "unexpectedLabelDiagnostics": 4,
+  "expectedPinnedConflicts": 2,
+  "timeouts": 0,
+  "nondeterministic": 0,
+  "triviaChanges": 0,
+  "paintOrOverlapFailures": 0,
+  "minimumFittedTextBelow8px": 22,
+  "fitPanelPx": [
+    730,
+    450
+  ],
+  "limitations": [
+    "One fixed seed, 5–9 nodes per generated graph; not exhaustive or coverage-guided fuzzing.",
+    "Static native SVGs on one Chromium/Linux font environment; this does not establish animated drag quality or cross-platform typography.",
+    "Geometry checks sample path interiors and do not prove every possible intersection absent.",
+    "Beauty and semantic clarity require human judgment; Fit font size is a heuristic."
+  ],
+  "reproduce": [
+    "cargo build --locked --all-features",
+    "npm run test:layout-audit",
+    "Open artifacts/layout-audit/index.html and results.json"
+  ],
+  "knownDiagnostics": {
+    "03-fan-out": "infeasible layout: no feasible label position for bus->c2",
+    "fuzz-cycle-7": "infeasible layout: no feasible label position for n1->n2",
+    "fuzz-pinned-3": "infeasible layout: n3 and n4 overlap or leave less than 8 px body clearance",
+    "fuzz-pinned-4": "infeasible layout: n0 and n1 overlap or leave less than 8 px body clearance",
+    "fuzz-tree-0": "infeasible layout: no feasible label position for n1->n4",
+    "fuzz-tree-6": "infeasible layout: no feasible label position for n2->n5"
+  },
+  "findings": [
+    {
+      "id": "label-reflow",
+      "priority": "P1",
+      "title": "Recover label placement by expanding unconstrained layouts",
+      "cases": [
+        "03-fan-out",
+        "fuzz-cycle-7",
+        "fuzz-tree-0",
+        "fuzz-tree-6"
+      ],
+      "evidence": "Four unpinned graphs fail with no feasible label position. Every one renders after removing edge captions; the five-consumer fan-out also renders with explicit vertical alignment and an 8g gap.",
+      "opportunity": "Retry bounded rank/row spacing or outer caption rails before rejecting a graph without conflicting hard constraints. Preserve explicit pins and return a diagnostic if recovery is genuinely impossible.",
+      "acceptance": "All four unchanged sources render deterministically with readable captions and the existing geometry/leader checks still pass.",
+      "code": [
+        "src/layout.rs:924",
+        "src/labels.rs:674"
+      ]
+    },
+    {
+      "id": "parallel-order",
+      "priority": "P1",
+      "title": "Keep unconstrained parallel endpoints in consistent lane order",
+      "cases": [
+        "09-parallel",
+        "06-feedback",
+        "20-records",
+        "21-ports",
+        "12-butterfly"
+      ],
+      "evidence": "Three connections between a Client and Server weave even though straight separated lanes fit; the WebSocket caption ends far below the nodes. Opposing feedback and record-slot operations show similar lane exchanges.",
+      "opportunity": "Coordinate free endpoint ordering across both ends and consider route/caption cost for the bundle. Respect fixed named-port order. Distinguish legitimate crossings in constrained and nonplanar graphs from avoidable crossings.",
+      "acceptance": "The three unconstrained parallel protocols have noncrossing, separated lanes and nearby unambiguous captions; record slots retain their exact positions."
+    },
+    {
+      "id": "fit-readability",
+      "priority": "P1",
+      "title": "Include fitted text size and viewport shape in presentation quality",
+      "cases": [
+        "02-long-pipeline",
+        "fuzz-parallel-6",
+        "fuzz-dag-4",
+        "fuzz-parallel-4"
+      ],
+      "evidence": "22 of 58 rendered diagrams have minimum fitted text below 8 px in a 730 by 450 px panel. The eight-stage pipeline is about 15.5:1 with 5.8 px minimum text; the weakest parallel sample is about 4.6 px. These are readability heuristics, not geometry errors.",
+      "opportunity": "Offer an aspect-aware folded or vertical presentation for long chains, with a readable zoom floor and panning when a full Fit would make text too small. Changing CSS scale alone cannot improve the underlying frame.",
+      "acceptance": "A standard documentation-width preview can show the eight-stage concept with readable labels and an obvious sequence; explicit positions remain authoritative.",
+      "code": [
+        "src/layout.rs:274",
+        "src/layout.rs:329",
+        "web/diagram-viewport.js"
+      ]
+    },
+    {
+      "id": "long-text",
+      "priority": "P2",
+      "title": "Provide width-aware node and caption wrapping",
+      "cases": [
+        "14-long-labels",
+        "fuzz-parallel-5",
+        "fuzz-tree-7",
+        "15-unicode"
+      ],
+      "evidence": "Long single-line titles stretch rectangles, cylinders and especially diamonds. The explicitly multiline Unicode gateway shows that a compact, readable result is possible.",
+      "opportunity": "Add an opt-in or bounded automatic line-break policy based on measured glyph widths, with special treatment for diamond geometry and connection captions. Preserve the source label and SVG description.",
+      "acceptance": "Long service names remain readable in compact bodies without glyph overflow; Unicode graphemes, manual newlines and SQL slots retain correct metrics.",
+      "code": [
+        "src/layout.rs:14",
+        "src/layout.rs:314",
+        "src/labels.rs"
+      ]
+    },
+    {
+      "id": "hierarchy",
+      "priority": "P2",
+      "title": "Improve sibling grouping and branch centering in fresh layouts",
+      "cases": [
+        "04-fan-in",
+        "fuzz-tree-1",
+        "fuzz-tree-2",
+        "fuzz-tree-5",
+        "fuzz-tree-4"
+      ],
+      "evidence": "Equal-role producers are staggered across multiple ranks, and some trees double back around their root or mix sibling depths. The clean tree-4 sample shows a more legible sibling structure.",
+      "opportunity": "Use stable sibling ordering and subtree centering with crossing/bend penalties after initial ranking. Prefer visible depth when it does not conflict with explicit constraints or an established drag layout.",
+      "acceptance": "Fresh fan-in and tree layouts make role/depth groups easy to identify and reduce avoidable bends; drag mental-map stability remains unchanged.",
+      "code": [
+        "src/layout.rs:282",
+        "src/topology.rs"
+      ]
+    },
+    {
+      "id": "scope-membership",
+      "priority": "P2",
+      "title": "Clarify the meaning of disjoint shared-scope islands",
+      "cases": [
+        "19-zone"
+      ],
+      "evidence": "All three members share a tint, but the Trusted boundary badge sits above API alone. A viewer can mistake the two other islands for unrelated highlights.",
+      "opportunity": "Consider a repeated keyed scope badge, a common legend, or a boundary style that explicitly communicates shared membership without including nonmembers. Treat this as a design choice, not a collision defect.",
+      "acceptance": "A viewer can identify all three trusted members from the static image without accidentally including Browser."
+    }
+  ],
+  "reviews": [
+    {
+      "id": "01-pipeline",
+      "beauty": 4,
+      "clarity": 5,
+      "note": "Clear left-to-right request path; short labels stay close to their connections."
+    },
+    {
+      "id": "02-long-pipeline",
+      "beauty": 3,
+      "clarity": 2,
+      "note": "Eight stages become a very thin strip; minimum fitted text is about 5.8 px in a 730 px panel."
+    },
+    {
+      "id": "03-fan-out",
+      "beauty": null,
+      "clarity": 1,
+      "note": "Five unconstrained consumers cannot render because one short event caption has no candidate. Removing edge captions or explicitly distributing consumers vertically succeeds."
+    },
+    {
+      "id": "04-fan-in",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "Convergence is traceable, but equal-role producers are staggered across two columns and three rows; their hierarchy is unclear."
+    },
+    {
+      "id": "05-decision",
+      "beauty": 4,
+      "clarity": 5,
+      "note": "The diamond branches and rejoins clearly; yes/no captions are readable and attached to the correct branches."
+    },
+    {
+      "id": "06-feedback",
+      "beauty": 3,
+      "clarity": 4,
+      "note": "The retry intent is visible, but the two opposing queue/worker lanes swap order in a small central weave."
+    },
+    {
+      "id": "07-ring",
+      "beauty": 4,
+      "clarity": 5,
+      "note": "A compact square makes the directed cycle immediately recognizable."
+    },
+    {
+      "id": "08-self-loop",
+      "beauty": 4,
+      "clarity": 5,
+      "note": "The short outside loop communicates retry clearly without colliding with its node."
+    },
+    {
+      "id": "09-parallel",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "Three protocols unnecessarily weave between the same two endpoints; WebSocket is displaced far below on a long leader."
+    },
+    {
+      "id": "10-bidirectional",
+      "beauty": 4,
+      "clarity": 4,
+      "note": "Two-way arrowheads communicate request/reply clearly, though one combined caption cannot distinguish per-direction semantics."
+    },
+    {
+      "id": "11-disconnected",
+      "beauty": 3,
+      "clarity": 4,
+      "note": "Independent components remain separate, but their uneven placement leaves substantial dead space."
+    },
+    {
+      "id": "12-butterfly",
+      "beauty": 2,
+      "clarity": 3,
+      "note": "The shared central channel makes fallback routes hard to follow; the two diagonal dependencies weave together."
+    },
+    {
+      "id": "13-mesh",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "The dense mesh is connected correctly but its central bundle and remote access callouts make individual dependencies difficult to trace. Some crossings are unavoidable for K3,3."
+    },
+    {
+      "id": "14-long-labels",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "Long one-line node names expand the frame; captions need detours and a remote leader, shrinking the complete diagram."
+    },
+    {
+      "id": "15-unicode",
+      "beauty": 4,
+      "clarity": 5,
+      "note": "Japanese, German and Greek render cleanly; the explicit multiline gateway title has a useful compact silhouette."
+    },
+    {
+      "id": "16-container",
+      "beauty": 4,
+      "clarity": 5,
+      "note": "Production ownership and the internal API/database dependency are immediately clear."
+    },
+    {
+      "id": "17-nested",
+      "beauty": 3,
+      "clarity": 4,
+      "note": "Both ownership levels remain readable; the incoming edge takes a noticeable bend across the outer header band."
+    },
+    {
+      "id": "18-cross-scope",
+      "beauty": 3,
+      "clarity": 4,
+      "note": "The handoff across groups is clear; its elevated caption leader makes the frame taller than needed."
+    },
+    {
+      "id": "19-zone",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "The three scope members share a tint but are separate islands; the single Trusted boundary badge appears local to API rather than common to all members."
+    },
+    {
+      "id": "20-records",
+      "beauty": 3,
+      "clarity": 4,
+      "note": "Record rows and table heading are readable; the two incoming operations exchange lane order before entering their slots."
+    },
+    {
+      "id": "21-ports",
+      "beauty": 2,
+      "clarity": 3,
+      "note": "Explicit ports attach cleanly, but opposing lanes weave and the port ack caption competes with the connection ack caption."
+    },
+    {
+      "id": "22-obstacle",
+      "beauty": 4,
+      "clarity": 5,
+      "note": "The route clears the pinned firewall with a compact orthogonal detour and a nearby caption."
+    },
+    {
+      "id": "23-trace",
+      "beauty": 4,
+      "clarity": 5,
+      "note": "Numbered blue captions give an unambiguous reading order while leaving node roles clear."
+    },
+    {
+      "id": "24-vertical",
+      "beauty": 4,
+      "clarity": 5,
+      "note": "The explicit vertical distribution is balanced and both stage transitions are readable."
+    },
+    {
+      "id": "fuzz-dag-0",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "The branch is visible, but the long diamond consumes disproportionate width."
+    },
+    {
+      "id": "fuzz-dag-1",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "A long horizontal chain plus lower shortcut lanes produces tiny fitted text."
+    },
+    {
+      "id": "fuzz-dag-2",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "Several shortcut elbows and callouts weaken the otherwise simple dependency order."
+    },
+    {
+      "id": "fuzz-dag-3",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "The primary chain is clear; the wide one-row frame reduces caption readability."
+    },
+    {
+      "id": "fuzz-dag-4",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "Many bypass rails crowd a very thin horizontal composition."
+    },
+    {
+      "id": "fuzz-dag-5",
+      "beauty": 2,
+      "clarity": 3,
+      "note": "Long store names and shortcut rails stretch the frame despite a readable primary chain."
+    },
+    {
+      "id": "fuzz-dag-6",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "Several long captions and wraparound bypasses make the chain difficult to scan."
+    },
+    {
+      "id": "fuzz-dag-7",
+      "beauty": 3,
+      "clarity": 4,
+      "note": "The forward chain and short shortcut are clear, though the default composition is wider than necessary."
+    },
+    {
+      "id": "fuzz-cycle-0",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "A rectangular cycle is visible, but long decision labels stretch its center."
+    },
+    {
+      "id": "fuzz-cycle-1",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "Long decision text and multiple internal routes obscure the cycle reading order."
+    },
+    {
+      "id": "fuzz-cycle-2",
+      "beauty": 4,
+      "clarity": 4,
+      "note": "The large outer ring is readable and the smaller feedback loops remain identifiable."
+    },
+    {
+      "id": "fuzz-cycle-3",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "The two-row cycle is understandable; oversized decision and cache labels dominate it."
+    },
+    {
+      "id": "fuzz-cycle-4",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "The outer loop is traceable, but long database titles make fitted captions small."
+    },
+    {
+      "id": "fuzz-cycle-5",
+      "beauty": 4,
+      "clarity": 4,
+      "note": "A reasonably balanced loop preserves direction and keeps most labels local."
+    },
+    {
+      "id": "fuzz-cycle-6",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "Rows and columns help trace the cycle, but the cross-row shortcut creates a busy center."
+    },
+    {
+      "id": "fuzz-cycle-7",
+      "beauty": null,
+      "clarity": 1,
+      "note": "Unconstrained graph fails caption placement for n1->n2; removing edge captions succeeds."
+    },
+    {
+      "id": "fuzz-parallel-0",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "Wraparound rails extend an already thin chain; individual routes are difficult to track at Fit."
+    },
+    {
+      "id": "fuzz-parallel-1",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "Several long return routes and labels compress the primary chain."
+    },
+    {
+      "id": "fuzz-parallel-2",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "Many lanes converge at the last node and extend across nearly the entire width."
+    },
+    {
+      "id": "fuzz-parallel-3",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "A caption leader extends far below the compact node row, wasting vertical space."
+    },
+    {
+      "id": "fuzz-parallel-4",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "Wide text-heavy nodes plus long bypasses make the graph exceptionally horizontal."
+    },
+    {
+      "id": "fuzz-parallel-5",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "An oversized central diamond and perimeter rails compete for attention."
+    },
+    {
+      "id": "fuzz-parallel-6",
+      "beauty": 1,
+      "clarity": 1,
+      "note": "The weakest fitted result: about 4.6 px minimum text, with many closely packed return rails."
+    },
+    {
+      "id": "fuzz-parallel-7",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "A wide diamond and long downward caption leaders dominate the composition."
+    },
+    {
+      "id": "fuzz-pinned-0",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "The fixed two-row layout is valid, but long crossing rails in the center need careful tracing."
+    },
+    {
+      "id": "fuzz-pinned-1",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "Pinned placement is honored; opposing middle rails and long labels create visual density."
+    },
+    {
+      "id": "fuzz-pinned-2",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "The three-row obstacle course is routed safely, though long return paths surround its perimeter."
+    },
+    {
+      "id": "fuzz-pinned-3",
+      "beauty": null,
+      "clarity": null,
+      "note": "Expected hard-constraint conflict: oversized n3 and n4 overlap at fixed centers."
+    },
+    {
+      "id": "fuzz-pinned-4",
+      "beauty": null,
+      "clarity": null,
+      "note": "Expected hard-constraint conflict: oversized n0 and n1 overlap at fixed centers."
+    },
+    {
+      "id": "fuzz-pinned-5",
+      "beauty": 4,
+      "clarity": 4,
+      "note": "A clear two-row U-shaped flow; the cross-row shortcut remains understandable."
+    },
+    {
+      "id": "fuzz-pinned-6",
+      "beauty": 4,
+      "clarity": 4,
+      "note": "A balanced fixed grid gives the flow a clear reading order with only one extra branch."
+    },
+    {
+      "id": "fuzz-pinned-7",
+      "beauty": 3,
+      "clarity": 3,
+      "note": "Both branches are visible, but their center corridors run close together."
+    },
+    {
+      "id": "fuzz-tree-0",
+      "beauty": null,
+      "clarity": 1,
+      "note": "An unconstrained tree fails caption placement for n1->n4; removing edge captions succeeds."
+    },
+    {
+      "id": "fuzz-tree-1",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "The root-to-child route turns back underneath the root, obscuring the tree hierarchy."
+    },
+    {
+      "id": "fuzz-tree-2",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "Sibling branches interleave vertically around a wide rectangle and diamond."
+    },
+    {
+      "id": "fuzz-tree-3",
+      "beauty": 3,
+      "clarity": 4,
+      "note": "The branching hierarchy is mostly clear; two long terminal labels consume substantial width."
+    },
+    {
+      "id": "fuzz-tree-4",
+      "beauty": 4,
+      "clarity": 5,
+      "note": "A clean two-level branching tree with distinct sibling groups and local captions."
+    },
+    {
+      "id": "fuzz-tree-5",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "The depth structure is hard to see because sibling routes double back and cross shared corridors."
+    },
+    {
+      "id": "fuzz-tree-6",
+      "beauty": null,
+      "clarity": 1,
+      "note": "An unconstrained tree fails caption placement for n2->n5; removing edge captions succeeds."
+    },
+    {
+      "id": "fuzz-tree-7",
+      "beauty": 2,
+      "clarity": 2,
+      "note": "A very wide decision and upward/vertical routes obscure depth and sibling structure."
+    }
+  ],
+  "controlExperiments": [
+    {
+      "ids": [
+        "03-fan-out",
+        "fuzz-cycle-7",
+        "fuzz-tree-0",
+        "fuzz-tree-6"
+      ],
+      "change": "Remove edge captions without changing nodes or edges",
+      "result": "All four render; hierarchy and route grouping still merit improvement."
+    },
+    {
+      "id": "03-fan-out",
+      "change": "Add align col for c0–c4 and distribute col with an 8g gap",
+      "result": "Renders with all captions retained; the tall layout and close vertical lanes remain visually suboptimal."
+    }
+  ]
+}

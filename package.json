@@ -8,7 +8,8 @@
     "docs:check": "node scripts/check-docs.cjs",
     "test:docs": "node scripts/docs-test.cjs",
     "test:browser": "node scripts/browser-test.cjs",
-    "bench:browser": "node scripts/browser-benchmark.cjs"
+    "bench:browser": "node scripts/browser-benchmark.cjs",
+    "test:layout-audit": "node scripts/layout-audit.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1",
