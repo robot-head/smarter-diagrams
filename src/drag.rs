@@ -215,6 +215,19 @@ impl DragSession {
                     if !retained.contains(&old.feature) {
                         continue;
                     }
+                    if let Some(edge) = candidate.scene.edge(&old.feature)
+                        && effective_annotations(
+                            &candidate.scene,
+                            &edge.id,
+                            &edge.annotations,
+                            self.options.variant.as_deref(),
+                        )
+                        .iter()
+                        .any(|a| a.name == "label")
+                    {
+                        continue;
+                    }
+
                     let Some(index) = stable.labels.iter().position(|l| l.feature == old.feature)
                     else {
                         continue;
