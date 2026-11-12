@@ -72,6 +72,17 @@ module.exports=async function siteUsability(browser,page,base){
     if(width<768)assert.equal(await page.locator('main').evaluate(el=>getComputedStyle(el).flexDirection),'column');
     if(width===375||width===820)await page.screenshot({path:`artifacts/visual-qa-fixed/editor-${width}.png`,fullPage:true});
   }
+  await page.setViewportSize({width:375,height:900});
+  await page.goto(url('playground.html'));
+  const embedded=await(await page.locator('iframe').elementHandle()).contentFrame();
+  await embedded.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('revision'));
+  await page.waitForFunction(()=>document.querySelector('iframe').clientHeight<1150);
+  const collapsedHeight=await page.locator('iframe').evaluate(e=>e.clientHeight);
+  await embedded.locator('#source-panel summary').click();
+  await page.waitForFunction(height=>document.querySelector('iframe').clientHeight>height+200,collapsedHeight);
+  await embedded.locator('#source-panel summary').click();
+  await page.waitForFunction(height=>Math.abs(document.querySelector('iframe').clientHeight-height)<2,collapsedHeight);
+  await page.screenshot({path:'artifacts/visual-qa-fixed/mobile-content-height.png',fullPage:true});
   // Every source-history mutation must update the running model, not just SVG.
   await page.setViewportSize({width:1440,height:1000});await page.goto(url('demo/?example=simulation'));
   await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('revision'));

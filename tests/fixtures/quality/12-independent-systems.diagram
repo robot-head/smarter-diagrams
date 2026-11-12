@@ -1,0 +1,12 @@
+observer: Observer
+a0: Checkout stage 1 [shape: rect]
+a1: Checkout stage 2 [shape: rect]
+a2: Checkout stage 3 [shape: rect]
+a3: Checkout stage 4 [shape: rect]
+a4: Checkout stage 5 [shape: rect]
+b0: Search stage 1 [shape: rect]
+b1: Search stage 2 [shape: rect]
+b2: Search stage 3 [shape: rect]
+b3: Search stage 4 [shape: rect]
+a0 -> a1 -> a2 -> a3 -> a4: order
+b0 -> b1 -> b2 -> b3: query

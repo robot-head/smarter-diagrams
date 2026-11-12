@@ -1,6 +1,11 @@
 // Runs inside Chromium against painted SVG geometry and actual glyph bounds.
 module.exports = function checkRenderedSvg(markup) {
   const svg = new DOMParser().parseFromString(markup, 'image/svg+xml').documentElement;
+  // Measure in native drawing units. Chromium's rounded-rect stroke hit test
+  // loses precision when a percentage-sized SVG falls back to a 300px probe.
+  const native=svg.viewBox.baseVal;
+  svg.style.width=`${native.width}px`;svg.style.height=`${native.height}px`;
+  svg.style.maxWidth='none';svg.style.maxHeight='none';
   const holder=document.createElement('div');holder.style.cssText='position:absolute;left:-10000px;visibility:hidden';holder.append(svg);document.body.append(holder);
   try {
     const failures=[];

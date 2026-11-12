@@ -16,7 +16,7 @@ if (release) for (const file of required) if (!fs.existsSync(path.join(root, fil
 for (const dir of ['demo', 'api', 'evidence', 'examples', 'generated']) fs.rmSync(path.join(publicDir, dir), { recursive: true, force: true });
 copy(path.join(root, 'web'), path.join(publicDir, 'demo'));
 if (fs.existsSync(path.join(root, 'target/doc'))) copy(path.join(root, 'target/doc'), path.join(publicDir, 'api'));
-for (const file of ['benchmarks.csv', 'browser-benchmark.json', 'wasm-size.json', 'github-plan.json']) copy(path.join(root, 'docs', file), path.join(publicDir, 'evidence', file));
+for (const file of ['benchmarks.csv', 'browser-benchmark.json', 'wasm-size.json', 'github-plan.json', 'layout-audit.json', 'layout-exploration.json', 'layout-quality-review.json']) copy(path.join(root, 'docs', file), path.join(publicDir, 'evidence', file));
 copy(path.join(root, 'docs/requirements'), path.join(publicDir, 'evidence/requirements'));
 fs.mkdirSync(path.join(root, 'site/reference'), { recursive: true });
 for (const file of ['architecture', 'performance', 'verification']) {

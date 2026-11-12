@@ -1,0 +1,19 @@
+api: API
+queue: Work queue [shape: queue]
+store: Results [shape: database]
+w0: Worker 1 [shape: rect]
+w1: Worker 2 [shape: rect]
+w2: Worker 3 [shape: rect]
+w3: Worker 4 [shape: rect]
+w4: Worker 5 [shape: rect]
+api -> queue: submit
+queue -> w0: dispatch
+w0 -> store: result
+queue -> w1: dispatch
+w1 -> store: result
+queue -> w2: dispatch
+w2 -> store: result
+queue -> w3: dispatch
+w3 -> store: result
+queue -> w4: dispatch
+w4 -> store: result

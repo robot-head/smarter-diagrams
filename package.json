@@ -10,7 +10,10 @@
     "test:browser": "node scripts/browser-test.cjs",
     "bench:browser": "node scripts/browser-benchmark.cjs",
     "test:layout-audit": "node scripts/layout-audit.cjs",
-    "test:layout-explore": "node scripts/layout-audit.cjs --explore"
+    "test:layout-explore": "node scripts/layout-audit.cjs --explore",
+    "test:layout-preflight": "node scripts/layout-quality-preflight.cjs",
+    "test:layout-quality": "node scripts/layout-quality-rounds.cjs",
+    "test:layout-review": "node scripts/check-layout-review.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1",

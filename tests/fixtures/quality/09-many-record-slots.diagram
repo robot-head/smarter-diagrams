@@ -1,0 +1,17 @@
+checkout: Checkout
+audit: Audit service
+report: Reporting
+orders: Orders [shape: sql_table] {
+port id: uuid [side: W,pos: 1]
+port customer_id: uuid [side: W,pos: 2]
+port status: text [side: W,pos: 3]
+port created_at: text [side: W,pos: 4]
+port total: decimal [side: W,pos: 5]
+port audit_id: uuid [side: W,pos: 6]
+}
+checkout -> orders#id: insert
+checkout -> orders#customer_id: identify
+checkout -> orders#status: update
+audit -> orders#created_at: timestamp
+audit -> orders#audit_id: correlate
+report -> orders#total: aggregate

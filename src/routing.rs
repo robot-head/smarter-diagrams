@@ -65,10 +65,15 @@ pub fn route_all(
     prior: Option<&Layout>,
     l: &mut Layout,
 ) -> Result<(), Error> {
-    // Costs include only routes accepted for this frame, never an edge's old
-    // path or paths left over from a previous pointer position.
+    // Costs include current mandatory ports and routes accepted for this frame,
+    // never an edge's old path or paths from a previous pointer position.
     l.routes.clear();
     l.reused_routes = 0;
+    let used_ports: std::collections::BTreeSet<_> = scene
+        .edges
+        .iter()
+        .flat_map(|e| [port_key(e, true), port_key(e, false)])
+        .collect();
     for e in &scene.edges {
         let a = l.ports[&port_key(e, true)].clone();
         let b = l.ports[&port_key(e, false)].clone();
@@ -87,6 +92,23 @@ pub fn route_all(
             l.routes.insert(e.id.clone(), r);
             l.reused_routes += 1;
             continue;
+        }
+        // Future mandatory shafts are congestion costs, not hard obstacles:
+        // explicit geometry may require a crossing, but must stay feasible.
+        let mut congestion = l.clone();
+        for key in &used_ports {
+            if key == &a.key || key == &b.key {
+                continue;
+            }
+            if let Some(p) = l.ports.get(key) {
+                congestion.routes.insert(
+                    format!("@reserved-port:{key}"),
+                    Route {
+                        edge: key.clone(),
+                        points: vec![p.point, p.stub],
+                    },
+                );
+            }
         }
         // Interior route cannot re-enter either endpoint box after its mandatory stub.
         for id in [&e.source.node, &e.target.node] {
@@ -152,6 +174,16 @@ pub fn route_all(
         } else {
             None
         };
+        let clear_balanced = balanced.as_ref().filter(|points| {
+            congestion.routes.values().all(|r| {
+                points.windows(2).all(|p| {
+                    r.points.windows(2).all(|q| {
+                        !proper_crossing(p[0], p[1], q[0], q[1])
+                            && collinear_overlap(p[0], p[1], q[0], q[1]) < 1e-7
+                    })
+                })
+            })
+        });
         let route = if tight_straight {
             // Facing stubs can overlap on a short straight connection. Order
             // their vertices along the shaft instead of drawing a hairpin.
@@ -161,8 +193,8 @@ pub fn route_all(
                     .total_cmp(&((q.x - a.point.x) * nx + (q.y - a.point.y) * ny))
             });
             points
-        } else if let Some(points) = balanced {
-            points
+        } else if let Some(points) = clear_balanced {
+            points.clone()
         } else if let Some(x) = channel {
             let p = Point::new(x, a.stub.y);
             let q = Point::new(x, b.stub.y);
@@ -176,14 +208,22 @@ pub fn route_all(
                 )));
             }
             let channel_direction = if q.y >= p.y { 1 } else { 3 };
-            let mut one = search(a.stub, p, dir(a.side), channel_direction, &obs, l, o)?;
+            let mut one = search(
+                a.stub,
+                p,
+                dir(a.side),
+                channel_direction,
+                &obs,
+                &congestion,
+                o,
+            )?;
             let two = search(
                 q,
                 b.stub,
                 channel_direction,
                 opposite(dir(b.side)),
                 &obs,
-                l,
+                &congestion,
                 o,
             )?;
             one.push(q);
@@ -196,9 +236,10 @@ pub fn route_all(
                 dir(a.side),
                 opposite(dir(b.side)),
                 &obs,
-                l,
+                &congestion,
                 o,
-            )?
+            )
+            .or_else(|error| balanced.clone().ok_or(error))?
         };
         let mut points = vec![a.point];
         points.extend(route);
@@ -251,10 +292,42 @@ pub fn route_all(
         }
 
         // Keep explicit port stub points even when collinear, so geometry consumers can inspect them.
-        let route = Route {
+        let mut route = Route {
             edge: e.id.clone(),
             points,
         };
+        if !route_is_valid(scene, l, e, &route, o.margin)
+            && let Some(points) = balanced
+        {
+            route.points = [vec![a.point], points, vec![b.point]].concat();
+            dedup_points(&mut route.points);
+        }
+        if !route_is_valid(scene, l, e, &route, o.margin)
+            && !annotations.iter().any(|a| a.name == "route")
+        {
+            // Congestion costs can favor a direction-state walk that revisits
+            // a vertex. Keep the simple geometry contract before aesthetics.
+            let mut clear = l.clone();
+            clear.routes.clear();
+            if let Ok(points) = search(
+                a.stub,
+                b.stub,
+                dir(a.side),
+                opposite(dir(b.side)),
+                &obs,
+                &clear,
+                o,
+            ) {
+                let mut candidate = Route {
+                    edge: e.id.clone(),
+                    points: [vec![a.point], points, vec![b.point]].concat(),
+                };
+                dedup_points(&mut candidate.points);
+                if route_is_valid(scene, l, e, &candidate, o.margin) {
+                    route = candidate;
+                }
+            }
+        }
         if !route_is_valid(scene, l, e, &route, o.margin) {
             return Err(Error::Layout(format!(
                 "route {} cannot preserve its attachments and clearance",
@@ -423,6 +496,15 @@ fn search(
         xs.extend([r.left(), r.right()]);
         ys.extend([r.top(), r.bottom()]);
     }
+    for (id, route) in &routed.routes {
+        if id.starts_with("@reserved-port:")
+            && let Some(p) = route.points.last()
+        {
+            let gap = o.lane_spacing.max(8.);
+            xs.extend([p.x - gap, p.x, p.x + gap]);
+            ys.extend([p.y - gap, p.y, p.y + gap]);
+        }
+    }
     if let Some(min) = xs.iter().copied().reduce(f64::min) {
         xs.push(min - o.stub);
     }
@@ -511,7 +593,10 @@ fn search(
                     if proper_crossing(p, v, pair[0], pair[1]) {
                         cost += o.weights.crossing;
                     } else if collinear_overlap(p, v, pair[0], pair[1]) > 1e-6 {
-                        cost += collinear_overlap(p, v, pair[0], pair[1]) / o.grid * o.weights.bend;
+                        // A shared internal shaft looks like a semantic junction.
+                        // Prefer a discrete crossing or a separate corridor.
+                        cost += 2. * o.weights.crossing
+                            + collinear_overlap(p, v, pair[0], pair[1]) / o.grid * o.weights.bend;
                     }
                 }
             }

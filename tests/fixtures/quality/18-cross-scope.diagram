@@ -1,0 +1,11 @@
+west: West {
+ api: API
+ queue: Queue
+ api -> queue: send
+}
+east: East {
+ worker: Worker
+ db: Database
+ worker -> db: write
+}
+west.queue -> east.worker: replicate

@@ -1,0 +1,29 @@
+n0: "東京 API 0" [shape: cache]
+n1: "Regional gateway 1" [shape: cache]
+n2: "Event journal 2" [shape: rect]
+n3: "Worker 3" [shape: diamond]
+n4: "東京 API 4" [shape: database]
+n5: "API 5" [shape: queue]
+n6: "Organization membership service 6" [shape: rect]
+n7: "Event journal 7" [shape: cache]
+n8: "API 8" [shape: cache]
+n9: "Regional gateway 9" [shape: queue]
+n10: "Organization membership service 10" [shape: queue]
+n11: "Worker 11" [shape: rect]
+n0 -> n1: validate organization access
+n1 -> n2: retry
+n2 -> n3: 
+n3 -> n4: validate organization access
+n4 -> n5: read through
+n5 -> n6: send
+n6 -> n7: read through
+n7 -> n8: validate organization access
+n8 -> n9: read through
+n9 -> n10: send
+n10 -> n11: validate organization access
+n2 -> n11: validate organization access
+n7 -> n11: 
+n9 -> n11: ack
+n10 -> n11: send
+n10 -> n11: read through
+n7 -> n11: ack

@@ -444,107 +444,15 @@ pub(crate) fn backbone(scene: &SceneGraph) -> Option<Vec<usize>> {
     }
 }
 
-fn shortcut_sides(scene: &SceneGraph, rects: &[Rect], order: &[usize]) -> Option<SideHints> {
-    // Too many exterior rails enlarge the frame and make fitted text smaller.
-    // Dense bypass sets retain the normal interior channel planner.
-    if scene.edges.len().saturating_sub(scene.nodes.len() - 1) > 3 {
-        return None;
-    }
-
-    let mut rank = vec![0; rects.len()];
-    for (step, &i) in order.iter().enumerate() {
-        rank[i] = step;
-    }
-    let left = rects.iter().map(|r| r.x).fold(f64::INFINITY, f64::min);
-    let right = rects.iter().map(|r| r.x).fold(f64::NEG_INFINITY, f64::max);
-    let mut hints = vec![None; scene.edges.len()];
-    for (index, e) in scene.edges.iter().enumerate() {
-        let a = scene.index(&e.source.node)?;
-        let b = scene.index(&e.target.node)?;
-        if rank[a] >= rank[b] {
-            return None;
-        }
-        if rank[b] == rank[a] + 1 {
-            continue;
-        }
-        let p = rects[a];
-        let q = rects[b];
-        // Preserve lateral choices through small drags. Intermediate columns
-        // retain normal port selection because an outside exit may be blocked.
-        let side = |r: Rect| {
-            if (r.x - left).abs() < 32. {
-                Some(Side::W)
-            } else if (r.x - right).abs() < 32. {
-                Some(Side::E)
-            } else {
-                None
-            }
-        };
-        if let (Some(sa), Some(sb)) = (side(p), side(q)) {
-            hints[index] = Some((sa, sb));
-        }
-    }
-    hints.iter().any(Option::is_some).then_some(hints)
+pub(crate) fn backbone_sides(
+    scene: &SceneGraph,
+    rects: &[Rect],
+    o: &LayoutOptions,
+) -> Option<SideHints> {
+    crate::sequence_routes::hints(scene, rects, o)
 }
-
-pub(crate) fn backbone_sides(scene: &SceneGraph, rects: &[Rect]) -> Option<SideHints> {
-    shortcut_sides(scene, rects, &backbone(scene)?)
-}
-
 pub(crate) fn coordinate_backbone(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) -> bool {
-    let rects: Vec<_> = scene.nodes.iter().map(|n| l.nodes[&n.id]).collect();
-    let Some(hints) = backbone_sides(scene, &rects) else {
-        return false;
-    };
-    let bounds = rects.iter().copied().reduce(Rect::union).unwrap();
-    let mut routes = BTreeMap::new();
-    let mut lane = 0;
-    for (index, e) in scene.edges.iter().enumerate() {
-        let Some((sa, sb)) = hints[index] else {
-            continue;
-        };
-        let a = &l.ports[&port_key(e, true)];
-        let b = &l.ports[&port_key(e, false)];
-        if a.side != sa || b.side != sb {
-            return false;
-        }
-        let clearance = o.stub + o.margin + lane as f64 * o.lane_spacing.max(12.);
-        lane += 1;
-        let outside_x = |side| {
-            if side == Side::W {
-                bounds.left() - clearance
-            } else {
-                bounds.right() + clearance
-            }
-        };
-        let x = outside_x(sa);
-        let mut points = vec![a.point, a.stub, Point::new(x, a.stub.y)];
-        if sa == sb {
-            points.push(Point::new(x, b.stub.y));
-        } else {
-            let y = if (a.stub.y + b.stub.y) / 2. < bounds.y {
-                bounds.top() - clearance
-            } else {
-                bounds.bottom() + clearance
-            };
-            let target_x = outside_x(sb);
-            points.extend([
-                Point::new(x, y),
-                Point::new(target_x, y),
-                Point::new(target_x, b.stub.y),
-            ]);
-        }
-        points.extend([b.stub, b.point]);
-        points.dedup_by(|a, b| a.distance(*b) < 1e-7);
-        routes.insert(
-            e.id.clone(),
-            Route {
-                edge: e.id.clone(),
-                points,
-            },
-        );
-    }
-    commit(scene, o, l, routes)
+    crate::sequence_routes::coordinate(scene, o, l)
 }
 
 fn commit(
@@ -751,4 +659,111 @@ pub(crate) fn coordinate_mesh(scene: &SceneGraph, o: &LayoutOptions, l: &mut Lay
         }
     }
     commit(scene, o, l, make(&order))
+}
+
+/// Short chains use measured caption space and keep a clear reading direction.
+pub(crate) fn small_chain(
+    scene: &SceneGraph,
+    rects: &mut [Rect],
+    o: &LayoutOptions,
+    place: bool,
+) -> Option<SideHints> {
+    let n = scene.nodes.len();
+    if !(2..=4).contains(&n) || scene.edges.len() != n - 1 {
+        return None;
+    }
+    let mut incoming = vec![0; n];
+    let mut outgoing = vec![Vec::new(); n];
+    for e in &scene.edges {
+        let a = scene.index(&e.source.node)?;
+        let b = scene.index(&e.target.node)?;
+        incoming[b] += 1;
+        outgoing[a].push(b);
+    }
+    if incoming.iter().any(|&d| d > 1) || outgoing.iter().any(|d| d.len() > 1) {
+        return None;
+    }
+    let start = (0..n).find(|&i| incoming[i] == 0)?;
+    let mut order = vec![start];
+    while let Some(&next) = outgoing[*order.last()?].first() {
+        if order.contains(&next) {
+            return None;
+        }
+        order.push(next);
+    }
+    if order.len() != n {
+        return None;
+    }
+    let cw = scene
+        .edges
+        .iter()
+        .map(|e| crate::labels::text_width(&crate::labels::connection_text(scene, e)))
+        .fold(0., f64::max);
+    let ch = scene
+        .edges
+        .iter()
+        .map(|e| crate::labels::text_height(&crate::labels::connection_text(scene, e)))
+        .fold(0., f64::max);
+    // Leave room for a local title edit without moving unrelated siblings.
+    let xgap = (cw + 24.).max(96.);
+    let ygap = (ch + 32.).max(96.);
+    let maxw = rects.iter().map(|r| r.w).fold(0., f64::max);
+    let maxh = rects.iter().map(|r| r.h).fold(0., f64::max);
+    let fit = |w: f64, h: f64| (450. * o.target_aspect_ratio / w).min(450. / h).min(1.);
+    let horizontal = fit(
+        rects.iter().map(|r| r.w).sum::<f64>() + (n - 1) as f64 * xgap + 48.,
+        maxh + ch + 48.,
+    );
+    let vertical = fit(
+        maxw + cw + 48.,
+        rects.iter().map(|r| r.h).sum::<f64>() + (n - 1) as f64 * ygap + 48.,
+    );
+    let vertical = if place {
+        vertical > horizontal * 1.25
+    } else {
+        let xs = rects.iter().map(|r| r.x).fold(f64::NEG_INFINITY, f64::max)
+            - rects.iter().map(|r| r.x).fold(f64::INFINITY, f64::min);
+        let ys = rects.iter().map(|r| r.y).fold(f64::NEG_INFINITY, f64::max)
+            - rects.iter().map(|r| r.y).fold(f64::INFINITY, f64::min);
+        if xs > 8. && ys > 8. {
+            return None;
+        }
+        ys > xs
+    };
+    if place {
+        for (step, &i) in order.iter().enumerate() {
+            rects[i].x = 0.;
+            rects[i].y = 0.;
+            if step > 0 {
+                let before = rects[order[step - 1]];
+                if vertical {
+                    rects[i].y = before.bottom() + ygap + rects[i].h / 2.;
+                } else {
+                    rects[i].x = before.right() + xgap + rects[i].w / 2.;
+                }
+            }
+        }
+    }
+    let mut hints = Vec::new();
+    for e in &scene.edges {
+        let a = rects[scene.index(&e.source.node)?];
+        let b = rects[scene.index(&e.target.node)?];
+        let pair = if vertical {
+            if a.bottom() + 2. * o.stub < b.top() {
+                (Side::S, Side::N)
+            } else if b.bottom() + 2. * o.stub < a.top() {
+                (Side::N, Side::S)
+            } else {
+                return None;
+            }
+        } else if a.right() + 2. * o.stub < b.left() {
+            (Side::E, Side::W)
+        } else if b.right() + 2. * o.stub < a.left() {
+            (Side::W, Side::E)
+        } else {
+            return None;
+        };
+        hints.push(Some(pair));
+    }
+    Some(hints)
 }

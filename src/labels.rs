@@ -688,6 +688,14 @@ pub(crate) fn place_with_prior(
                 all.push(c);
             }
         }
+        if ids.is_empty() && f.position.is_none() && f.slot.is_none() && f.slide.is_none() {
+            for c in nearby_callouts(f, scene) {
+                if valid(&c.label, f, scene, l, &node_index) {
+                    ids.push(all.len());
+                    all.push(c);
+                }
+            }
+        }
         if ids.is_empty() {
             return Err(Error::Layout(format!(
                 "no feasible label position for {}",
@@ -771,6 +779,11 @@ pub(crate) fn place_with_prior(
         }
         component.sort_by_key(|i| by_feature[*i].len());
         let solution = select_component(&component, &by_feature, &all, &conflicts);
+        if solution.len() != component.len() {
+            return Err(Error::Layout(
+                "no feasible label position for complete caption assignment".into(),
+            ));
+        }
         selected.extend(solution);
     }
     let mut labels: Vec<_> = selected.into_iter().map(|i| all[i].label.clone()).collect();
@@ -790,6 +803,28 @@ pub(crate) fn place_with_prior(
 // branch. Prefer the same offset from that leaf instead of a random elbow.
 fn fan_caption(f: &Feature, scene: &SceneGraph, l: &Layout) -> Option<Candidate> {
     let edge = scene.edge(&f.id)?;
+    let w = feature_width(f, scene);
+    let h = text_height(&f.text);
+    if let Some(anchor) = crate::bundles::caption_anchor(scene, l, edge, w)
+        .or_else(|| crate::duplex::caption_anchor(scene, l, edge, w))
+        .or_else(|| crate::gather::caption_anchor(scene, l, edge, w))
+        .or_else(|| crate::records::caption_anchor(scene, l, edge, w))
+    {
+        return Some(Candidate {
+            cost: -1000.,
+            label: LabelPlacement {
+                feature: f.id.clone(),
+                text: f.text.clone(),
+                bounds: Rect::new(anchor.x, anchor.y - h / 2. - 6., w, h),
+                anchor,
+                knockout: false,
+                callout: false,
+                orthogonal_leader: false,
+                horizontal: true,
+                slide: 0.5,
+            },
+        });
+    }
     let fan = scene.nodes.len() >= 4 && scene.edges.len() + 1 == scene.nodes.len();
     let fan_out = fan
         && scene
@@ -947,8 +982,8 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
                         bounds,
                         anchor,
                         knockout: side == 0.,
-                        callout: false,
-                        orthogonal_leader: false,
+                        callout: extra + 6. > h,
+                        orthogonal_leader: extra + 6. > h,
                         horizontal,
                         slide: (arc + len * t) / total,
                     },
@@ -1012,6 +1047,52 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
     let _ = l;
     out
 }
+// A tightly packed parallel bundle may need a diagonal, local leader. Only
+// search this larger neighborhood when ordinary automatic slots are all blocked.
+fn nearby_callouts(f: &Feature, scene: &SceneGraph) -> Vec<Candidate> {
+    let w = feature_width(f, scene);
+    let h = text_height(&f.text);
+    let mut out = Vec::new();
+    for arc in [0.15, 0.35, 0.5, 0.65, 0.85] {
+        let anchor = crate::render::at_arc(&f.route, arc);
+        for radius in [64., 112., 160.] {
+            for (dx, dy) in [
+                (0.0_f64, -1.),
+                (1., -1.),
+                (1., 0.),
+                (1., 1.),
+                (0., 1.),
+                (-1., 1.),
+                (-1., 0.),
+                (-1., -1.),
+            ] {
+                let length: f64 = (dx * dx + dy * dy).sqrt();
+                for horizontal in [false, true] {
+                    out.push(Candidate {
+                        label: LabelPlacement {
+                            feature: f.id.clone(),
+                            text: f.text.clone(),
+                            bounds: Rect::new(
+                                anchor.x + dx * radius / length,
+                                anchor.y + dy * radius / length,
+                                w,
+                                h,
+                            ),
+                            anchor,
+                            knockout: false,
+                            callout: true,
+                            orthogonal_leader: true,
+                            horizontal,
+                            slide: arc,
+                        },
+                        cost: 300. + radius,
+                    });
+                }
+            }
+        }
+    }
+    out
+}
 fn valid(
     label: &LabelPlacement,
     f: &Feature,
@@ -1054,7 +1135,6 @@ fn select_component(
     conflicts: &[BTreeSet<usize>],
 ) -> Vec<usize> {
     struct Search<'a> {
-        component: &'a [usize],
         by_feature: &'a [Vec<usize>],
         all: &'a [Candidate],
         conflicts: &'a [BTreeSet<usize>],
@@ -1063,32 +1143,50 @@ fn select_component(
         budget: usize,
     }
     impl Search<'_> {
-        fn visit(&mut self, depth: usize, cost: f64, chosen: &mut Vec<usize>) {
+        fn visit(&mut self, remaining: &[usize], cost: f64, chosen: &mut Vec<usize>) {
             if self.budget == 0 {
                 return;
             }
             self.budget -= 1;
-            if depth == self.component.len() {
+            if remaining.is_empty() {
                 if cost < self.cost {
                     self.best = chosen.clone();
                     self.cost = cost;
                 }
                 return;
             }
-            let lower: f64 = self.component[depth..]
-                .iter()
-                .map(|i| self.all[self.by_feature[*i][0]].cost)
-                .sum();
+            // Recompute the most constrained feature after every choice.
+            // A cheap early caption must not strand a later feature or leave
+            // a partial greedy assignment as the search's final result.
+            let mut selected = 0;
+            let mut choices = Vec::new();
+            let mut lower = 0.;
+            for (at, &feature) in remaining.iter().enumerate() {
+                let available: Vec<_> = self.by_feature[feature]
+                    .iter()
+                    .copied()
+                    .filter(|id| chosen.iter().all(|c| !self.conflicts[*id].contains(c)))
+                    .collect();
+                if available.is_empty() {
+                    return;
+                }
+                lower += available
+                    .iter()
+                    .map(|&id| self.all[id].cost)
+                    .fold(f64::INFINITY, f64::min);
+                if choices.is_empty() || available.len() < choices.len() {
+                    selected = at;
+                    choices = available;
+                }
+            }
             if cost + lower >= self.cost {
                 return;
             }
-            let ids = self.by_feature[self.component[depth]].clone();
-            for id in ids {
-                if chosen.iter().any(|c| self.conflicts[id].contains(c)) {
-                    continue;
-                }
+            let mut next = remaining.to_vec();
+            next.remove(selected);
+            for id in choices {
                 chosen.push(id);
-                self.visit(depth + 1, cost + self.all[id].cost, chosen);
+                self.visit(&next, cost + self.all[id].cost, chosen);
                 chosen.pop();
             }
         }
@@ -1108,15 +1206,18 @@ fn select_component(
         f64::INFINITY
     };
     let mut search = Search {
-        component,
         by_feature,
         all,
         conflicts,
-        best: greedy,
+        best: if greedy.len() == component.len() {
+            greedy
+        } else {
+            Vec::new()
+        },
         cost,
         budget: 100000,
     };
-    search.visit(0, 0., &mut Vec::new());
+    search.visit(component, 0., &mut Vec::new());
     search.best
 }
 /// Wrap at word boundaries using the same glyph estimates as geometry. Explicit

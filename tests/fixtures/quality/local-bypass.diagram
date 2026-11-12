@@ -1,0 +1,13 @@
+n0: "地域ゲートウェイ 0" [shape: cache]
+n1: "API 1" [shape: queue]
+n2: "Organization membership service 2" [shape: diamond]
+n3: "地域ゲートウェイ 3" [shape: queue]
+n4: "地域ゲートウェイ 4" [shape: rect]
+n0 -> n1: retry
+n1 -> n2: read through
+n2 -> n3: validate organization access
+n3 -> n4: ack
+n2 -> n4: validate organization access
+n2 -> n4: retry
+n3 -> n4: retry
+n1 -> n4: ack

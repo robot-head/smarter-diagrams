@@ -909,12 +909,22 @@ impl Lower<'_> {
         }
         self.validate_port_attrs(&attrs);
         let label = if ts.get(2).is_some_and(|t| t.kind == Kind::Colon) {
+            let end = ts[3..]
+                .iter()
+                .position(|t| matches!(t.kind, Kind::LBracket | Kind::At))
+                .map_or(ts.len(), |i| i + 3);
             format!(
                 "{}: {}",
                 id,
-                ts.get(3)
-                    .map(|t| unquote(t.text(self.source)))
-                    .unwrap_or_default()
+                if end > 3 {
+                    unquote(
+                        Span::new(ts[3].span.start, ts[end - 1].span.end)
+                            .text(self.source)
+                            .trim(),
+                    )
+                } else {
+                    String::new()
+                }
             )
         } else {
             id.clone()

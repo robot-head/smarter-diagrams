@@ -1,0 +1,22 @@
+a0: Service 1 [shape: rect]
+a1: Service 2 [shape: rect]
+a2: Service 3 [shape: rect]
+a3: Service 4 [shape: rect]
+a4: Service 5 [shape: rect]
+b0: Store 1 [shape: database]
+b1: Store 2 [shape: database]
+b2: Store 3 [shape: database]
+b3: Store 4 [shape: database]
+b4: Store 5 [shape: database]
+a0 -> b0: send
+a0 -> b2: send
+a0 -> b4: read through
+a1 -> b1: read through
+a2 -> b0: read through
+a2 -> b2: 
+a2 -> b3: ack
+a3 -> b0: ack
+a3 -> b3: ack
+a4 -> b0: validate organization access
+a4 -> b1: send
+a4 -> b4: retry

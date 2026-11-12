@@ -1,0 +1,17 @@
+client: Client @pin(grid: -50,0)
+left: West @pin(grid: 0,0,lock: [w: 65g,h: 32g]) {
+ api: API @pin(grid: -24,0)
+ queue: Work queue [shape: queue] @pin(grid: 0,0)
+ worker: Worker @pin(grid: 24,0)
+ api -> queue -> worker: jobs
+}
+right: East @pin(grid: 100,0,lock: [w: 65g,h: 32g]) {
+ api: API @pin(grid: 76,0)
+ queue: Work queue [shape: queue] @pin(grid: 100,0)
+ worker: Worker @pin(grid: 124,0)
+ api -> queue -> worker: jobs
+}
+client -> left.api: request
+client -> right.api: request
+left.worker -> right.queue: send
+right.worker -> left.queue: retry

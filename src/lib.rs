@@ -11,21 +11,29 @@
 //! assert!(svg.contains("<svg"));
 //! # Ok::<(), smarter_diagrams::Error>(())
 //! ```
+mod bundles;
 pub mod document;
 mod drag;
 pub mod drift;
+mod duplex;
 pub mod edit;
 #[cfg(feature = "export")]
 pub mod export;
 pub mod formal;
+mod gather;
 pub mod labels;
 pub mod layout;
 pub mod lint;
 pub mod mcp;
 pub mod model;
+mod ownership;
 mod presentation;
+mod records;
 pub mod render;
 pub mod routing;
+mod scope_feedback;
+mod sequence_routes;
+mod series;
 mod shapes;
 pub mod simulation;
 pub mod solver;

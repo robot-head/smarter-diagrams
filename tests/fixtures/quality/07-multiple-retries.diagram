@@ -1,0 +1,13 @@
+s0: Stage 1 [shape: rect]
+s1: Stage 2 [shape: rect]
+s2: Stage 3 [shape: rect]
+s3: Stage 4 [shape: rect]
+s4: Stage 5 [shape: rect]
+s5: Stage 6 [shape: rect]
+s6: Stage 7 [shape: rect]
+s7: Stage 8 [shape: rect]
+s0 -> s1 -> s2 -> s3 -> s4 -> s5 -> s6 -> s7: process
+s3 -> s1: transient retry
+s5 -> s2: revalidate
+s7 -> s0: restart
+s4 -> s4: retry locally

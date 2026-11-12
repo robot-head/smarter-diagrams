@@ -1,0 +1,5 @@
+client: Customer account management console
+api: Regional authorization and policy enforcement service
+db: Durable customer transaction history
+client -> api: Authenticate using a short-lived access token
+api -> db: Read the current organization membership

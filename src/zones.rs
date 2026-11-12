@@ -18,6 +18,7 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
         .collect();
     let padding = value(&zone.attrs, "padding").unwrap_or(1.5) * GRID;
     let mut includes = Vec::new();
+    let mut owner_envelopes: BTreeMap<Option<String>, Rect> = BTreeMap::new();
     for id in &members {
         let mut r = layout.nodes[id].inflate(padding);
         for parent in ancestors(scene, id)
@@ -40,18 +41,16 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
             );
         }
         if r.w > 0. && r.h > 0. {
+            owner_envelopes
+                .entry(scene.node(id).unwrap().parent.clone())
+                .and_modify(|old| *old = old.union(r))
+                .or_insert(r);
             includes.push(r);
         }
     }
-    // A root-level shared boundary reads as one enclosure. Subtract nonmembers
-    // below; nested ownership retains its separately clipped regions.
-    if members
-        .iter()
-        .all(|id| scene.node(id).is_some_and(|n| n.parent.is_none()))
-        && let Some(envelope) = includes.iter().copied().reduce(Rect::union)
-    {
-        includes.push(envelope);
-    }
+    // Members sharing an owner form one enclosure inside that owner's clip.
+    // Different ownership regions remain separate, with matching scope titles.
+    includes.extend(owner_envelopes.into_values());
     let exclusions: Vec<_> = scene
         .nodes
         .iter()
