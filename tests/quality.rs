@@ -776,3 +776,90 @@ fn cross_boundary_anchors_untangle_entries_and_keep_contiguous_zone_splat() {
     );
     assert_eq!(crossings(&unpinned), 0);
 }
+
+#[test]
+fn nmts_fragment_views_fold_compactly_into_desktop_viewport() {
+    let src = include_str!("../examples/nmts-fragment.diagram");
+    let d = compile(src).unwrap();
+    valid(&d);
+    assert_eq!(crossings(&d), 0);
+    let b = render::bounds(&d.scene, &d.layout);
+    assert!(
+        b.w <= 1250. && b.h <= 650.,
+        "expected compact NMTS canonical arch, got {b:?}"
+    );
+    for (view, max_w, max_h) in [("rf_chain", 920., 560.), ("logical_bearer", 950., 400.)] {
+        let projected = smarter_diagrams::views::project(&d.scene, view).unwrap();
+        let l = layout::layout(&projected, &LayoutOptions::default(), None).unwrap();
+        let vd = Diagram {
+            parse: d.parse.clone(),
+            scene: projected,
+            layout: l,
+        };
+        valid(&vd);
+        assert_eq!(crossings(&vd), 0, "unexpected crossing in view {view}");
+        let vb = render::bounds(&vd.scene, &vd.layout);
+        assert!(
+            vb.w <= max_w && vb.h <= max_h,
+            "expected compact NMTS view {view}, got {vb:?}"
+        );
+    }
+}
+
+#[test]
+fn securities_mesh_routes_horizontal_spine_straight_with_local_labels() {
+    let src = include_str!("../examples/tala-securities-mesh.diagram");
+    let d = compile(src).unwrap();
+    valid(&d);
+    assert_eq!(crossings(&d), 0);
+    let b = render::bounds(&d.scene, &d.layout);
+    assert!(
+        b.w <= 1560. && b.h <= 440.,
+        "expected compact securities mesh bounds, got {b:?}"
+    );
+    let straight_pairs = [
+        ("reference.clients", Some("party_id"), "desks.equities"),
+        ("desks.equities", None, "desks.alloc"),
+        ("desks.alloc", None, "risk.credit"),
+        ("risk.credit", None, "risk.ledger"),
+        ("reference.securities", Some("isin"), "desks.fixed_inc"),
+    ];
+    for (src_node, src_port, dst_node) in straight_pairs {
+        let edge = d
+            .scene
+            .edges
+            .iter()
+            .find(|e| {
+                e.source.node == src_node
+                    && e.source.port.as_deref() == src_port
+                    && e.target.node == dst_node
+            })
+            .unwrap_or_else(|| panic!("missing edge {src_node} -> {dst_node}"));
+        let pts = &d.layout.routes[&edge.id].points;
+        assert!(
+            pts.len() >= 2 && pts.iter().all(|p| (p.y - pts[0].y).abs() < 1e-6),
+            "expected straight horizontal route for {}, got {pts:?}",
+            edge.id
+        );
+    }
+    for label in &d.layout.labels {
+        assert!(
+            !label.callout,
+            "expected flush non-callout label for {} ({}), got {label:?}",
+            label.feature, label.text
+        );
+    }
+    let contours = render::zone_contours(&d.scene, &d.layout, &d.scene.zones[0]);
+    let outer = contours
+        .iter()
+        .filter(|poly| {
+            poly.iter()
+                .zip(poly.iter().cycle().skip(1))
+                .take(poly.len())
+                .map(|(a, b)| a.x * b.y - b.x * a.y)
+                .sum::<f64>()
+                > 1e-6
+        })
+        .count();
+    assert_eq!(outer, 1, "audit zone should form one contiguous splat");
+}

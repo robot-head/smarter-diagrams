@@ -92,16 +92,26 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
             let (ra, rb) = (member_rects[best.1], member_rects[best.2]);
             let (ox0, ox1) = (ra.left().max(rb.left()), ra.right().min(rb.right()));
             if ox1 - ox0 >= 24. {
-                let (ty, by) = (ra.top().min(rb.top()), ra.bottom().max(rb.bottom()));
-                let bridge = Rect::new((ox0 + ox1) / 2., (ty + by) / 2., ox1 - ox0, by - ty);
+                let (gy0, gy1) = (ra.bottom().min(rb.bottom()), ra.top().max(rb.top()));
+                let bridge = if gy1 > gy0 {
+                    Rect::new((ox0 + ox1) / 2., (gy0 + gy1) / 2., ox1 - ox0, gy1 - gy0)
+                } else {
+                    let (ty, by) = (ra.top().min(rb.top()), ra.bottom().max(rb.bottom()));
+                    Rect::new((ox0 + ox1) / 2., (ty + by) / 2., ox1 - ox0, by - ty)
+                };
                 if !exclusions.iter().any(|ex| ex.intersects(bridge)) {
                     includes.push(bridge);
                 }
             }
             let (oy0, oy1) = (ra.top().max(rb.top()), ra.bottom().min(rb.bottom()));
             if oy1 - oy0 >= 24. {
-                let (lx, rx) = (ra.left().min(rb.left()), ra.right().max(rb.right()));
-                let bridge = Rect::new((lx + rx) / 2., (oy0 + oy1) / 2., rx - lx, oy1 - oy0);
+                let (gx0, gx1) = (ra.right().min(rb.right()), ra.left().max(rb.left()));
+                let bridge = if gx1 > gx0 {
+                    Rect::new((gx0 + gx1) / 2., (oy0 + oy1) / 2., gx1 - gx0, oy1 - oy0)
+                } else {
+                    let (lx, rx) = (ra.left().min(rb.left()), ra.right().max(rb.right()));
+                    Rect::new((lx + rx) / 2., (oy0 + oy1) / 2., rx - lx, oy1 - oy0)
+                };
                 if !exclusions.iter().any(|ex| ex.intersects(bridge)) {
                     includes.push(bridge);
                 }

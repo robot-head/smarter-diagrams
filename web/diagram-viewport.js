@@ -35,5 +35,5 @@ export class DiagramViewport {
     const floor=this.readable?(matchMedia('(pointer: coarse)').matches ? .55 : .7):.05;
     this.zoom=Math.max(floor,Math.min(1,Math.max(1,width)/this.bounds[2],Math.max(1,Math.min(440,height))/this.bounds[3]));this.apply();this.viewport.scrollTo(0,0);
   }
-  apply(){const percent=`${Math.round(this.zoom*100)}%`;if(this.output.textContent!==percent)this.output.textContent=percent;if(!this.target||!this.bounds)return;this.more.hidden=this.bounds[2]*this.zoom<=this.viewport.clientWidth-16;for(const [name,value]of Object.entries({width:`${this.bounds[2]*this.zoom}px`,height:`${this.bounds[3]*this.zoom}px`,maxWidth:'none',maxHeight:'none',display:'block',margin:'auto'}))if(this.target.style[name]!==value)this.target.style[name]=value;}
+  apply(){const percent=`${Math.round(this.zoom*100)}%`;if(this.output.textContent!==percent)this.output.textContent=percent;if(!this.target||!this.bounds)return;this.more.hidden=this.bounds[2]*this.zoom<=this.viewport.clientWidth-14;for(const [name,value]of Object.entries({width:`${this.bounds[2]*this.zoom}px`,height:`${this.bounds[3]*this.zoom}px`,maxWidth:'none',maxHeight:'none',display:'block',margin:'auto'}))if(this.target.style[name]!==value)this.target.style[name]=value;}
 }

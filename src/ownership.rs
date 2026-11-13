@@ -91,8 +91,11 @@ fn align_container_columns(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOpt
             {
                 return None;
             }
-            let x0 = rects[children[0]].x;
-            if children.iter().any(|&i| (rects[i].x - x0).abs() > 1e-3) {
+            let r0 = rects[children[0]];
+            if children
+                .iter()
+                .any(|&i| rects[i].left() >= r0.right() || rects[i].right() <= r0.left())
+            {
                 return None;
             }
             let child_ids: BTreeSet<&str> = children
@@ -133,9 +136,6 @@ fn align_container_columns(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOpt
             columns.push(group_col);
         }
     }
-    if columns.is_empty() {
-        return;
-    }
     let endpoint_y = |ep: &Endpoint, rects: &[Rect]| -> Option<f64> {
         let idx = scene.index(&ep.node)?;
         let r = rects[idx];
@@ -156,6 +156,7 @@ fn align_container_columns(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOpt
         }
         Some(r.y)
     };
+    let horiz_ep = |ep: &Endpoint| !matches!(ep.constraint.side(), Some(Side::N) | Some(Side::S));
     for sweep in 0..4 {
         let iter: Box<dyn Iterator<Item = &Vec<usize>>> = if sweep % 2 == 0 {
             Box::new(columns.iter())
@@ -213,6 +214,232 @@ fn align_container_columns(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOpt
                 let extra = top_extra(&scene.nodes[i]);
                 rects[i].y = cursor + extra + rects[i].h / 2.;
                 cursor += extra + rects[i].h + gap;
+            }
+        }
+    }
+    let flow_pairs: BTreeSet<(&str, &str)> = scene
+        .flows
+        .iter()
+        .flat_map(|f| {
+            f.steps.windows(2).map(|w| {
+                let a = w[0].split('#').next().unwrap_or(&w[0]);
+                let b = w[1].split('#').next().unwrap_or(&w[1]);
+                (a, b)
+            })
+        })
+        .collect();
+    // Align single-node columns inside multi-column containers along declared flows, shared
+    // zones, or external horizontal peers so primary spines stay straight without taller boxes.
+    for _ in 0..2 {
+        for (owner_idx, owner) in scene.nodes.iter().enumerate() {
+            if !owner.container {
+                continue;
+            }
+            let children: Vec<usize> = scene
+                .nodes
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| c.parent.as_ref() == Some(&owner.id))
+                .map(|(i, _)| i)
+                .collect();
+            if children.len() < 3
+                || children.iter().any(|&i| {
+                    scene.nodes[i].container || rel_nodes.contains(scene.nodes[i].id.as_str())
+                })
+            {
+                continue;
+            }
+            let mut cols: BTreeMap<i64, Vec<usize>> = BTreeMap::new();
+            for &i in &children {
+                cols.entry((rects[i].x * 4.).round() as i64)
+                    .or_default()
+                    .push(i);
+            }
+            if cols.len() < 2 || !cols.values().any(|c| c.len() >= 2) {
+                continue;
+            }
+            let min_top = children
+                .iter()
+                .map(|&i| with_top_extra(&scene.nodes[i], rects[i]).top())
+                .fold(f64::INFINITY, f64::min);
+            let max_bot = children
+                .iter()
+                .map(|&i| rects[i].bottom())
+                .fold(f64::NEG_INFINITY, f64::max);
+            let child_set: BTreeSet<&str> = children
+                .iter()
+                .map(|&i| scene.nodes[i].id.as_str())
+                .collect();
+            let owner_rect = children
+                .iter()
+                .map(|&i| rects[i])
+                .reduce(Rect::union)
+                .unwrap_or_default();
+            for col in cols.into_values() {
+                if col.len() != 1 {
+                    continue;
+                }
+                let u = col[0];
+                let uid = scene.nodes[u].id.as_str();
+                let mut internal_peer_counts: BTreeMap<&str, usize> = BTreeMap::new();
+                for e in &scene.edges {
+                    if e.source.node != e.target.node {
+                        if e.source.node == uid && child_set.contains(e.target.node.as_str()) {
+                            *internal_peer_counts
+                                .entry(e.target.node.as_str())
+                                .or_default() += 1;
+                        } else if e.target.node == uid && child_set.contains(e.source.node.as_str())
+                        {
+                            *internal_peer_counts
+                                .entry(e.source.node.as_str())
+                                .or_default() += 1;
+                        }
+                    }
+                }
+                if internal_peer_counts.values().any(|&c| c >= 2) {
+                    continue;
+                }
+                let lo = min_top + top_extra(&scene.nodes[u]) + rects[u].h / 2.;
+                let hi = max_bot - rects[u].h / 2.;
+                if lo > hi + 1e-6 {
+                    continue;
+                }
+                let horiz_peer_ok = |peer_id: &str, y: f64| -> bool {
+                    let Some(pi) = scene.index(peer_id) else {
+                        return false;
+                    };
+                    let pr = rects[pi];
+                    let x_sep = pr.left() - owner_rect.right() >= 2. * o.stub
+                        || owner_rect.left() - pr.right() >= 2. * o.stub;
+                    x_sep && y >= owner_rect.top() - 32. && y <= owner_rect.bottom() + 32.
+                };
+                let mut targets = Vec::new();
+                for e in &scene.edges {
+                    if e.source.node == uid && !child_set.contains(e.target.node.as_str()) {
+                        if horiz_ep(&e.source)
+                            && horiz_ep(&e.target)
+                            && let Some(y) = endpoint_y(&e.target, rects)
+                            && horiz_peer_ok(&e.target.node, y)
+                        {
+                            targets.push(y);
+                        }
+                    } else if e.target.node == uid && !child_set.contains(e.source.node.as_str()) {
+                        if horiz_ep(&e.source)
+                            && horiz_ep(&e.target)
+                            && let Some(y) = endpoint_y(&e.source, rects)
+                            && horiz_peer_ok(&e.source.node, y)
+                        {
+                            targets.push(y);
+                        }
+                    } else if e.source.node == uid
+                        && child_set.contains(e.target.node.as_str())
+                        && flow_pairs.contains(&(uid, e.target.node.as_str()))
+                        && let Some(y) = endpoint_y(&e.target, rects)
+                    {
+                        targets.push(y);
+                    } else if e.target.node == uid
+                        && child_set.contains(e.source.node.as_str())
+                        && flow_pairs.contains(&(e.source.node.as_str(), uid))
+                        && let Some(y) = endpoint_y(&e.source, rects)
+                    {
+                        targets.push(y);
+                    }
+                }
+                for z in &scene.zones {
+                    if z.members.iter().any(|m| m == uid) {
+                        for &peer in &children {
+                            if peer != u && z.members.iter().any(|m| m == &scene.nodes[peer].id) {
+                                targets.push(rects[peer].y);
+                            }
+                        }
+                    }
+                }
+                if !targets.is_empty() {
+                    let avg = targets.iter().sum::<f64>() / targets.len() as f64;
+                    rects[u].y = avg.clamp(lo, hi);
+                }
+            }
+            let _ = owner_idx;
+        }
+    }
+    // Shift root containers vertically within a local window when doing so straightens
+    // horizontal cross-container connections (including sql_table record slots).
+    let mut roots: Vec<usize> = scene
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| n.parent.is_none() && n.container && !rel_nodes.contains(n.id.as_str()))
+        .map(|(i, _)| i)
+        .collect();
+    roots.sort_by(|&a, &b| rects[a].x.total_cmp(&rects[b].x));
+    if roots.len() >= 2 {
+        let root_of = |id: &str| -> Option<usize> {
+            let mut cur = scene.index(id)?;
+            while let Some(p) = scene.nodes[cur].parent.as_deref() {
+                cur = scene.index(p)?;
+            }
+            Some(cur)
+        };
+        for pass in 0..2 {
+            let order: Vec<usize> = if pass % 2 == 0 {
+                roots.clone()
+            } else {
+                roots.iter().rev().copied().collect()
+            };
+            for r_idx in order {
+                let mut deltas = Vec::new();
+                for e in &scene.edges {
+                    if !horiz_ep(&e.source) || !horiz_ep(&e.target) {
+                        continue;
+                    }
+                    let (Some(ra), Some(rb)) = (root_of(&e.source.node), root_of(&e.target.node))
+                    else {
+                        continue;
+                    };
+                    if ra == rb {
+                        continue;
+                    }
+                    let x_apart = rects[rb].left() - rects[ra].right() >= 2. * o.stub
+                        || rects[ra].left() - rects[rb].right() >= 2. * o.stub;
+                    if !x_apart {
+                        continue;
+                    }
+                    let (Some(ya), Some(yb)) =
+                        (endpoint_y(&e.source, rects), endpoint_y(&e.target, rects))
+                    else {
+                        continue;
+                    };
+                    if ra == r_idx {
+                        deltas.push(yb - ya);
+                    } else if rb == r_idx {
+                        deltas.push(ya - yb);
+                    }
+                }
+                if deltas.is_empty() {
+                    continue;
+                }
+                deltas.sort_by(f64::total_cmp);
+                let shift = deltas[deltas.len() / 2].clamp(-96., 96.);
+                if shift.abs() < 1. {
+                    continue;
+                }
+                let moved = Rect::new(
+                    rects[r_idx].x,
+                    rects[r_idx].y + shift,
+                    rects[r_idx].w,
+                    rects[r_idx].h,
+                );
+                let collides = roots.iter().any(|&other| {
+                    other != r_idx && moved.inflate(24.).intersects(rects[other].inflate(24.))
+                });
+                if !collides {
+                    let rid = &scene.nodes[r_idx].id;
+                    for (j, r) in rects.iter_mut().enumerate() {
+                        if j == r_idx || ancestors(scene, &scene.nodes[j].id).contains(rid) {
+                            r.y += shift;
+                        }
+                    }
+                }
             }
         }
     }
@@ -394,33 +621,109 @@ fn group(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions, units: &[usi
             dag
         };
         let ranks = crate::topology::coffman_graham(&ranking_graph, part.len().max(2));
-        let caption_width = local
-            .edges
-            .iter()
-            .map(|e| crate::labels::text_width(&crate::labels::connection_text(&local, e)))
-            .fold(0., f64::max);
+        let edge_caption_w = |e: &Edge| {
+            let text = scene
+                .edge(&e.id)
+                .map(|orig| crate::labels::connection_text(scene, orig))
+                .unwrap_or_else(|| crate::labels::connection_text(&local, e));
+            crate::labels::text_width(&text)
+        };
+        let caption_width = local.edges.iter().map(edge_caption_w).fold(0., f64::max);
         let caption_height = local
             .edges
             .iter()
-            .map(|e| crate::labels::text_height(&crate::labels::connection_text(&local, e)))
+            .map(|e| {
+                let text = scene
+                    .edge(&e.id)
+                    .map(|orig| crate::labels::connection_text(scene, orig))
+                    .unwrap_or_else(|| crate::labels::connection_text(&local, e));
+                crate::labels::text_height(&text)
+            })
             .fold(0., f64::max);
         let mut widths = BTreeMap::<usize, f64>::new();
+        let mut rank_has_container = BTreeMap::<usize, bool>::new();
         for (i, r) in boxes.iter().enumerate() {
             widths
                 .entry(ranks[i])
                 .and_modify(|w| *w = w.max(r.w))
                 .or_insert(r.w);
+            let is_c = scene.nodes[units[part[i]]].container;
+            rank_has_container
+                .entry(ranks[i])
+                .and_modify(|c| *c |= is_c)
+                .or_insert(is_c);
         }
+        let has_parallel_or_loop = local.edges.iter().enumerate().any(|(ei, ea)| {
+            ea.source.node == ea.target.node
+                || local.edges[..ei].iter().any(|eb| {
+                    (eb.source.node == ea.source.node && eb.target.node == ea.target.node)
+                        || (eb.source.node == ea.target.node && eb.target.node == ea.source.node)
+                })
+        });
         let mut xs = BTreeMap::new();
         let mut x = 0.;
-        let mut last_width = 0.;
-        let x_gap = (caption_width + 2. * o.stub + 20.).max(80.) * spacing;
+        let mut prev_rank: Option<(usize, f64)> = None;
         let y_gap = (caption_height + 40.) * spacing;
         for (&rank, &width) in &widths {
-            x += (last_width + width) / 2.;
+            if let Some((pr, last_width)) = prev_rank {
+                let left_c = rank_has_container[&pr];
+                let right_c = rank_has_container[&rank];
+                let direct_w = local
+                    .edges
+                    .iter()
+                    .filter_map(|e| {
+                        let (u, v) = (local.index(&e.source.node)?, local.index(&e.target.node)?);
+                        let adj = (ranks[u] == pr && ranks[v] == rank)
+                            || (ranks[v] == pr && ranks[u] == rank);
+                        if !adj {
+                            return None;
+                        }
+                        let (lu, rv) = if ranks[u] == pr { (u, v) } else { (v, u) };
+                        let inset = if !left_c && !right_c && !has_parallel_or_loop {
+                            (last_width - boxes[lu].w).max(0.) / 2.
+                                + (width - boxes[rv].w).max(0.) / 2.
+                        } else {
+                            0.
+                        };
+                        Some((edge_caption_w(e) - inset).max(1.))
+                    })
+                    .fold(0., f64::max);
+                let span_w = if direct_w > 0. {
+                    direct_w
+                } else {
+                    local
+                        .edges
+                        .iter()
+                        .filter(|e| {
+                            let (Some(u), Some(v)) =
+                                (local.index(&e.source.node), local.index(&e.target.node))
+                            else {
+                                return false;
+                            };
+                            let (lo, hi) = (ranks[u].min(ranks[v]), ranks[u].max(ranks[v]));
+                            lo <= pr && hi >= rank
+                        })
+                        .map(edge_caption_w)
+                        .fold(0., f64::max)
+                };
+                let pair_gap = if !left_c && !right_c {
+                    if has_parallel_or_loop {
+                        (span_w + 2. * o.stub + 20.).max(80.) * spacing
+                    } else {
+                        (span_w + 20.).max(56.) * spacing
+                    }
+                } else {
+                    let credit = (if left_c { o.container_padding } else { 0. })
+                        + (if right_c { o.container_padding } else { 0. });
+                    let min_gap = if left_c && right_c { 42. } else { 58. };
+                    (span_w + 18. - credit).max(min_gap) * spacing
+                };
+                x += (last_width + width) / 2. + pair_gap;
+            } else {
+                x += width / 2.;
+            }
             xs.insert(rank, x);
-            x += x_gap;
-            last_width = width;
+            prev_rank = Some((rank, width));
         }
         let mut rows = BTreeMap::<usize, f64>::new();
         for (i, r) in boxes.iter_mut().enumerate() {
@@ -472,52 +775,100 @@ fn group(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions, units: &[usi
                 boxes[i].y = boxes[best_peer].y;
             }
         }
-        // Short-chain orientation applies to leaf bodies. Small owner groups
-        // retain scope packing, which reserves their frame-to-frame channels.
+        // Short-chain and wide-DAG orientation applies to leaf bodies inside root containers.
         if part.iter().all(|&unit| !scene.nodes[units[unit]].container) {
             crate::topology::readable_concept(&local, &mut boxes, o, true);
             let root_count = scene.nodes.iter().filter(|n| n.parent.is_none()).count();
-            let in_root_owner = scene.nodes[units[part[0]]]
+            let owner_id = scene.nodes[units[part[0]]]
                 .parent
                 .as_deref()
-                .and_then(|p| scene.node(p))
-                .is_some_and(|owner| owner.parent.is_none());
-            if in_root_owner
-                && root_count >= 4
-                && (3..=4).contains(&part.len())
-                && local.edges.len() + 1 == part.len()
+                .filter(|p| scene.node(p).is_some_and(|owner| owner.parent.is_none()));
+            let is_dag = ranking_graph.edges.len() == local.edges.len();
+            let cur_bounds = boxes
+                .iter()
+                .copied()
+                .reduce(Rect::union)
+                .unwrap_or_default();
+            let is_leaf_bridge_topology = root_count == 3 && {
+                let root_containers = scene
+                    .nodes
+                    .iter()
+                    .filter(|n| n.parent.is_none() && n.container)
+                    .count();
+                let root_leaves: Vec<&str> = scene
+                    .nodes
+                    .iter()
+                    .filter(|n| n.parent.is_none() && !n.container)
+                    .map(|n| n.id.as_str())
+                    .collect();
+                root_containers == 2
+                    && root_leaves.len() == 1
+                    && scene.edges.iter().any(|e| e.target.node == root_leaves[0])
+                    && scene.edges.iter().any(|e| e.source.node == root_leaves[0])
+            };
+            let should_stack_ranks = owner_id.is_some()
+                && is_dag
+                && ((widths.len() >= 3 && cur_bounds.w > 760.)
+                    || (is_leaf_bridge_topology && widths.len() >= 2 && cur_bounds.w > 360.)
+                    || (root_count >= 4
+                        && (3..=4).contains(&part.len())
+                        && local.edges.len() + 1 == part.len()
+                        && cur_bounds.w > 560.));
+            if let Some(oid) = owner_id
+                && should_stack_ranks
             {
-                let mut indeg = vec![0usize; part.len()];
-                let mut out = vec![Vec::new(); part.len()];
-                for e in &local.edges {
-                    if let (Some(a), Some(b)) =
-                        (local.index(&e.source.node), local.index(&e.target.node))
+                let mut by_rank: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+                for (i, &rk) in ranks.iter().enumerate().take(part.len()) {
+                    by_rank.entry(rk).or_default().push(i);
+                }
+                // If this container only transmits out of its final rank into a non-container
+                // bridge between root platforms, place that exit rank at the top so the dish/port
+                // faces the upper bridge directly without crossing internal stages.
+                let max_rk = *by_rank.keys().max().unwrap();
+                let mut ext_in_any = false;
+                let mut ext_out_max_only = false;
+                for e in &scene.edges {
+                    let s_in = ancestors(scene, &e.source.node).contains(oid);
+                    let t_in = ancestors(scene, &e.target.node).contains(oid);
+                    if !s_in && t_in {
+                        ext_in_any = true;
+                    } else if s_in
+                        && !t_in
+                        && let Some(u) = local.index(&e.source.node)
                     {
-                        indeg[b] += 1;
-                        out[a].push(b);
+                        let bridge_target = scene
+                            .node(&e.target.node)
+                            .is_some_and(|tn| tn.parent.is_none() && !tn.container);
+                        if ranks[u] == max_rk && bridge_target && root_count == 3 {
+                            ext_out_max_only = true;
+                        } else {
+                            ext_in_any = true;
+                        }
                     }
                 }
-                if indeg.iter().all(|&d| d <= 1)
-                    && out.iter().all(|v| v.len() <= 1)
-                    && let Some(start) = (0..part.len()).find(|&i| indeg[i] == 0)
-                {
-                    let mut chain = vec![start];
-                    while let Some(&nxt) = out[*chain.last().unwrap()].first() {
-                        if chain.contains(&nxt) {
-                            break;
-                        }
-                        chain.push(nxt);
+                let rank_seq: Vec<Vec<usize>> = if ext_out_max_only && !ext_in_any {
+                    by_rank.into_values().rev().collect()
+                } else {
+                    by_rank.into_values().collect()
+                };
+                let vgap = (caption_height + 28.).max(52.) * spacing;
+                let hgap = 36. * spacing;
+                let mut cursor_y = 0.;
+                for row_nodes in rank_seq {
+                    let row_extra = row_nodes
+                        .iter()
+                        .map(|&idx| top_extra(&scene.nodes[units[part[idx]]]))
+                        .fold(0., f64::max);
+                    let row_h = row_nodes.iter().map(|&idx| boxes[idx].h).fold(0., f64::max);
+                    let row_w: f64 = row_nodes.iter().map(|&idx| boxes[idx].w).sum::<f64>()
+                        + hgap * row_nodes.len().saturating_sub(1) as f64;
+                    let mut cursor_x = -row_w / 2.;
+                    for idx in row_nodes {
+                        boxes[idx].x = cursor_x + boxes[idx].w / 2.;
+                        boxes[idx].y = cursor_y + row_extra + row_h / 2.;
+                        cursor_x += boxes[idx].w + hgap;
                     }
-                    if chain.len() == part.len() {
-                        let vgap = (caption_height + 40.).max(72.) * spacing;
-                        let mut cursor_y = 0.;
-                        for &idx in &chain {
-                            let extra = top_extra(&scene.nodes[units[part[idx]]]);
-                            boxes[idx].x = 0.;
-                            boxes[idx].y = cursor_y + extra + boxes[idx].h / 2.;
-                            cursor_y += extra + boxes[idx].h + vgap;
-                        }
-                    }
+                    cursor_y += row_extra + row_h + vgap;
                 }
             }
         }
@@ -529,6 +880,7 @@ fn group(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions, units: &[usi
             .filter(|(_, unit)| scene.nodes[units[**unit]].container)
             .map(|(at, _)| at)
             .collect();
+        let mut folded_owners = false;
         if owners.len() == 2 {
             let (a, b) = (owners[0], owners[1]);
             let forward = local
@@ -562,8 +914,51 @@ fn group(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions, units: &[usi
                     boxes[i].x = prefix_width / 2.;
                     boxes[i].y = mid + (row as f64 - (prefixes.len() - 1) as f64 / 2.) * step;
                 }
+                folded_owners = true;
             }
         }
+        // Fold an overly wide 3-stage root bridge (Platform -> Link -> Platform) into a balanced
+        // 2-column arch with the link centered overhead so the diagram fits standard viewports.
+        let is_root_group = units
+            .first()
+            .is_some_and(|&u| scene.nodes[u].parent.is_none());
+        if !folded_owners
+            && is_root_group
+            && !owners.is_empty()
+            && ranking_graph.edges.len() == local.edges.len()
+            && widths.len() == 3
+            && rank_counts.values().all(|&c| c == 1)
+        {
+            let row_bounds = boxes
+                .iter()
+                .copied()
+                .reduce(Rect::union)
+                .unwrap_or_default();
+            if row_bounds.w > 980. && row_bounds.w / row_bounds.h.max(1.) > 1.8 {
+                let mut seq: Vec<usize> = (0..part.len()).collect();
+                seq.sort_by_key(|&i| ranks[i]);
+                let (u0, u1, u2) = (seq[0], seq[1], seq[2]);
+                if !scene.nodes[units[part[u1]]].container
+                    && boxes[u1].h < boxes[u0].h * 0.85
+                    && boxes[u1].h < boxes[u2].h * 0.85
+                {
+                    let center_gap = 72. * spacing;
+                    let top_extra_1 = top_extra(&scene.nodes[units[part[u1]]]);
+                    boxes[u0].x = boxes[u0].w / 2.;
+                    boxes[u2].x = boxes[u0].w + center_gap + boxes[u2].w / 2.;
+                    boxes[u1].x = (boxes[u0].right() + boxes[u2].left()) / 2.;
+                    boxes[u1].y = top_extra_1 + boxes[u1].h / 2.;
+                    let row_top = boxes[u1].bottom() + (caption_height + 36.).max(52.) * spacing;
+                    boxes[u0].y =
+                        row_top + top_extra(&scene.nodes[units[part[u0]]]) + boxes[u0].h / 2.;
+                    boxes[u2].y =
+                        row_top + top_extra(&scene.nodes[units[part[u2]]]) + boxes[u2].h / 2.;
+                }
+            }
+        }
+        let in_container = units
+            .first()
+            .is_some_and(|&u| scene.nodes[u].parent.is_some());
         let bounds = boxes
             .iter()
             .enumerate()
@@ -572,7 +967,12 @@ fn group(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions, units: &[usi
             .unwrap();
         for (at, &unit) in part.iter().enumerate() {
             let i = units[unit];
-            let dx = boxes[at].x - bounds.left() - rects[i].x;
+            let ref_x = if in_container {
+                bounds.x
+            } else {
+                bounds.left()
+            };
+            let dx = boxes[at].x - ref_x - rects[i].x;
             let dy = boxes[at].y - bounds.top() + bottom - rects[i].y;
             let id = &scene.nodes[i].id;
             for (j, r) in rects.iter_mut().enumerate() {
@@ -584,6 +984,6 @@ fn group(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions, units: &[usi
             rects[i].w = boxes[at].w;
             rects[i].h = boxes[at].h;
         }
-        bottom += bounds.h + 96. * spacing;
+        bottom += bounds.h + (if in_container { 36. } else { 96. }) * spacing;
     }
 }

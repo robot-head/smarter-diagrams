@@ -1,3 +1,7 @@
+---
+aside: false
+---
+
 # Runnable examples
 
 Every example below is compiled by the Rust CLI during the site build. Download the `.diagram` source, inspect its node and connection tables, switch views where declared, or open any figure directly in the live canvas editor.

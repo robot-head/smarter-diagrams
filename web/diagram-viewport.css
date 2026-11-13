@@ -14,7 +14,7 @@ nav{flex-wrap:wrap;min-width:0}
 nav button,nav select{min-height:38px}
 button[aria-pressed=true]{background:var(--sd-status);border-color:var(--sd-status);color:var(--sd-bg);font-weight:700;box-shadow:0 0 0 2px var(--sd-bg),0 0 0 3px var(--sd-status)}
 button[aria-pressed] span[aria-hidden]{margin-right:4px}
-main:has(.canvas-panel){grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
+main:has(.canvas-panel){grid-template-columns:minmax(240px,264px) minmax(0,1fr)}
 @media(max-width:767px){main{display:flex;flex-direction:column}main>section{width:100%;box-sizing:border-box}textarea{height:300px}body{margin:16px}.demo-links{align-items:center}}
 
 #canvas,#canvas *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}

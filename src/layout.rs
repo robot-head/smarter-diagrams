@@ -1630,11 +1630,31 @@ fn attachment_pair(
             e.target.constraint.side().unwrap_or(Side::N),
         );
     }
-    let point = |r: Rect, s: Side| match s {
-        Side::N => Point::new(r.x, r.top()),
-        Side::E => Point::new(r.right(), r.y),
-        Side::S => Point::new(r.x, r.bottom()),
-        Side::W => Point::new(r.left(), r.y),
+    let point = |r: Rect, s: Side, c: &PortConstraint| {
+        let tx = match *c {
+            PortConstraint::FixedPos { side, offset_grid } if side == s => {
+                (r.left() + offset_grid * o.grid).clamp(r.left() + o.corner, r.right() - o.corner)
+            }
+            PortConstraint::FixedRatio { side, ratio } if side == s => {
+                (r.left() + ratio * r.w).clamp(r.left() + o.corner, r.right() - o.corner)
+            }
+            _ => r.x,
+        };
+        let ty = match *c {
+            PortConstraint::FixedPos { side, offset_grid } if side == s => {
+                (r.top() + offset_grid * o.grid).clamp(r.top() + o.corner, r.bottom() - o.corner)
+            }
+            PortConstraint::FixedRatio { side, ratio } if side == s => {
+                (r.top() + ratio * r.h).clamp(r.top() + o.corner, r.bottom() - o.corner)
+            }
+            _ => r.y,
+        };
+        match s {
+            Side::N => Point::new(tx, r.top()),
+            Side::E => Point::new(r.right(), ty),
+            Side::S => Point::new(tx, r.bottom()),
+            Side::W => Point::new(r.left(), ty),
+        }
     };
     let mut best = (f64::INFINITY, Side::E, Side::W);
     let sides = [Side::E, Side::W, Side::S, Side::N];
@@ -1645,8 +1665,8 @@ fn attachment_pair(
             {
                 continue;
             }
-            let a = point(rects[ai], sa);
-            let b = point(rects[bi], sb);
+            let a = point(rects[ai], sa, &e.source.constraint);
+            let b = point(rects[bi], sb, &e.target.constraint);
             let (ax, ay) = sa.normal();
             let (bx, by) = sb.normal();
             let u = a.offset(ax * o.stub, ay * o.stub);
@@ -1665,6 +1685,11 @@ fn attachment_pair(
                             continue;
                         }
                         if scene.nodes[i].container {
+                            if let Some(hdr) = container_header_rect(&scene.nodes[i], *r)
+                                && hdr.inflate(4.).blocks(p[0], p[1])
+                            {
+                                cost += 100000.;
+                            }
                             continue;
                         }
                         if r.inflate(o.margin).blocks(p[0], p[1]) {

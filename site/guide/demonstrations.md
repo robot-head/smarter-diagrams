@@ -1,3 +1,7 @@
+---
+aside: false
+---
+
 # Domain demonstrations
 
 Three end-to-end demonstrations pair declarative `.diagram` models with runnable Rust programs in [`examples/`](https://github.com/robot-head/smarter-diagrams/tree/main/examples):

@@ -463,13 +463,27 @@
   z-index: 1;
 }
 
+@media (min-width: 960px) {
+  .VPDoc:not(.has-aside) {
+    padding: 32px 20px 96px !important;
+  }
+  .VPDoc:not(.has-aside) .content {
+    padding: 0 12px 128px !important;
+  }
+  .VPDoc:not(.has-aside) .container,
+  .VPDoc:not(.has-aside) .content,
+  .VPDoc:not(.has-aside) .content-container {
+    max-width: 1240px !important;
+  }
+}
+
 @media (min-width: 1280px) {
   .VPHome .image-src {
     max-width: 550px;
     padding: 18px;
   }
   .VPDoc.has-aside .content-container {
-    max-width: 860px !important;
+    max-width: 1040px !important;
   }
   .VPDoc .vp-doc > div > p,
   .VPDoc .vp-doc > div > ul,

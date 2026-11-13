@@ -120,6 +120,23 @@ pub(crate) fn segment_hits(a: Point, b: Point, r: Rect) -> bool {
     }
     lo <= hi
 }
+fn segments_intersect(a: Point, b: Point, c: Point, d: Point) -> bool {
+    let cross =
+        |o: Point, u: Point, v: Point| (u.x - o.x) * (v.y - o.y) - (u.y - o.y) * (v.x - o.x);
+    if a.x.max(b.x) + 1e-6 < c.x.min(d.x)
+        || c.x.max(d.x) + 1e-6 < a.x.min(b.x)
+        || a.y.max(b.y) + 1e-6 < c.y.min(d.y)
+        || c.y.max(d.y) + 1e-6 < a.y.min(b.y)
+    {
+        return false;
+    }
+    let d1 = cross(a, b, c);
+    let d2 = cross(a, b, d);
+    let d3 = cross(c, d, a);
+    let d4 = cross(c, d, b);
+    ((d1 <= 1e-6 && d2 >= -1e-6) || (d1 >= -1e-6 && d2 <= 1e-6))
+        && ((d3 <= 1e-6 && d4 >= -1e-6) || (d3 >= -1e-6 && d4 <= 1e-6))
+}
 fn footprint(label: &LabelPlacement) -> Rect {
     let r = clearance(label);
     leader_path(label)
@@ -134,6 +151,12 @@ fn conflict(a: &LabelPlacement, b: &LabelPlacement) -> bool {
         || leader_path(b)
             .windows(2)
             .any(|p| segment_hits(p[0], p[1], clearance(a)))
+        || (a.anchor.distance(b.anchor) > 1e-3
+            && leader_path(a).windows(2).any(|pa| {
+                leader_path(b)
+                    .windows(2)
+                    .any(|pb| segments_intersect(pa[0], pa[1], pb[0], pb[1]))
+            }))
 }
 /// Keep a valid gesture caption instead of searching for a new preferred slot.
 pub(crate) fn placements_clear(scene: &SceneGraph, layout: &Layout) -> bool {
@@ -153,7 +176,13 @@ pub(crate) fn placements_clear(scene: &SceneGraph, layout: &Layout) -> bool {
                     && crate::layout::container_header_rect(node, rect)
                         .is_some_and(|h| bounds.intersects(h))
             } else if crossed.contains(&node.id) {
-                let clear_border = !bounds.intersects(rect) || rect.inflate(-6.).encloses(bounds);
+                let opaque_flow_pill = !label.callout
+                    && scene
+                        .edge(&label.feature)
+                        .is_some_and(|e| crate::render::flow_caption(scene, e).is_some());
+                let clear_border = opaque_flow_pill
+                    || !bounds.intersects(rect)
+                    || rect.inflate(-6.).encloses(bounds);
                 let hits_header = crate::layout::container_header_rect(node, rect)
                     .is_some_and(|h| bounds.intersects(h));
                 !clear_border || hits_header
@@ -462,8 +491,9 @@ fn place_inner(
         {
             candidates.push(candidate);
         }
-        // Facing horizontal ports use one stable caption rail above the pair.
-        // Segment length and A* tie breaks must not toggle inline/callout slots.
+        // Facing horizontal ports with a vertical Z-elbow use one stable caption
+        // rail above the pair when the leader path is unobstructed. Straight
+        // horizontal connectors keep their tight on-segment placement instead.
         if f.position.is_none()
             && f.slot.is_none()
             && f.slide.is_none()
@@ -472,7 +502,9 @@ fn place_inner(
         {
             let a = &l.ports[&port_key(edge, true)];
             let b = &l.ports[&port_key(edge, false)];
-            if matches!((a.side, b.side), (Side::E, Side::W) | (Side::W, Side::E)) {
+            if matches!((a.side, b.side), (Side::E, Side::W) | (Side::W, Side::E))
+                && (a.point.y - b.point.y).abs() > 4.
+            {
                 let points = &f.route;
                 let total: f64 = points.windows(2).map(|p| p[0].distance(p[1])).sum();
                 let mut remaining = total / 2.;
@@ -490,29 +522,50 @@ fn place_inner(
                     remaining -= length;
                 }
                 let h = text_height(&f.text);
-                candidates.push(Candidate {
-                    label: LabelPlacement {
-                        feature: f.id.clone(),
-                        text: f.text.clone(),
-                        bounds: Rect::new(
-                            (a.stub.x + b.stub.x) / 2.,
-                            l.nodes[&edge.source.node]
-                                .top()
-                                .min(l.nodes[&edge.target.node].top())
-                                - h / 2.
-                                - 24.,
-                            feature_width(f, scene),
-                            h,
-                        ),
-                        anchor,
-                        knockout: false,
-                        callout: true,
-                        orthogonal_leader: false,
-                        horizontal: true,
-                        slide: 0.5,
-                    },
-                    cost: -10000.,
+                let rail_label = LabelPlacement {
+                    feature: f.id.clone(),
+                    text: f.text.clone(),
+                    bounds: Rect::new(
+                        (a.stub.x + b.stub.x) / 2.,
+                        l.nodes[&edge.source.node]
+                            .top()
+                            .min(l.nodes[&edge.target.node].top())
+                            - h / 2.
+                            - 24.,
+                        feature_width(f, scene),
+                        h,
+                    ),
+                    anchor,
+                    knockout: false,
+                    callout: true,
+                    orthogonal_leader: false,
+                    horizontal: true,
+                    slide: 0.5,
+                };
+                let rail_leader = leader_path(&rail_label);
+                let crosses_foreign_route = rail_leader.windows(2).any(|lp| {
+                    l.routes.iter().any(|(oid, oroute)| {
+                        oid != &f.id
+                            && oroute
+                                .points
+                                .windows(2)
+                                .any(|rp| segments_intersect(lp[0], lp[1], rp[0], rp[1]))
+                    })
                 });
+                let punches_container = rail_leader.windows(2).any(|lp| {
+                    scene.nodes.iter().any(|n| {
+                        n.container && {
+                            let r = l.nodes[&n.id];
+                            r.contains(lp[0]) != r.contains(lp[1])
+                        }
+                    })
+                });
+                if !crosses_foreign_route && !punches_container {
+                    candidates.push(Candidate {
+                        label: rail_label,
+                        cost: -10000.,
+                    });
+                }
             }
         }
 
@@ -693,14 +746,60 @@ fn place_inner(
             }
         }
         let crossed_penalty = |c: &Candidate| {
-            if f.crossed
+            let mut pen = if f
+                .crossed
                 .iter()
                 .any(|id| l.nodes[id].intersects(c.label.bounds))
             {
                 48.
             } else {
                 0.
+            };
+            if f.position.is_none() && scene.edge(&f.id).is_some() {
+                let owner_escapes = f
+                    .ignore
+                    .iter()
+                    .filter(|id| {
+                        scene.node(id).is_some_and(|n| n.container)
+                            && !l.nodes[*id].inflate(-4.).encloses(c.label.bounds)
+                    })
+                    .count();
+                pen += owner_escapes as f64 * 360.;
             }
+            if f.position.is_none() && c.label.callout {
+                let path = leader_path(&c.label);
+                let foreign_crossings = l
+                    .routes
+                    .iter()
+                    .filter(|(oid, oroute)| {
+                        *oid != &f.id
+                            && path.windows(2).any(|lp| {
+                                oroute
+                                    .points
+                                    .windows(2)
+                                    .any(|rp| segments_intersect(lp[0], lp[1], rp[0], rp[1]))
+                            })
+                    })
+                    .count();
+                pen += foreign_crossings as f64 * 600.;
+                let container_punches = scene
+                    .nodes
+                    .iter()
+                    .filter(|n| {
+                        n.container && {
+                            let r = l.nodes[&n.id];
+                            path.windows(2)
+                                .any(|lp| r.contains(lp[0]) != r.contains(lp[1]))
+                        }
+                    })
+                    .count();
+                pen += container_punches as f64 * 240.;
+                if prior.is_none() && c.cost > -5000. {
+                    let leader_len: f64 = path.windows(2).map(|p| p[0].distance(p[1])).sum();
+                    pen += 0.8 * leader_len;
+                }
+            }
+            pen
         };
         let is_valid_candidate = |c: &Candidate| {
             let stable_leader = prior.is_none()
@@ -1014,15 +1113,24 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
         }
         let low = ((along / 2. + 4.) / len).min(0.5);
         let high = 1. - low;
-        let samples = if let Some(t) = f.slide {
+        let mut samples = if let Some(t) = f.slide {
             vec![((t * total - arc) / len).clamp(low, high)]
         } else {
-            vec![0.5, 0.25_f64.clamp(low, high), 0.75_f64.clamp(low, high)]
+            vec![
+                0.5,
+                0.35_f64.clamp(low, high),
+                0.65_f64.clamp(low, high),
+                0.2_f64.clamp(low, high),
+                0.8_f64.clamp(low, high),
+                low,
+                high,
+            ]
         };
+        samples.dedup_by(|a, b| (*a - *b).abs() < 1e-4);
         for t in samples {
             let anchor = Point::new(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
             for (side, extra) in [-1., 1., 0.].into_iter().flat_map(|side| {
-                [0., 14., 28.]
+                [0., 8., 18., 30.]
                     .into_iter()
                     .filter(move |extra| side != 0. || *extra == 0.)
                     .map(move |extra| (side, extra))
@@ -1085,7 +1193,7 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
     }
     // External quadrants at several distances let port captions yield space
     // to an edge label instead of forcing a cutout through the connection.
-    if f.id.contains('#') && f.route.len() == 2 {
+    if f.id.contains('#') && scene.edge(&f.id).is_none() && f.route.len() == 2 {
         let wall = f.route[0];
         let anchor = f.route[1];
         let nx = (anchor.x - wall.x).signum();
@@ -1221,7 +1329,12 @@ fn valid(
                 return false;
             }
         } else if f.crossed.contains(&n.id) {
-            if r.intersects(hit.bounds) && !hit.bounds.inflate(-6.).encloses(r) {
+            let opaque_flow_pill = !label.callout
+                && scene
+                    .edge(&f.id)
+                    .is_some_and(|e| crate::render::flow_caption(scene, e).is_some());
+            if !opaque_flow_pill && r.intersects(hit.bounds) && !hit.bounds.inflate(-6.).encloses(r)
+            {
                 return false;
             }
             if let Some(header) = crate::layout::container_header_rect(n, hit.bounds)

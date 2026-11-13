@@ -1,8 +1,8 @@
 {
   "status": "complete",
   "reviewer": "Codex visual inspection",
-  "reviewedAt": "2026-11-12",
-  "engineFingerprint": "5615827de7ff2e18ada3dc502d28b1d16e7e3aa4013d8ff549232643c7c0539a",
+  "reviewedAt": "2026-11-13",
+  "engineFingerprint": "aa660a7fb7020de32a50a3d80d456d9c4b2f4cbefa9b7858e31351a58d436add",
   "method": "Inspect every distinct SVG on Chromium contact sheets; reopen dense or ambiguous examples at native size. Reuse a review only when SVG SHA-256 bytes match. Scores are subjective visual judgments, separate from semantic and geometry assertions. After discovery, every one of the 220 distinct sources was recompiled in each of five complete confirmation passes; every SVG byte hash matched its inspected image.",
   "rubric": {
     "beauty": "5: no observed material spacing, alignment, shape, clipping or connector defect at readable/native zoom; 4 or below: a concrete visual improvement remains.",
@@ -54,7 +54,7 @@
     },
     {
       "id": "05-decision",
-      "svgSha256": "5ad17df70c7f6eb3342ee379e96b39ef1c0186c51422964b4ee3175af5891095",
+      "svgSha256": "3a52f125cfa6172b59d9c8e2a7e1cd2492f089ac574196ca6a63ceea8c948003",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
@@ -70,7 +70,7 @@
     },
     {
       "id": "07-ring",
-      "svgSha256": "761ef9358a2199677f2da73b67ee47f2b1b684472b068953db6d4f36f5f78616",
+      "svgSha256": "6637965af9f77c653b7e3a2a578c9b3bc5d7ddd23219428c67678b76b82ba317",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
@@ -110,7 +110,7 @@
     },
     {
       "id": "12-butterfly",
-      "svgSha256": "e7cd085a880ce936bbf8fcd212478bade70c9cc254340f11fb4b960166a7d817",
+      "svgSha256": "3d0711321891b8db131134df18d60a48d0cfc1f33361fac17bf04039f4f6f1b7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
@@ -118,7 +118,7 @@
     },
     {
       "id": "13-mesh",
-      "svgSha256": "c098f2064c23cb2795075c7103154370873870de72e193deb7f334a244a0a6c7",
+      "svgSha256": "92a414688f4d57bfee59b61a121b960d09ceab178eaa7727c3b743e5c899d49e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -142,7 +142,7 @@
     },
     {
       "id": "16-container",
-      "svgSha256": "e6f92b8ef554255516162b03f0da8c38bdd6599270d703f29d40ebee913ab915",
+      "svgSha256": "13c0e0d86407ef29d09b47dfe9e15ef4238eced817d4959d307d27e3580fc223",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -150,7 +150,7 @@
     },
     {
       "id": "17-nested",
-      "svgSha256": "655b6df945621ae349ba9d046574c4e5aaca62ffdff229ba75995e82914c2279",
+      "svgSha256": "024052ef307db56f94278cc556f696e5359f87dae613e3e723cbcf57dc3fc189",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -158,7 +158,7 @@
     },
     {
       "id": "18-cross-scope",
-      "svgSha256": "de8f946b422d7319fbf94d9a25fbb97cb23c7724b400b9b467b4fd5783ea3240",
+      "svgSha256": "fa8b8421707594a11a9199518e6bee70b4e09ab6b527553e8fbb2cf3c863bc48",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -182,7 +182,7 @@
     },
     {
       "id": "21-ports",
-      "svgSha256": "3ea402049b894063e00b72db275794882963df4272abee76d9afe429449eef27",
+      "svgSha256": "3f6f5a50598cec22be39789c1f2650944626314313262a36f7f1cf95a0ef7d52",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
@@ -190,7 +190,7 @@
     },
     {
       "id": "22-obstacle",
-      "svgSha256": "a74ed10fa5c8a0e8cf07aed08b26885f1951e7e08597f290ffa054fd9c28e336",
+      "svgSha256": "24a952bcd7a67e68d61e9fa5b9642fe18ba5eb6008038d09f340bc818bbcdff0",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
@@ -198,11 +198,11 @@
     },
     {
       "id": "23-trace",
-      "svgSha256": "f4b686f625af6f2dad64f08bf31986a42422823f92b87ee9f68b34910be4a07d",
+      "svgSha256": "9c4cc2adcb97368fa67449b5696d3ad58c4c5f0d3b2fe72863037b250e5e86d9",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
-      "notes": "Numbered blue caption pills and continuous shafts make the three-step request order clear."
+      "notes": "Numbered trace badges sit flush on straight horizontal connectors without sky-rail callout leaders."
     },
     {
       "id": "24-vertical",
@@ -222,7 +222,7 @@
     },
     {
       "id": "fuzz-dag-1",
-      "svgSha256": "d708302724cee582fea7f47b827bf8d0e28359da0ddb52c3be2c8fd25dade00d",
+      "svgSha256": "4a0d88c78f2dce20ba0342343153ad63d6ecb8e86ad72383b947ad7e35d46c5a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -246,7 +246,7 @@
     },
     {
       "id": "fuzz-dag-4",
-      "svgSha256": "37bade1f02fbca2a8e6ce3aa6ca5d20b54dcd51c5f668e088e3fc57709f8ae08",
+      "svgSha256": "b8cf7a376c8013539c7dc869b351a561d6f2a48498cc65c70764e155e6ae7d6e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -254,7 +254,7 @@
     },
     {
       "id": "fuzz-dag-5",
-      "svgSha256": "d2c9dd6c554ae7162230829a25077b8b0c211e3fe621a2e4a3bbf0da69ee94bd",
+      "svgSha256": "ef889b65e401f902515d4cde6b27f7291bd98172a1b14bb2d4e877355f37782e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -262,7 +262,7 @@
     },
     {
       "id": "fuzz-dag-6",
-      "svgSha256": "4d39239303cd2af2b77c44e939dd2081d7536d84860b13bb844116808a7ca7e4",
+      "svgSha256": "bf433c1bcc3241d9a96779f983c6ee27146c31cfd7108c161e14b0beae53ba0f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -278,7 +278,7 @@
     },
     {
       "id": "fuzz-cycle-0",
-      "svgSha256": "c09b5ff8a8bba065341ea479bdafca1ad2139dbadbd14adb0e52a055abe515e2",
+      "svgSha256": "bb9f40204b076334df7da21c50841a2a90bd96a6c840c30fae3febb94a32028b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -286,7 +286,7 @@
     },
     {
       "id": "fuzz-cycle-1",
-      "svgSha256": "73af4dc7dfcf1354cc4ac3804beb57afa76d4188e147d34b542365f7d4fe529d",
+      "svgSha256": "fb6873ac34d0574135f644856ce81a93ece334a393b44bda8a97b35bec95b727",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -294,7 +294,7 @@
     },
     {
       "id": "fuzz-cycle-2",
-      "svgSha256": "e4b1ae8f4fa0a511176d4d098476480c3daf96e820138b4edf326af4d068dec2",
+      "svgSha256": "38477a824715c55cd40cdc745e7ba4198df3528d30cf6cfc2072554c06288479",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -310,7 +310,7 @@
     },
     {
       "id": "fuzz-cycle-4",
-      "svgSha256": "807f67597960d8c8455a86b791116f9fe355fbfd2b70b071fcf8093da1883ecf",
+      "svgSha256": "db9229cabad330af494ff699a4f3d8caf392730b7b7773b9ce298859dbdb4298",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -318,7 +318,7 @@
     },
     {
       "id": "fuzz-cycle-5",
-      "svgSha256": "182f76063b63ec75d3ee41aef83479efdae85a32f508f988362c9b180fa2bcf1",
+      "svgSha256": "3dad776e42b849005eb5659d4934307d90249d6d72c56e94884f9704785608ee",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -326,7 +326,7 @@
     },
     {
       "id": "fuzz-cycle-6",
-      "svgSha256": "cdfb72396208252fd338f1c0a3e6d3a69cad0d04795c8013c127944cdbc9e696",
+      "svgSha256": "f3e67232e5c8a49584bf1aa90d24149f0beaacd1f25f4a45da7c6a0e0bf208f7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -334,7 +334,7 @@
     },
     {
       "id": "fuzz-cycle-7",
-      "svgSha256": "af324234a4ec6523f33f1cf1003cf46a5a722247232923d33d331f00552a3af7",
+      "svgSha256": "416dc69c44a5cb143f4da6b47b8448a5ce778dedc96aa3b91505ff321ee56297",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -342,7 +342,7 @@
     },
     {
       "id": "fuzz-parallel-0",
-      "svgSha256": "fd77e6009912bc1e074a70555a41274053ad950399fdbdf2106fc559045c2e97",
+      "svgSha256": "73a244e601dda62c03d3c34a04dd1b254f1a3223c2409933ca43ab8b41e545ce",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -350,7 +350,7 @@
     },
     {
       "id": "fuzz-parallel-1",
-      "svgSha256": "e702fa6b77c5e18fe90634a297c2f29459afc59ce23b593546ffaf82669b9414",
+      "svgSha256": "64c281b3164a42ee38e324e216762f55a91aa67f483ef445991d38597f6d2978",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -358,7 +358,7 @@
     },
     {
       "id": "fuzz-parallel-2",
-      "svgSha256": "dc10d5bb5b32e970d11b899ad778073b4150b2f79fb58006983dfaec66299a34",
+      "svgSha256": "bfdd56bf5892367bdc61c3983f6283cee53c202bbca7ab6062be9a00b6a3281b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -366,7 +366,7 @@
     },
     {
       "id": "fuzz-parallel-3",
-      "svgSha256": "22fe07592263bc6c84218f070cf8d5b7899793e63f8863e0c869d2e2e8574ee1",
+      "svgSha256": "d3d9ec533ddc8bad43a91d88729304d749b3e6db3c4d4649ec48c21f296cd74a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -374,7 +374,7 @@
     },
     {
       "id": "fuzz-parallel-4",
-      "svgSha256": "089575cce1a498a5ae151a690db6d37ffc33e55e381355fe9937611a7a6452ae",
+      "svgSha256": "2c7dc74c8f76038b3056d7c94594db3a665984ca7eeee7cb2ae431c513bdcacf",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -382,7 +382,7 @@
     },
     {
       "id": "fuzz-parallel-5",
-      "svgSha256": "37f2557146356fd9f9d44e1aedb8621a95fe42a2d96f7a58ac9800dc205dfac9",
+      "svgSha256": "d613d3814fd68ffddd1b154cbfaf65da9952f21d5a5bab42528385c60884d191",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -390,7 +390,7 @@
     },
     {
       "id": "fuzz-parallel-6",
-      "svgSha256": "3e33453d796f3807424cc20e81cdcd8988eb8ae688ba256f0306ff99f191bdc5",
+      "svgSha256": "b37c909e7ae9eb1b447650ebb1f030d94e73703aa1b1d8215e3c711bae951969",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -398,7 +398,7 @@
     },
     {
       "id": "fuzz-parallel-7",
-      "svgSha256": "4eebb3308636cba62e484f4075a0f14ecf1248f87867d699dea7287d04f8467c",
+      "svgSha256": "e06d9c9df1ce30ecb47b73610bca82180fb3d313c14ac6d0342078f74595113b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -406,7 +406,7 @@
     },
     {
       "id": "fuzz-pinned-0",
-      "svgSha256": "9eec7251b20571e3256c16da5a0ec915239c0f9909e0d14bafb647638367195f",
+      "svgSha256": "8240079d0d30434bfb54e80709460f2e5c38d50275b98133a2bb7389f624051f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -414,7 +414,7 @@
     },
     {
       "id": "fuzz-pinned-1",
-      "svgSha256": "3fdfbc2b3463e07b000fb177743c359c787d28e14b95b629928a9214a055191e",
+      "svgSha256": "764e9500713eb7d7570ab71b253143fcf1b00ca34787bbd6363913194751f89b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -422,7 +422,7 @@
     },
     {
       "id": "fuzz-pinned-2",
-      "svgSha256": "85224d8174096aec9e88e8d41a1d3ec9b26fb6847a950f064f28e3a1fbb400bf",
+      "svgSha256": "4f1acb598691584df6cf444c1c2c27df4fcaeb92ba5878f10aea3798fafcd2f9",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -430,7 +430,7 @@
     },
     {
       "id": "fuzz-pinned-3",
-      "svgSha256": "1c847b5337b9ed2dc67e12565f1bb07f6e9b1cc54ed1d6c28e41f1f2d8d15ba3",
+      "svgSha256": "2bffb9972a008955802f0c1bc30685382ede86e68f2d2a71e95a29dcef9f258b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -438,7 +438,7 @@
     },
     {
       "id": "fuzz-pinned-4",
-      "svgSha256": "b279e9e630cc3957ac7aa8a360d4839d632fd5d55808aad554f1f74e7a779f75",
+      "svgSha256": "8e7baa45f2140683dfd6eb64a29230a1cc78cca0042f079012ca0b7f5d0ca475",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -446,7 +446,7 @@
     },
     {
       "id": "fuzz-pinned-5",
-      "svgSha256": "f8fde0609b6f3f1d3f9e4440c4d57548eed92129f70e5fc601af3cb8597138f4",
+      "svgSha256": "9e1a6d9816859390c28a33592ef53cec9fc07fcab5abcde633dc1bcef6cb4fc8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -454,7 +454,7 @@
     },
     {
       "id": "fuzz-pinned-6",
-      "svgSha256": "2f327fb1aadeea5e1db5021102c67753a0ffa9c1fdd4478cd8415b6315dfa47b",
+      "svgSha256": "5c563c659166eadd9d4b11978c4d9ebd5cf3dd8d5f19285bba2d4fd07b85e655",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -462,7 +462,7 @@
     },
     {
       "id": "fuzz-pinned-7",
-      "svgSha256": "ae381b72147fd16d6425ee298b739e8f3015171c7dc15b4321ae50435484cff5",
+      "svgSha256": "20e66c6354f82d1b3c6a4216f9e193c365ab4c36ea8dd79f0a919087c9697dfe",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -470,7 +470,7 @@
     },
     {
       "id": "fuzz-tree-0",
-      "svgSha256": "1a49bbb2f471a888461aacd2b0b189849bac7f984c897387aa0aa18fd0ab5ac4",
+      "svgSha256": "af1d9a6e99fdc5ffaf81b6bd159e66a047af73474f82272896fa2869d7679056",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -478,7 +478,7 @@
     },
     {
       "id": "fuzz-tree-1",
-      "svgSha256": "fefe8737b68cdc090530ca94afa91dc82bd0e6012f4a42ca7afe1f8072e2b91e",
+      "svgSha256": "9ca921c10975e849e50f4b46390370d3b6c02d386ce61501b88065bb3a8c7f7d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -486,7 +486,7 @@
     },
     {
       "id": "fuzz-tree-2",
-      "svgSha256": "07d7509253de8e24d0753f3d0ffa137ec6a7658852416ae750f59563a5d1f4eb",
+      "svgSha256": "f685775dfb70a136f8fe42438bec6821406d0360434e7e42ed4eeb49a5b962d1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -494,7 +494,7 @@
     },
     {
       "id": "fuzz-tree-3",
-      "svgSha256": "06fa92bb27d2c09dbae8a1fb17c742fb42ef4bd3dc5c661bb18509a56188259d",
+      "svgSha256": "7601aeb5b248b8d4e589df3a0861ff0c1913fafce002f25413a4d4e12415601e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -502,7 +502,7 @@
     },
     {
       "id": "fuzz-tree-4",
-      "svgSha256": "de8bb479eb53ff242daa5c58b95ecb6e1e35764a9dc04d769fcfc99c0c5ae997",
+      "svgSha256": "5ac35869e7e84d9f7d2a3def8ef996e0a101cac0c12086b492403b7ea0f5cc29",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
@@ -510,7 +510,7 @@
     },
     {
       "id": "fuzz-tree-5",
-      "svgSha256": "eed0059e3f085ed123da06ab177bfe7969b344c2ced3da4253583390fe43a992",
+      "svgSha256": "619de4ef04eea1494bac91d40113e5e5ed27edf180a14edfe08c755ad1c8afd7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
@@ -518,7 +518,7 @@
     },
     {
       "id": "fuzz-tree-6",
-      "svgSha256": "4ce1765d6e03f51ffc7a3b8622529a307133610827ec1e1b5a25de8928480c51",
+      "svgSha256": "6aaf4a69d7892225d735875481e3fcb16f87011e48958dab3b10d25b64f3453c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
@@ -526,7 +526,7 @@
     },
     {
       "id": "fuzz-tree-7",
-      "svgSha256": "0a34e4fdb0272817649fa7f080655239515df5bb137fef31c8c2e72869803c08",
+      "svgSha256": "7e3056c504d62396b839c1bdc2626eb9cd39e363c61815274a68e4084275d6ad",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
@@ -550,7 +550,7 @@
     },
     {
       "id": "03-dense-mesh",
-      "svgSha256": "7b44789fe17c44ef608694daad5c14f31887ea31b3c096424b257e1cb8a84b32",
+      "svgSha256": "8d46e0b72bb86e1ff140c11796523384f62c6b8311c8fa2ce2ef3ade6603a4b8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
@@ -566,7 +566,7 @@
     },
     {
       "id": "05-balanced-tree",
-      "svgSha256": "ba438db204d79967a6b19b1126821c7bcf130a82f2869bbc835a94242fed9ee6",
+      "svgSha256": "4ea6cb411ea23b85398f0854b057849eeda62554a149d03e64fa9e4f788c62ff",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
@@ -574,7 +574,7 @@
     },
     {
       "id": "06-unbalanced-tree",
-      "svgSha256": "b22b63c022dd5a34a757f0d46c62cf48f2e3e2e68c554429eb0d7eac1fc24b20",
+      "svgSha256": "797faabe3bca84c908dcbea99beea8d5a76e700d7abaf90262c4f78a5dc4302c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
@@ -582,7 +582,7 @@
     },
     {
       "id": "07-multiple-retries",
-      "svgSha256": "bafbdbdea9e789419bef51c714648f309a06175ffc3e44783c8a4cf03280aee2",
+      "svgSha256": "411bc8b47854e47c158a637e8489e4fc5a3159aa5ed5b9780507d3ef1879992b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
@@ -590,11 +590,11 @@
     },
     {
       "id": "08-cross-ownership",
-      "svgSha256": "8867a41f84ee9c56e1c2d68763c08ce1832dd2955152f9979fdc55c7582debe1",
+      "svgSha256": "e1ec5f1879bf81f13b54189550bf839ee94bc11bb35fa3f2943b16654535ab05",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
-      "notes": "Shared trusted scope forms one contiguous Gestalt splat across West, East, and Shared services while excluding non-member workers and Browser."
+      "notes": "West, East and Shared services stay distinct while the Shared trusted scope zone forms one contiguous halo."
     },
     {
       "id": "09-many-record-slots",
@@ -630,7 +630,7 @@
     },
     {
       "id": "c0ffee01-dag",
-      "svgSha256": "f32ea1ae8cfeea52aaa5e134a3c068d73696c6740e48368b699180e1861a1edd",
+      "svgSha256": "3167a85b3c9399f55ebdfb4f741fc8352a82411b5266240f69e00cd005995f1b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
@@ -638,7 +638,7 @@
     },
     {
       "id": "c0ffee01-cycle",
-      "svgSha256": "3eb87c3cda73a4de43669a9fdd8ec349299ee036a4ec4fa31ea2122f608ee530",
+      "svgSha256": "c76a811749d677726e92ed847c67a89599a1aa63c3ec5301a5ebac4e91ade228",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
@@ -646,7 +646,7 @@
     },
     {
       "id": "c0ffee01-parallel",
-      "svgSha256": "5921e8247e04f03e49c572d0a51db9c0428c003ce39bdaab52583a8a40afa71e",
+      "svgSha256": "12cf462ed7e0287a0c0462275f6656e83e62007a7eed313b2e55708bb390068a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -654,7 +654,7 @@
     },
     {
       "id": "c0ffee01-tree",
-      "svgSha256": "8a843b980f3bdac272fb0d1632f3a26e8415aa9d3ca4f92bc2a613d4a668d336",
+      "svgSha256": "dc942867a4ff543dadfb673573b394ec5c2558089054ba24e5e6e173052d20a9",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -662,7 +662,7 @@
     },
     {
       "id": "c0ffee01-two-stage",
-      "svgSha256": "10ed96b453d82b348d285645c3c12940deedc89f88a9d92cd3bcdf0209186b6c",
+      "svgSha256": "564311ed50457ca1491b8821be1ca79eac4de7008fe0a15b22f89e8f934a197b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -670,7 +670,7 @@
     },
     {
       "id": "c0ffee01-sparse-mesh",
-      "svgSha256": "80d537d7e600a3a86372ecafcfb57ec05c45e7252c832df89d4ca6d0279c5497",
+      "svgSha256": "863c35c944b9d85f8f349c4bed3c14ef963fa96fa64453d4300fc5a80ba6a5b8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -686,7 +686,7 @@
     },
     {
       "id": "c0ffee01-scoped",
-      "svgSha256": "d480ec6e6cf91e1e1c08ace4add847a33b41d4aaff192946ff19ed6e397539cf",
+      "svgSha256": "49b14594f3350b5067ad7cc1628914b2bdb4e2a623c873bb6f270017002b8aaa",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -694,7 +694,7 @@
     },
     {
       "id": "a11ce002-dag",
-      "svgSha256": "86ae759952bc947081a2f05d1b834d2309043b1aa947746caf697fe359241b95",
+      "svgSha256": "3118fc83ab9453106262507d0d891717e232dead3bc7fd4c65810801d1d75e07",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -702,7 +702,7 @@
     },
     {
       "id": "a11ce002-cycle",
-      "svgSha256": "7623047058b8bff0cf12da2b7f12708d22be0759dc8bdd8cd94cda91d1225c38",
+      "svgSha256": "f34b032dde6fdaf79b0a38230e7a50fe2ffa2ec61614c0c84f44e21a2b0eb962",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -710,7 +710,7 @@
     },
     {
       "id": "a11ce002-parallel",
-      "svgSha256": "f95d31b8f19b4b42cfb977344d5db1dd902895ed7c66585f82e2be16e40cbaef",
+      "svgSha256": "3cdf661200503a412c5ca8697368ca0bda895b9d0ee7d5cc29e4f3f0f2b93416",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -718,7 +718,7 @@
     },
     {
       "id": "a11ce002-tree",
-      "svgSha256": "14760d164814e13ce5397e04d1c8f9a113543203f843d4b7cf9e87a50bb25a46",
+      "svgSha256": "1cb94aca62808fd17e80b9e727b264e7c79fc50cc3a7b2a210aba65849657f32",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -726,7 +726,7 @@
     },
     {
       "id": "a11ce002-two-stage",
-      "svgSha256": "10224c7ec110593799f6e94cb2a701a3eab6baf85ca3e91e8d625c7026913527",
+      "svgSha256": "342814f2930ab223356b3b9b33984946e11952e12012b5954ee071ee64cc429d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -734,7 +734,7 @@
     },
     {
       "id": "a11ce002-sparse-mesh",
-      "svgSha256": "b200526ac68e4d4192815831811b13984431bf609083d6a087ef0737dc475f36",
+      "svgSha256": "218729db4358fb032a24ded81b531f6a051f5310c83c76c873014c01890a9d8f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -750,7 +750,7 @@
     },
     {
       "id": "a11ce002-scoped",
-      "svgSha256": "8147f6c17f892320696c60b43f5a92569746af12f0c229b286809ba3f07a5367",
+      "svgSha256": "3dd320f0728e1fee92443a980666acdfc977a5269c99f8937e1fa784271e6b63",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -758,7 +758,7 @@
     },
     {
       "id": "5eed1203-dag",
-      "svgSha256": "ff2e5c12b20605a11a6fad3549391f67e65c2e62932a2ebf0fe2dc7140049de7",
+      "svgSha256": "a09106f5aea900be50085c1fedcc6971d74aa2b33a574e9d822a7dd5a1312cf4",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -766,7 +766,7 @@
     },
     {
       "id": "5eed1203-cycle",
-      "svgSha256": "6867f25258bd9f70ede48bec3b1d0805d91ec5713e9c9699e847d35955b564da",
+      "svgSha256": "ca0599f27c21550efe88b68e0132b915bfc987957b01b3b68fe10ddabcf5db4d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -774,7 +774,7 @@
     },
     {
       "id": "5eed1203-parallel",
-      "svgSha256": "c69972fb5720dc69c2bf83f7aeced432b5e56757cbbcc1a6d7b5d51383ed856a",
+      "svgSha256": "6911522ecbd05a51b7a9d4fd65c8ea5bf593fb10bfe1e5ac8ab25db48f05f407",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -782,7 +782,7 @@
     },
     {
       "id": "5eed1203-tree",
-      "svgSha256": "99507c0648e7d1597952f18af263b6a323455f3d14f8760fbc181364df131f35",
+      "svgSha256": "688024f534afd07e3351866e996cd1ac411f360ce98cf4a6c71d76438732e5fa",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -790,7 +790,7 @@
     },
     {
       "id": "5eed1203-two-stage",
-      "svgSha256": "cef196da17d40416e65db7af4d6b2ab75c8447176068266e7db98160908c6a6a",
+      "svgSha256": "582d9757baab55be202ebc14f96dcaae3f68a72752bd669ad526dcba55868951",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
@@ -798,7 +798,7 @@
     },
     {
       "id": "5eed1203-sparse-mesh",
-      "svgSha256": "af8df84de475ca1e2c5e5e2fc43b70ee7a2258376a6aeac82df83bd95a0844bb",
+      "svgSha256": "a06406e920fcf39810b8e053c7498803c42b28bf289a7cb0662372b82ec712ab",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
@@ -814,7 +814,7 @@
     },
     {
       "id": "5eed1203-scoped",
-      "svgSha256": "12b5eff6bcf66fec4e5c3ba21579240ab9b062299b12c43998df258f454283ec",
+      "svgSha256": "caa0c91d1cd2ec714aabce4341ecd24d20dc03e207063a3197fc159892ec9300",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
@@ -822,7 +822,7 @@
     },
     {
       "id": "d1a60001-dag",
-      "svgSha256": "a1d704fc6d1aaed851a364e00ff833ca5c398f1a18b2f7af139d3c234f464ef1",
+      "svgSha256": "118ed522f8b550079b6a3945e7030fedce399bf5dee12a1dfe20f06852d3a9f6",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -830,7 +830,7 @@
     },
     {
       "id": "d1a60001-cycle",
-      "svgSha256": "76648daa0b33dbf1cba8b8c4543f5fc5060b68c2ec08342abf32bdb957994beb",
+      "svgSha256": "2bc1f3865b5c8a6255fe787fb88e8a79640e648a71a504575d54f079c95bbddf",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -838,7 +838,7 @@
     },
     {
       "id": "d1a60001-parallel",
-      "svgSha256": "368aecceb287935111d87acd471b94412fcaba85048ae79a444b1e124e84007b",
+      "svgSha256": "8ebcee8c8b1f2ee75954bcfe754d76e204f5c49672754474088c07444592b314",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -846,7 +846,7 @@
     },
     {
       "id": "d1a60001-tree",
-      "svgSha256": "dbb61a055acceb0a6889b02ceb5c86e5bf67477192081f1f03937c2bf3e20d9b",
+      "svgSha256": "39cdd5837cc43933ebf7bab0d9c00ab8eaf9c86aa3f90cb6cfb99f6b5918849c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -854,7 +854,7 @@
     },
     {
       "id": "d1a60001-two-stage",
-      "svgSha256": "d3e09a988321b9dfb508118b77e0692cb90775ca6ac0ff91e142b071874331ec",
+      "svgSha256": "cf0fc3d2eec3303ab990f7aae502146e62a87db23358fc123a3eb554abfccc36",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -862,7 +862,7 @@
     },
     {
       "id": "d1a60001-sparse-mesh",
-      "svgSha256": "0274be205faeba6feebf6e51752bc5e671c89a0c79abc3f8cde550f63bb259b7",
+      "svgSha256": "87f6e8849534ede735404d4ec1c51d71256aacf18ecc5f36be5cfd6d993c16e0",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -878,7 +878,7 @@
     },
     {
       "id": "d1a60001-scoped",
-      "svgSha256": "05f6d3908030b41d72cbda98f1e364d51443c779f2c0eb4e35b5f1ec8e3dd13e",
+      "svgSha256": "dfe0333fb3d0038ac846c2bbf3891f89320511dfe64ec160ba18f4fd2c35ee92",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -886,7 +886,7 @@
     },
     {
       "id": "c0ffee77-dag",
-      "svgSha256": "e8df8f6d7bc5d1a2adda29d24e5fabf106f2c595095591b1376ad42322cab12c",
+      "svgSha256": "f4f3c54f6b633a8c077229abbf63bd5cd95e273b1f980ff9d8a40e7c0ba2aa5d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -894,7 +894,7 @@
     },
     {
       "id": "c0ffee77-cycle",
-      "svgSha256": "e1a87f3bc903bb8cd31faee7cec6b9f2b82eecdcc429d972abbf503239b84fd4",
+      "svgSha256": "eb4d82b48cdaed50ee8a975b90d4b60b7b6cd54757d367760b18560c87618989",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -902,7 +902,7 @@
     },
     {
       "id": "c0ffee77-parallel",
-      "svgSha256": "2aabb91072c2535f34a8aeb955bd4fe9ac4160eea2714f76beb8a34479e9b91d",
+      "svgSha256": "958caf36354dfbb95ca728349ef5629a549e8dc4cceeabbe2f7f1560d4ede0b0",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -910,7 +910,7 @@
     },
     {
       "id": "c0ffee77-tree",
-      "svgSha256": "769f86cc6a412201864ef384d605fe158faee2ff67eb1506e5b1a474c8ffc8c5",
+      "svgSha256": "a06623ec4df8ba139f593aa8fd529c099c5ceb97602a5140b70c11fadba90123",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -918,7 +918,7 @@
     },
     {
       "id": "c0ffee77-two-stage",
-      "svgSha256": "a1c07d6e9cde9c96f6990ee8b5a74ac61e48d0458af3902e5d0110978a58217b",
+      "svgSha256": "77e7d2a034ac66f66c2f5a28aa449a8b4fbdc5fb2802e872abd0cfc2f38416cd",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -926,7 +926,7 @@
     },
     {
       "id": "c0ffee77-sparse-mesh",
-      "svgSha256": "0cd26199e89cac9223cd0c77cae1aa416db27ca26bcf996715126fe9382b4301",
+      "svgSha256": "7129fd1c129b3c398bc5fc7e01c984a1dd04378b903e347596de181b245abc2b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -942,7 +942,7 @@
     },
     {
       "id": "c0ffee77-scoped",
-      "svgSha256": "f3dc808d53736d0e388b31ada4bd995eec468c3716aa1464bf06eaa467181b71",
+      "svgSha256": "4a2daadf60c1595e58cbfaecdac01a4d5751f63b68cc511208502acf5a75193b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -950,7 +950,7 @@
     },
     {
       "id": "5eedf00d-dag",
-      "svgSha256": "65eb4807593086b616f12cdf01c951e97bd0ece5a36efa4e441890fbb1bdc05e",
+      "svgSha256": "905da6b9fe0de6b89ac05514e22b019db0128a4af0b6064b98d6810b47fca3ab",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -958,7 +958,7 @@
     },
     {
       "id": "5eedf00d-cycle",
-      "svgSha256": "82c47d51eccc2ef37f5197729b8a6e42a02e2b540a4726700661d3a679e59b27",
+      "svgSha256": "cf0b8e0f8441613389e4fcfa5d65998e20896638e9dd46781e6b315adb6c4ca7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -966,7 +966,7 @@
     },
     {
       "id": "5eedf00d-parallel",
-      "svgSha256": "dd8143cfef045573eb62f9c6e79b8b2e7c4189fb49b3a40a044c1b4322563d08",
+      "svgSha256": "dcb6427b7bbead0d27e2d3c7e58756646a8e672c118006c8c25912e709348d96",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -974,7 +974,7 @@
     },
     {
       "id": "5eedf00d-tree",
-      "svgSha256": "14295f0745cb722ac1e49ec056d949a09c835110e5c504373891017001d86f87",
+      "svgSha256": "d3e34ebd198157c07ddbedb57f29ad6aea7eaf5b0c7dca129d1768f2b1ffaae2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -982,7 +982,7 @@
     },
     {
       "id": "5eedf00d-two-stage",
-      "svgSha256": "c29d1cc2bc75bd050b7c018700f3c078e32d7981e2cd2ae52296c73ec1dde523",
+      "svgSha256": "0794d2b05c3bb7d037ba92776893b0c91177ed7542425a64b243898d5a7ce7e1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -990,7 +990,7 @@
     },
     {
       "id": "5eedf00d-sparse-mesh",
-      "svgSha256": "8f41ee74e0802ca03bea31dcd6db4362443dbd436dc855494b9d1caab3fcd5a4",
+      "svgSha256": "0fa3fbc2fec5ecc520de4a993aab736b9046559f50e17b83d348b04b5050d493",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -1006,7 +1006,7 @@
     },
     {
       "id": "5eedf00d-scoped",
-      "svgSha256": "89e342d02da91d41fe105eb068c33f61ee5e1490b34ae6b8a86e0d3607d32ad9",
+      "svgSha256": "b8d9461250215e768560c734564dd045a0e1f430927aa20048299ee23380686a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -1014,7 +1014,7 @@
     },
     {
       "id": "10293847-dag",
-      "svgSha256": "0f67ab90824ce1864e3ecb7b80e40839017f4551084760e4bd2b09decbd62fbd",
+      "svgSha256": "0c4f338d6d5cbff3b0e43e7fbbfdecad1aedda31a8befdacbc4e0ec4e320dc2d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1022,7 +1022,7 @@
     },
     {
       "id": "10293847-cycle",
-      "svgSha256": "165163401cf24afb060b6848f7d652dbe5dc840a83532790af32ae0c7d948c2d",
+      "svgSha256": "e550470d8b2f573eed5a562c55e2c1c5fea8f017818c8020006b4fe783b6c632",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1030,7 +1030,7 @@
     },
     {
       "id": "10293847-parallel",
-      "svgSha256": "ee500ede2180affe4d5068ad660318f199726e84d1e9635882002df5022ee1bd",
+      "svgSha256": "83960de8656e604aec054c54bbe30e662426cb310f663f992964808560980413",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1038,7 +1038,7 @@
     },
     {
       "id": "10293847-tree",
-      "svgSha256": "fddc64a7e493da763528e066807bf17f9df68ea2a8be5b9b59b7394176366690",
+      "svgSha256": "490882e324fc73c5a95864aba02035ecf787672620d8cd6e379b9c66c356f435",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1046,7 +1046,7 @@
     },
     {
       "id": "10293847-two-stage",
-      "svgSha256": "8cf883a0213db56106434d1ffa5cc5643b20e3688f0e540f029f92f0c32a09bb",
+      "svgSha256": "505f522c89fc024490862cf34eeac63ffcf63b907abe3f83ec6aa3caeacce012",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1054,7 +1054,7 @@
     },
     {
       "id": "10293847-sparse-mesh",
-      "svgSha256": "a959fcc7f618e632574b32c3605d209534a1aef64e709034ee404458f5f75922",
+      "svgSha256": "87b6ec1cf2897808e0c6d769b5f4c5a5a1da34da148b3b95543156bfd8e16ccd",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1070,7 +1070,7 @@
     },
     {
       "id": "10293847-scoped",
-      "svgSha256": "eb2207fa48602bcba2ee8a1af62ee7c5486a56062487a3f61e301b35270d61d6",
+      "svgSha256": "2514d0e9417eabc677e638c16f1703d327a50c34f6dde65cd52cdc69b67d8406",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1078,7 +1078,7 @@
     },
     {
       "id": "7f4a7c15-dag",
-      "svgSha256": "301cadd8deba75c485c6fc54160b9e99935097024f32dbb7127506a519637332",
+      "svgSha256": "5c138200290e380093f4fa459bcbb9defa2aac4413b016231c941c291f9bc015",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1086,7 +1086,7 @@
     },
     {
       "id": "7f4a7c15-cycle",
-      "svgSha256": "329eff57e26196d3543d713cca3f9b6cf86c1aad084284d0b0888f2c329cbd03",
+      "svgSha256": "2de6b3c80439ea13124ab38d5da7dd5ac1245d2b2b18c1328b6ff52cf4fedcbf",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1094,7 +1094,7 @@
     },
     {
       "id": "7f4a7c15-parallel",
-      "svgSha256": "e131d5b3d9e89beb0f99e94b54a6da5f283194f3305c810bfb52649be90efb1c",
+      "svgSha256": "b8095216467d6128db3af1c2fdbce60b3ee9cdab613ccb0c862e28786656c551",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1102,7 +1102,7 @@
     },
     {
       "id": "7f4a7c15-tree",
-      "svgSha256": "ab263da5140cc34b223a374585c91aa987d41e031acdc2da8241d15d0761d08e",
+      "svgSha256": "4192f363b55f44370d78cdb9e31c182e41145534dea9ee743d9835a7c610dca5",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1110,7 +1110,7 @@
     },
     {
       "id": "7f4a7c15-two-stage",
-      "svgSha256": "34fc0f783d3da1bc1e457c305c98f3e3dac3116e9e81570727ff197106815c8f",
+      "svgSha256": "05f040b57073d2995531b6af4c225b30d4b9458ae0d58eb72a5f352b607bfa0d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1118,7 +1118,7 @@
     },
     {
       "id": "7f4a7c15-sparse-mesh",
-      "svgSha256": "7fc426be5a5fc8567177d15486bf8a688ce6556bf1cf1333a3dade97cf68b06c",
+      "svgSha256": "f06e1862ac9568b4ef2fdce7d830327678ceae3d412b32ba8472ece942d2f4af",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1134,7 +1134,7 @@
     },
     {
       "id": "7f4a7c15-scoped",
-      "svgSha256": "95135ccbd951e15fde7a442e472a7309c332ab447898610740c05e6a4e365092",
+      "svgSha256": "965998c41dbfc55351ed4a0ab5ba87d1f1c8a09e9ac5e916b0472a38c70121cc",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1142,7 +1142,7 @@
     },
     {
       "id": "91e10da5-dag",
-      "svgSha256": "8be4ebf29737c15cb63ef74f719b1aa5fe9915eb3bac104ec08a1dc4c9a16f0b",
+      "svgSha256": "51bfcfba595733f3f6698853aca465bf7bd746c6602d85a14a3f47b08e395952",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1150,7 +1150,7 @@
     },
     {
       "id": "91e10da5-cycle",
-      "svgSha256": "82d16b22fcad1711f2e8538dfea83b76b42a6aecb621e2763dca4c7e1a3a67b6",
+      "svgSha256": "2710956c3690607b697a7204582ed6d0eccf13ea0614644e964fbaf158de09b4",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1158,7 +1158,7 @@
     },
     {
       "id": "91e10da5-parallel",
-      "svgSha256": "9704a8a466ad4fd0d72623bbc8f6a144d462388348c1c02b9d1d4fc3be1b7909",
+      "svgSha256": "98553f34529d3eb2da1e8eb69aac4346210447bf327d910b12b35200f50b111b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
@@ -1166,7 +1166,7 @@
     },
     {
       "id": "91e10da5-tree",
-      "svgSha256": "6adb0d3b6a902acb5a3a93ea1cafa74cec1958a35476e7421bda16c912c2c0c4",
+      "svgSha256": "eb41707309849f9cdbe902f9b568ada9f619772798b43d047ee695190e3b31fd",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
@@ -1174,7 +1174,7 @@
     },
     {
       "id": "91e10da5-two-stage",
-      "svgSha256": "8b1ee19ab7ed72b9b569012fe2e892e9ca5747f9790919004a81eaf51ca25727",
+      "svgSha256": "be040d2f59b5468abc4cecd3ffb5d94c68b9aa5b7a0c52a127e1a7aa87656486",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
@@ -1198,7 +1198,7 @@
     },
     {
       "id": "91e10da5-scoped",
-      "svgSha256": "a6af71abd8ab53b8bf25d05e3138dff59862302be7f00e986312e554be46baef",
+      "svgSha256": "379c224f7167a4e23175401c7ef15246393019abc1a11809c0eb2b593a228101",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
@@ -1206,7 +1206,7 @@
     },
     {
       "id": "abc12345-dag",
-      "svgSha256": "bf139d60bac94bbb12aecfc09a2b4c88f5628a2fdfb01616d9c78f8dfb6f956d",
+      "svgSha256": "74ea6bb7129d5453af909610dd037d16208c108bb051a145431430c99ceac517",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1214,7 +1214,7 @@
     },
     {
       "id": "abc12345-cycle",
-      "svgSha256": "0a341478584ac727dc351a7870dbc189a9b72c3b020dc7b497ef49d9d800c61c",
+      "svgSha256": "b4b40951a3b07087873efc4e11e86916ed250cc6eb564230ab9296a100394212",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1222,7 +1222,7 @@
     },
     {
       "id": "abc12345-parallel",
-      "svgSha256": "3a79f3815e9dbc8a6883516910bce36c6134d9df8d6555de6f41d43429f000ad",
+      "svgSha256": "2e48e3fd345eb2be1f40e89d76f81d15a38638f00d115cfd3ec3537dc30e48bb",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1230,7 +1230,7 @@
     },
     {
       "id": "abc12345-tree",
-      "svgSha256": "f87742fa9a25ef6b7cfa92ec893e782ab060970537d6ff478fe88358744da458",
+      "svgSha256": "c94a427883f39292d736ea394494b6758298071c2902b43223a7be9de9438ed2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1238,7 +1238,7 @@
     },
     {
       "id": "abc12345-two-stage",
-      "svgSha256": "5eb23560ef23bdae95f8cdd1b903d32a2aa87542b911039d25b16a4373de703d",
+      "svgSha256": "2f8409146aa92fddcb9dcb4a10451670b600c380a2743737ee368317f785034a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1246,7 +1246,7 @@
     },
     {
       "id": "abc12345-sparse-mesh",
-      "svgSha256": "65877688b50413edd47257cce3ba4ec4f602f8b69d446a041dfe8b081e0bdb21",
+      "svgSha256": "68388c0f371f2b4848e88196854bf04bd99728b4be9e62350163e3e9f276be36",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1262,7 +1262,7 @@
     },
     {
       "id": "abc12345-scoped",
-      "svgSha256": "d356f4f28f99576c6e41310c6dcdb5261476cd0a6476af92e47af4fd21c3e498",
+      "svgSha256": "3798cd2ae978853b8af0aeb3e4837f315b901bdfab2314114300c2d4ac6b8078",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1270,7 +1270,7 @@
     },
     {
       "id": "13579bdf-dag",
-      "svgSha256": "d63dfa575702ce91015a4842cf5522f582d4c32f8043669a15884b03da92e57f",
+      "svgSha256": "c6eff3e9a7637542abc99ef011d432b48a8ed876d07f1732bbe048e637e79bc0",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1278,7 +1278,7 @@
     },
     {
       "id": "13579bdf-cycle",
-      "svgSha256": "f0d00743fbe9dfa3ca339718c142a2cf601a8bc2f0564a715e005faed46a988a",
+      "svgSha256": "cd91dfe043887c7f6ef091f1dc81df225617fe2f76ca36a2d7b08e2e522bcb7d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1286,7 +1286,7 @@
     },
     {
       "id": "13579bdf-parallel",
-      "svgSha256": "87552762282b6535e7901a3a7de380a17f9e25115e2edfdfef2dbe7bccecde77",
+      "svgSha256": "6b3a24cd450ae9c51abc634aba5cc5247cfa439a61580f79831de399fcf41245",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1294,7 +1294,7 @@
     },
     {
       "id": "13579bdf-tree",
-      "svgSha256": "41340727d437af71d3ff1251dd6c489c5fffae04cf4f9a68a0cb8f9f55cc2d74",
+      "svgSha256": "6b5bd7ae859b2e705b496fd293133abf756acb27ebde0bb93ced779dc2782311",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1302,7 +1302,7 @@
     },
     {
       "id": "13579bdf-two-stage",
-      "svgSha256": "96dbcb61e485a40eb39538b33d7233751b01dcacd1824b9ee721b78868a6c148",
+      "svgSha256": "b5ce414d5600e4e9a6b3d73116fe4558dac82670e9bf78f3e9816cbd4f2b391e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1310,7 +1310,7 @@
     },
     {
       "id": "13579bdf-sparse-mesh",
-      "svgSha256": "b78c9a5f7b202ea903fca7e2d22f043c7db9c165d9fae6aa64e38a6a563c92de",
+      "svgSha256": "cdea5fdb803dc41b6bfd636da4367d3aed618d34555bbdcaf83af65c12e2f087",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1326,7 +1326,7 @@
     },
     {
       "id": "13579bdf-scoped",
-      "svgSha256": "f243484ec595bda4f0e1b36865b97b9afde915a761f0b6f43771b926cc8e467d",
+      "svgSha256": "8b82971c0d49b723af8b39e39158f55d5dae516a50e8db08178d6694312db2cd",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1334,7 +1334,7 @@
     },
     {
       "id": "2468ace1-dag",
-      "svgSha256": "36be78be2961face93a17ac58920a884274913deec28d46233cd47fcb87bce50",
+      "svgSha256": "2d1d971cff8710a8184650350297bb7b70b721d5406d6e6e317f1870c2145d59",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1342,7 +1342,7 @@
     },
     {
       "id": "2468ace1-cycle",
-      "svgSha256": "ba3b931d6708ab79d9940f8bc7fb5f803bf337ea77864825b5c26c08dd349662",
+      "svgSha256": "4be76d8b86cdf578fd7fb1055ac4c2a1253ed9cc189dfb4f224d14f82239718a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1350,7 +1350,7 @@
     },
     {
       "id": "2468ace1-parallel",
-      "svgSha256": "eae31ba22e7732bfcbc39a75abd0bcda0576bdbf5b7dccbc48831cc9d03c5388",
+      "svgSha256": "4e741983a35bf552d74e949a5a3f46245cfc13054a8025b722c32e6f05cb92f8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1358,7 +1358,7 @@
     },
     {
       "id": "2468ace1-tree",
-      "svgSha256": "7c725a435b416080159c3956e4d6fcb465bbb3d0c8d0b94586955edb18a957f3",
+      "svgSha256": "ce4c9e4a5b070d017b17ac07a4659a546ee930afbf6e048ac92b51489bf0ea38",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1366,7 +1366,7 @@
     },
     {
       "id": "2468ace1-two-stage",
-      "svgSha256": "52d93d51354ffaf2444de46fdcc34856d8cbcd02dc4ddd12d4f2a55b9deed43a",
+      "svgSha256": "fb37339ccd6a7e6cbe51bfa8d24a1c264d6c50c0158cf3dada66dfe56f866c21",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1374,7 +1374,7 @@
     },
     {
       "id": "2468ace1-sparse-mesh",
-      "svgSha256": "e2c8cee12c59712488f22c190365f4e3b7d46055941b68c20e8ce6792bf5594d",
+      "svgSha256": "96e7b0d06e2934ef185484b4b7fefb3c90b2ee13606351cf8b63df2f13d732a3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1390,7 +1390,7 @@
     },
     {
       "id": "2468ace1-scoped",
-      "svgSha256": "e167270e8421bd2d8351eb5668f74b9b7f8f078457bf7c0cbdaa9bbaf1322f1a",
+      "svgSha256": "584f10fb4cffeba8a1af13e4705ce4cc2829b95b11ba6291839a0672569ad098",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1398,7 +1398,7 @@
     },
     {
       "id": "8badf00d-dag",
-      "svgSha256": "2e699ba97ea3caec684f2fec697e206fb77569fd1e10e24c74538793af30ecae",
+      "svgSha256": "5a243acc21860bc613c512ccdb8c41d93b84328ea8c0795d4a2cc73741e221d8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1406,7 +1406,7 @@
     },
     {
       "id": "8badf00d-cycle",
-      "svgSha256": "0312224172109ba910424121300c2090d59f2e238fd9d855439e96ccfc8c6f22",
+      "svgSha256": "0b009b91e30540c7f90c6768fa7dc759ba28f38af25818f0aa52b27d983a9bdb",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1414,7 +1414,7 @@
     },
     {
       "id": "8badf00d-parallel",
-      "svgSha256": "fde085ec0fcde22880c187490265599e599dbf7fc43ce561278d00d16c029ecf",
+      "svgSha256": "a19053643dd7540c11ca566cc6ff1212e36f58799a36d6bfcfd550d635486078",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1422,7 +1422,7 @@
     },
     {
       "id": "8badf00d-tree",
-      "svgSha256": "32022befcc4e1ef40712ef7ae86f760919f3cb9587c885b9ecffeded61cd73f9",
+      "svgSha256": "853e19e7c340b08f0fa4fdf39a8f426382129bbd8b6c22871cf425431ff8314c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1430,7 +1430,7 @@
     },
     {
       "id": "8badf00d-two-stage",
-      "svgSha256": "0b9d29ad942ce2fcbb0ef5185f73fe6e1954a7168cf6062894a957e77b8dbdf8",
+      "svgSha256": "b8b1c7d0e3453584beb8ee53157d16e00af773e742a7c7b4fb3511a084362cc4",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1438,7 +1438,7 @@
     },
     {
       "id": "8badf00d-sparse-mesh",
-      "svgSha256": "8994451481e4ac32ad1c1b0f03deb3606763a636995a23ee052798a223d8068b",
+      "svgSha256": "3b54b19699cc621acaeb479848b20cf95dd0caaaad6fef2818fbe5d4c02c1b9e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1454,7 +1454,7 @@
     },
     {
       "id": "8badf00d-scoped",
-      "svgSha256": "71b970026345fa6692274c983f44bebdf309b95c1a634917f0c3e1248104bee8",
+      "svgSha256": "9ed7123a58eddb8346cb6ad4b09695ed89f437b53bdd77356998dba262e5e062",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1462,7 +1462,7 @@
     },
     {
       "id": "6c8e9cf5-dag",
-      "svgSha256": "b9b9ad09e9fbd98865e5720076b384ea39d1e75fd6ca3aab6255741ebb55ca8d",
+      "svgSha256": "a580ccd24bf9372f4d848eed8c6912b315720f9036b4abb3f7bfe42b65ae3e15",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1470,7 +1470,7 @@
     },
     {
       "id": "6c8e9cf5-cycle",
-      "svgSha256": "2ae38e4e7bd0768b80704de39aa89d93760d8bb83b6242f6afd6ea2c00e860c1",
+      "svgSha256": "d7188134d4b8d214add5de74f9e09b622728057655cea16731cb7e26dd6c43e1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1478,7 +1478,7 @@
     },
     {
       "id": "6c8e9cf5-parallel",
-      "svgSha256": "17ffdcdff1bf75bfe4f086aba3c7e64642b06a2f96b3763ada3eae0f09893385",
+      "svgSha256": "e94a5cf3cea602e16a531b97f6c7af4ed8a8f9ca619e8517e6d6bc376a1d82aa",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1486,7 +1486,7 @@
     },
     {
       "id": "6c8e9cf5-tree",
-      "svgSha256": "91d17765d499f99d7b34d25b9dd8b80e324814c45a5a59724361f025f129f4d1",
+      "svgSha256": "2341749d2415d14a54b596999df25be06807028c2cfffa99b321d8ff0b64fc89",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1494,7 +1494,7 @@
     },
     {
       "id": "6c8e9cf5-two-stage",
-      "svgSha256": "b14f07aa08e1036401a307236b33b6741dafe13467d119270abfe429faa91377",
+      "svgSha256": "5296a18fcf7ea61e6c61cdfef1888bea02b8a33a52d788773fec657eb4c9e721",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1502,7 +1502,7 @@
     },
     {
       "id": "6c8e9cf5-sparse-mesh",
-      "svgSha256": "8eba05e5b6c8beb32550c3ee526014747a6b963bfce2ada7db2a0a001c9c36bf",
+      "svgSha256": "cdb593b1e8323d7818683442d9d3aa988a0c1c9e8adcb03e3316a52f9bbdb329",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1518,7 +1518,7 @@
     },
     {
       "id": "6c8e9cf5-scoped",
-      "svgSha256": "05346b53af5024a32a2bf131b7289d114d0d64a91446744d38dc0aef0e764a34",
+      "svgSha256": "6bff9c0f8bb1ad3adb193c004f85d20a351e428db787c413cfe693d32950b790",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1534,7 +1534,7 @@
     },
     {
       "id": "a341316c-cycle",
-      "svgSha256": "a04d449d708d11a30e5b738774fcfddf3249d881c473067eb6dc6a9669e66247",
+      "svgSha256": "8fba548c45d604c6dea5d374c415ac88ce3d6851f769e769bdc0badd9ca173fb",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1542,7 +1542,7 @@
     },
     {
       "id": "a341316c-parallel",
-      "svgSha256": "8d3db043d82e951ecdd9554a977087c51fcfb19af471a2760d3bf2651f4858c0",
+      "svgSha256": "b13a0bff407866bb3cc72a1927e8bf21a483552a764dddaa097ec6f130b119dc",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1550,7 +1550,7 @@
     },
     {
       "id": "a341316c-tree",
-      "svgSha256": "1092fc530676cf34374c12fa03d204b0024abb9301d29c92b94b08936266737a",
+      "svgSha256": "5935a65a30280b26a303b7582d0f3d58735f600fda0e04912ac51314bc135549",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1558,7 +1558,7 @@
     },
     {
       "id": "a341316c-two-stage",
-      "svgSha256": "a670917398cb22ea29623ed7880d86eadb6faa1c1d42f62e346cea6b963fb0d7",
+      "svgSha256": "1bcf82e6425cd39c4f1b2bc078ce988e8007b1e2b0d9f108b19c008d3731d78b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1566,7 +1566,7 @@
     },
     {
       "id": "a341316c-sparse-mesh",
-      "svgSha256": "ce3b2943c42ec122d145696295d979d9cb25d10bf94577a24d8cb8bb8fce8220",
+      "svgSha256": "fcf04d47175c9880d89d79d7aff7786ecccd4f94f6c5552c166581e41b2271b3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1582,7 +1582,7 @@
     },
     {
       "id": "a341316c-scoped",
-      "svgSha256": "64e88b7550cee69410e184ab2760cb7b069cd1def708582ec146cdab4ad8b788",
+      "svgSha256": "727b2ef8e077a76be35089b6bbe1c87bb8499d80c51be29b73a49511b27e76be",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1590,7 +1590,7 @@
     },
     {
       "id": "deadbeef-dag",
-      "svgSha256": "d76f219b18cfe8bd3d907fa7f79beadf08124bbfa396380bd6d0670ade52a8c1",
+      "svgSha256": "69570c7b14b103003e61515be95aacac06a9294a744eccc5bf2007644e10e436",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1598,7 +1598,7 @@
     },
     {
       "id": "deadbeef-cycle",
-      "svgSha256": "0d10847729b292b45ddcf88107eb43326270f920c3d7553d81d0116f00e9e1e1",
+      "svgSha256": "c7c846d46adb7a8451c5bc5a5ad6141ac78703e4605ab086e9d992225554120a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1606,7 +1606,7 @@
     },
     {
       "id": "deadbeef-parallel",
-      "svgSha256": "79bbffb42d2149f4630f999b5c529a1acf72901e5859f8d8e83ff1d5f5aa0b8f",
+      "svgSha256": "b3bacdb743042a26831ff6f98fb4c1afbc96585e30b13ee0ab3857793110374f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1614,7 +1614,7 @@
     },
     {
       "id": "deadbeef-tree",
-      "svgSha256": "2a7e1259ee419eb3c2cd3a6241b5ae929c5d9a58516e0f86a24bcc1042da6861",
+      "svgSha256": "ab9f524fd8958ed29f2d37d05d4a2694f578ef6aba00c69f4684a0bf156d52c2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1622,7 +1622,7 @@
     },
     {
       "id": "deadbeef-two-stage",
-      "svgSha256": "eeb2211a665cea50b91a174e95e5d48341bc6726e60ec5cc5f012c6ddc197826",
+      "svgSha256": "5240b103a05b1dfb432785b7f04f8d354b8ec19f27fbac7e77fde45e3cf70f76",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1630,7 +1630,7 @@
     },
     {
       "id": "deadbeef-sparse-mesh",
-      "svgSha256": "aee201599e235a47a9eb1e9f559db090c0ef90a15ec504b5504e7aecf4e34cd8",
+      "svgSha256": "9167e5b2beb5373ff8f7393ddf74a3406f068620de22da67906b61d7782b77ef",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1646,7 +1646,7 @@
     },
     {
       "id": "deadbeef-scoped",
-      "svgSha256": "d65cfcd1a77fef7c28598bb750ae52b66a8b96b3535491f86e23c71fb7c8a241",
+      "svgSha256": "6050d3ce4a93238f5bc80a7d6d81826668b25764d00999479e563032c6ee41d3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1654,7 +1654,7 @@
     },
     {
       "id": "41c64e6d-dag",
-      "svgSha256": "cb48457507be02644c266c446b2af6713c21533cf5ee78988ba8eba19708e9f3",
+      "svgSha256": "15817f980456ffa06a3c51efa7b3c5097f1b598d67d425d3eda1e2edf3a69a40",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1662,7 +1662,7 @@
     },
     {
       "id": "41c64e6d-cycle",
-      "svgSha256": "609c33f067ec8d8788f39a10649cf1fb0d2c3710e4f44c7dc42b3e2c7907346f",
+      "svgSha256": "a34df4014c12ce51462bb26dabafc2ed555aa606b1233a627dbe2fdf8d3e3204",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1670,7 +1670,7 @@
     },
     {
       "id": "41c64e6d-parallel",
-      "svgSha256": "75edd23bb3e40b9c64ff3893863dfa2497c47dc7994981980e2598d89d5a7721",
+      "svgSha256": "5f4c16098d3f895f97c3261963081e6b61f6ea3b7d735732367675d52d635fc2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1678,7 +1678,7 @@
     },
     {
       "id": "41c64e6d-tree",
-      "svgSha256": "817d8a1aaab0507e2d95a65f23fefe17931be45edddcf6912bf4cf0a07efc5b8",
+      "svgSha256": "b57e1efd1e6e7c413301324471e9d1510f9e26898e8407f469bb3671a1845454",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1686,7 +1686,7 @@
     },
     {
       "id": "41c64e6d-two-stage",
-      "svgSha256": "4c0dfcae658afbc922f961cf13b346e27f76e1563d57e5a9b6f45c7555090361",
+      "svgSha256": "a34424872a7714daf818d31ef2511baea7b946be2799552dea78551cdd52de56",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1694,7 +1694,7 @@
     },
     {
       "id": "41c64e6d-sparse-mesh",
-      "svgSha256": "c255b5b74e9ce5a1d6a56cf87f7ae489122a8c75af26a72492df094aaf29bf76",
+      "svgSha256": "92fe5e4ea06c45957fb08d99059dcb9f1bff748cc88f3d8f50e947db9c6b3494",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1710,7 +1710,7 @@
     },
     {
       "id": "41c64e6d-scoped",
-      "svgSha256": "01d02b29c42dc718be735339b477318a28d7cfe2725344b7c93b294b461e5a27",
+      "svgSha256": "d95ecd76624bcd02ee3771c0d7a85d79008864b9be33027e65baf3d5b7c38f1f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1718,7 +1718,7 @@
     },
     {
       "id": "9e3779b9-dag",
-      "svgSha256": "68b5e74856c8e0245f33a4c0d8617178f7fb9ae1c4ac2d285af46351718d4130",
+      "svgSha256": "da4adecc78581f7ba3c14167c49ae815457c8dc3bec89eb591cf0e961e0495b4",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1726,7 +1726,7 @@
     },
     {
       "id": "9e3779b9-cycle",
-      "svgSha256": "ebc0220569532316147692bdeaffc1ddd545ccd7ed2d40da5817f8d879d677dd",
+      "svgSha256": "8fe73acdb50f77e8416cb9a74876d30f55796be6e645b51da5cbeb32e38dc4e2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1734,7 +1734,7 @@
     },
     {
       "id": "9e3779b9-parallel",
-      "svgSha256": "930dec2d97986e562d8dfb6efda7172a83087b9bb7e6fab907401ebf01c32758",
+      "svgSha256": "7042cd97765573df939b63f1bcd46466a9e7a3dbcc0c2ac4e049254390aa70c7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
@@ -1742,7 +1742,7 @@
     },
     {
       "id": "9e3779b9-tree",
-      "svgSha256": "d4897b19be77310b6719c9533d6c4c29763e861b38231fb4fe0315b08682ed13",
+      "svgSha256": "be4b34393d3bf093374eda0b947a0dcfdc4c0765bce1c5635595688ce9e26d09",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
@@ -1750,7 +1750,7 @@
     },
     {
       "id": "9e3779b9-two-stage",
-      "svgSha256": "487d9748c99e3824d70fc74c6cd1e591a9b0d167e1fb5dc79934d5e93deaa961",
+      "svgSha256": "4f373c9b9e7d5e6fb41bb0b43eddd079ef98c84b9fc64bee40dfeba2be4e81c2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
@@ -1758,7 +1758,7 @@
     },
     {
       "id": "9e3779b9-sparse-mesh",
-      "svgSha256": "2e5f5769e68e485472974ee98956d5c59a94815d5d20520625a573c8cb8c8eac",
+      "svgSha256": "27aa94c8bf26c59c95a6e7248912bb393e49058d0ea7440815cd4972ccbb3b9b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
@@ -1774,7 +1774,7 @@
     },
     {
       "id": "9e3779b9-scoped",
-      "svgSha256": "8343897aec247bfd1c265b25102b1469b5e9c6501fc71233a99a3666c8a6aba3",
+      "svgSha256": "1a9a46508dd48dd30495c1309429816f09f655c6f0528938e66cdfda3ba69538",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
