@@ -10,6 +10,39 @@ pub const GRID: f64 = 16.;
 pub(crate) fn header_height(node: &Node) -> f64 {
     24. + (node.label.split('\n').count() - 1) as f64 * 20.
 }
+pub(crate) fn container_header_rect(node: &Node, r: Rect) -> Option<Rect> {
+    if !node.container || node.shape == "sql_table" {
+        return None;
+    }
+    let width = (crate::labels::text_width(&node.label) * 16. / 15. + 8.).min((r.w - 24.).max(0.));
+    let h = header_height(node);
+    Some(Rect::new(
+        r.left() + 12. + width / 2.,
+        r.top() + 19. + (h - 24.) / 2.,
+        width,
+        28. + h - 24.,
+    ))
+}
+pub(crate) fn sql_table_title_rect(node: &Node, r: Rect) -> Option<Rect> {
+    if node.shape != "sql_table" {
+        return None;
+    }
+    let title = crate::labels::node_title(node);
+    let w = crate::labels::text_width(&title) * 16. / 15. + 16.;
+    let h = crate::labels::text_height(&title);
+    Some(Rect::new(r.x, r.top() - h / 2. - 6., w.min(r.w), h))
+}
+pub(crate) fn top_extra(node: &Node) -> f64 {
+    if node.shape == "sql_table" {
+        crate::labels::text_height(&crate::labels::node_title(node)) + 12.
+    } else {
+        0.
+    }
+}
+pub(crate) fn with_top_extra(node: &Node, r: Rect) -> Rect {
+    let extra = top_extra(node);
+    Rect::new(r.x, r.y - extra / 2., r.w, r.h + extra)
+}
 pub(crate) fn title_width(node: &Node) -> f64 {
     crate::labels::text_width(&crate::labels::node_title(node)) * 16. / 15.
         + 32.
@@ -356,6 +389,7 @@ fn layout_pass(
                 .filter(|p| p.node == i && p.side == side)
                 .collect();
             let mut min = (ps.len().saturating_sub(1)) as f64 * o.port_spacing + 2. * o.corner;
+            let mut named_ratios = Vec::new();
             for p in ps {
                 match p.spec {
                     PortConstraint::FixedPos { offset_grid, .. } => {
@@ -368,8 +402,28 @@ fn layout_pass(
                             ));
                         }
                         min = min.max(o.corner / ratio.min(1. - ratio));
+                        if let Some((_, port_id)) = p.key.rsplit_once('#')
+                            && let Some(port) = scene.nodes[i].ports.get(port_id)
+                            && !port.label.trim().is_empty()
+                        {
+                            let span = if matches!(side, Side::N | Side::S) {
+                                crate::labels::text_width(&port.label) + 20.
+                            } else {
+                                crate::labels::text_height(&port.label) + 20.
+                            };
+                            named_ratios.push((ratio, span));
+                        }
                     }
                     _ => {}
+                }
+            }
+            if named_ratios.len() >= 3 {
+                named_ratios.sort_by(|a, b| a.0.total_cmp(&b.0));
+                for pair in named_ratios.windows(2) {
+                    let diff = pair[1].0 - pair[0].0;
+                    if diff > 1e-6 {
+                        min = min.max(pair[0].1.max(pair[1].1) / diff);
+                    }
                 }
             }
             if matches!(side, Side::N | Side::S) {
@@ -384,6 +438,16 @@ fn layout_pass(
         .any(|r| [r.x, r.y, r.w, r.h].iter().any(|v| !v.is_finite()))
     {
         return Err(Error::Layout("non-finite port perimeter dimensions".into()));
+    }
+    if previous.is_none()
+        && o.shape_budget > 0
+        && scene.relations.is_empty()
+        && scene
+            .nodes
+            .iter()
+            .all(|n| !n.container && n.parent.is_none())
+    {
+        order_flat_ranks(scene, &ranks, &mut rects, o);
     }
     let shape_stats = if previous.is_none() {
         crate::topology::optimize(scene, &mut rects, o)
@@ -404,7 +468,7 @@ fn layout_pass(
         }
     }
     if previous.is_none() {
-        crate::ownership::pack(scene, &mut rects, o);
+        crate::ownership::pack(scene, &mut rects, o, spacing);
     }
     // Size innermost containers before introducing hard containment inequalities.
     for i in (0..n).rev() {
@@ -419,8 +483,12 @@ fn layout_pass(
             let mut placed: Vec<usize> = Vec::new();
             for &j in &child_ids {
                 for &k in &placed {
-                    if rects[j].inflate(16.).intersects(rects[k].inflate(16.)) {
-                        let delta = rects[k].bottom() + 48. - rects[j].top();
+                    if with_top_extra(&scene.nodes[j], rects[j])
+                        .inflate(16.)
+                        .intersects(with_top_extra(&scene.nodes[k], rects[k]).inflate(16.))
+                    {
+                        let delta =
+                            rects[k].bottom() + 48. + top_extra(&scene.nodes[j]) - rects[j].top();
                         let id = scene.nodes[j].id.clone();
                         for (t, rect) in rects.iter_mut().enumerate() {
                             if t == j || ancestors(scene, &scene.nodes[t].id).contains(&id) {
@@ -436,7 +504,7 @@ fn layout_pass(
                 .iter()
                 .enumerate()
                 .filter(|(_, c)| c.parent.as_deref() == Some(&scene.nodes[i].id))
-                .map(|(j, _)| rects[j])
+                .map(|(j, c)| with_top_extra(c, rects[j]))
                 .collect();
             if let Some(bounds) = children.into_iter().reduce(Rect::union) {
                 let b = bounds.inflate(o.container_padding);
@@ -530,6 +598,116 @@ fn layout_pass(
             break;
         }
     }
+    if previous.is_none()
+        && pins.iter().any(|p| p.0.is_some() || p.1.is_some())
+        && scene.nodes.iter().any(|nd| nd.container)
+    {
+        let rel_nodes: BTreeSet<&str> = scene
+            .relations
+            .iter()
+            .flat_map(|r| r.members.iter().map(String::as_str))
+            .collect();
+        let mut by_col: BTreeMap<(Option<String>, usize), Vec<usize>> = BTreeMap::new();
+        for (i, nd) in scene.nodes.iter().enumerate() {
+            if !nd.container
+                && pins[i].0.is_none()
+                && pins[i].1.is_none()
+                && !rel_nodes.contains(nd.id.as_str())
+            {
+                by_col
+                    .entry((nd.parent.clone(), ranks[i]))
+                    .or_default()
+                    .push(i);
+            }
+        }
+        let cols: Vec<Vec<usize>> = by_col
+            .into_values()
+            .filter(|col| {
+                if col.len() < 2 {
+                    return false;
+                }
+                let ids: BTreeSet<&str> = col.iter().map(|&i| scene.nodes[i].id.as_str()).collect();
+                !scene.edges.iter().any(|e| {
+                    ids.contains(e.source.node.as_str()) && ids.contains(e.target.node.as_str())
+                })
+            })
+            .collect();
+        for sweep in 0..4 {
+            let iter: Box<dyn Iterator<Item = &Vec<usize>>> = if sweep % 2 == 0 {
+                Box::new(cols.iter())
+            } else {
+                Box::new(cols.iter().rev())
+            };
+            for col in iter {
+                let mut cur = col.clone();
+                cur.sort_by(|&a, &b| rects[a].y.total_cmp(&rects[b].y));
+                let top = cur
+                    .iter()
+                    .map(|&i| with_top_extra(&scene.nodes[i], rects[i]).top())
+                    .fold(f64::INFINITY, f64::min);
+                let bottom = cur
+                    .iter()
+                    .map(|&i| rects[i].bottom())
+                    .fold(f64::NEG_INFINITY, f64::max);
+                let body: f64 = cur
+                    .iter()
+                    .map(|&i| rects[i].h + top_extra(&scene.nodes[i]))
+                    .sum();
+                let gap = ((bottom - top - body) / (cur.len() - 1) as f64).max(32.);
+                let mut keyed: Vec<(f64, usize, usize)> = cur
+                    .iter()
+                    .enumerate()
+                    .map(|(slot, &i)| {
+                        let id = &scene.nodes[i].id;
+                        let mut sum = 0.;
+                        let mut wsum = 0.;
+                        for e in &scene.edges {
+                            let peer = if &e.source.node == id {
+                                scene.index(&e.target.node)
+                            } else if &e.target.node == id {
+                                scene.index(&e.source.node)
+                            } else {
+                                None
+                            };
+                            if let Some(j) = peer {
+                                let w = if pins[j].1.is_some() { 2. } else { 1. };
+                                sum += w * rects[j].y;
+                                wsum += w;
+                            }
+                        }
+                        let bary = if wsum > 0. { sum / wsum } else { rects[i].y };
+                        (bary, slot, i)
+                    })
+                    .collect();
+                keyed.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+                let mut cursor = top;
+                for (_, _, i) in keyed {
+                    let extra = top_extra(&scene.nodes[i]);
+                    rects[i].y = cursor + extra + rects[i].h / 2.;
+                    cursor += extra + rects[i].h + gap;
+                }
+            }
+        }
+        for i in (0..n).rev() {
+            if scene.nodes[i].container && pins[i].0.is_none() && pins[i].1.is_none() {
+                let children: Vec<_> = scene
+                    .nodes
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| c.parent.as_deref() == Some(&scene.nodes[i].id))
+                    .map(|(j, c)| with_top_extra(c, rects[j]))
+                    .collect();
+                if let Some(bounds) = children.into_iter().reduce(Rect::union) {
+                    let b = bounds.inflate(o.container_padding);
+                    let header = header_height(&scene.nodes[i]);
+                    rects[i].x = b.x;
+                    rects[i].y = b.y - header / 2.;
+                    rects[i].w = rects[i].w.max(b.w);
+                    rects[i].h = rects[i].h.max(b.h + header);
+                }
+            }
+        }
+    }
     let concept_sides = concept_sides
         .or_else(|| crate::duplex::present(scene, &mut rects, o, false))
         .or_else(|| crate::records::present(scene, &mut rects, o, false))
@@ -593,6 +771,7 @@ fn layout_pass(
                     source,
                     sa,
                     sb,
+                    &endpoint_sides,
                     request.target,
                 )
             {
@@ -601,6 +780,18 @@ fn layout_pass(
         }
     }
     grow_port_perimeters(scene, &requests, &mut rects, o)?;
+    let mut w_locked = vec![false; n];
+    let mut h_locked = vec![false; n];
+    for i in 0..n {
+        let lock = annotations[i]
+            .iter()
+            .find(|a| a.name == "pin")
+            .and_then(|a| a.attrs.get("lock"))
+            .map(|v| v.text.as_str())
+            .unwrap_or("");
+        w_locked[i] = lock.contains("w:") || lock.contains("w :");
+        h_locked[i] = lock.contains("h:") || lock.contains("h :");
+    }
     // Absolute child pins can enlarge an auto-sized container; explicit size locks stay hard.
     for i in (0..n).rev() {
         if !scene.nodes[i].container {
@@ -611,7 +802,13 @@ fn layout_pass(
             .iter()
             .enumerate()
             .filter(|(_, c)| c.parent.as_deref() == Some(&scene.nodes[i].id))
-            .map(|(j, _)| rects[j])
+            .map(|(j, c)| {
+                if h_locked[i] {
+                    rects[j]
+                } else {
+                    with_top_extra(c, rects[j])
+                }
+            })
             .collect();
         if let Some(bounds) = children.into_iter().reduce(Rect::union) {
             let x = pins[i].0.unwrap_or(bounds.x);
@@ -624,16 +821,10 @@ fn layout_pass(
             let required_h = 2.
                 * (y - bounds.top() + o.container_padding + header_height(&scene.nodes[i]))
                     .max(bounds.bottom() + o.container_padding - y);
-            let lock = annotations[i]
-                .iter()
-                .find(|a| a.name == "pin")
-                .and_then(|a| a.attrs.get("lock"))
-                .map(|v| v.text.as_str())
-                .unwrap_or("");
-            if !lock.contains("w:") && !lock.contains("w :") {
+            if !w_locked[i] {
                 rects[i].w = rects[i].w.max(required_w);
             }
-            if !lock.contains("h:") && !lock.contains("h :") {
+            if !h_locked[i] {
                 rects[i].h = rects[i].h.max(required_h);
             }
             rects[i].x = x;
@@ -667,6 +858,13 @@ fn layout_pass(
     }
     // Detect pin-reference cycles explicitly.
     check_pin_cycles(scene, &annotations)?;
+    let referenced_container: Vec<bool> = (0..n)
+        .map(|i| {
+            relatives
+                .iter()
+                .any(|(x, y)| x.is_some_and(|(j, _)| j == i) || y.is_some_and(|(j, _)| j == i))
+        })
+        .collect();
     let mut desired_x: Vec<_> = rects.iter().map(|r| r.x).collect();
     let mut desired_y: Vec<_> = rects.iter().map(|r| r.y).collect();
     let mut weights = vec![1.; n];
@@ -700,55 +898,26 @@ fn layout_pass(
     if let Some(prior) = previous {
         preserve_proximity(scene, prior, &rects, &mut desired_x, &mut desired_y, &pins);
     }
-    let mut cx = Vec::new();
-    let mut cy = Vec::new();
+    let mut base_cx = Vec::new();
+    let mut base_cy = Vec::new();
     for i in 0..n {
         if let Some((j, offset)) = relatives[i].0 {
-            cx.push(Constraint {
+            base_cx.push(Constraint {
                 coefficients: vec![(i, 1.), (j, -1.)],
                 rhs: offset,
                 equality: true,
             });
         } else if let Some(x) = pins[i].0 {
-            cx.push(Constraint::fixed(i, x));
+            base_cx.push(Constraint::fixed(i, x));
         }
         if let Some((j, offset)) = relatives[i].1 {
-            cy.push(Constraint {
+            base_cy.push(Constraint {
                 coefficients: vec![(i, 1.), (j, -1.)],
                 rhs: offset,
                 equality: true,
             });
         } else if let Some(y) = pins[i].1 {
-            cy.push(Constraint::fixed(i, y));
-        }
-        if let Some(p) = scene.nodes[i]
-            .parent
-            .as_deref()
-            .and_then(|p| scene.index(p))
-        {
-            cx.push(Constraint::separation(
-                p,
-                i,
-                -rects[p].w / 2. + o.container_padding + rects[i].w / 2.,
-            ));
-            cx.push(Constraint::separation(
-                i,
-                p,
-                -rects[p].w / 2. + o.container_padding + rects[i].w / 2.,
-            ));
-            cy.push(Constraint::separation(
-                p,
-                i,
-                -rects[p].h / 2.
-                    + o.container_padding
-                    + header_height(&scene.nodes[p])
-                    + rects[i].h / 2.,
-            ));
-            cy.push(Constraint::separation(
-                i,
-                p,
-                -rects[p].h / 2. + o.container_padding + rects[i].h / 2.,
-            ));
+            base_cy.push(Constraint::fixed(i, y));
         }
     }
     for rel in &scene.relations {
@@ -759,9 +928,9 @@ fn layout_pass(
             .collect();
         if rel.distribute {
             let cs = if rel.axis == Axis::Row {
-                &mut cx
+                &mut base_cx
             } else {
-                &mut cy
+                &mut base_cy
             };
             if let Some(gap) = rel.gap_grid {
                 for pair in ids.windows(2) {
@@ -788,15 +957,80 @@ fn layout_pass(
             }
         } else {
             let cs = if rel.axis == Axis::Row {
-                &mut cy
+                &mut base_cy
             } else {
-                &mut cx
+                &mut base_cx
             };
             for pair in ids.windows(2) {
                 cs.push(Constraint::equality(pair[0], pair[1]));
             }
         }
     }
+    let build_cx = |rects: &[Rect], sep: &[Constraint], include_unlocked: bool| {
+        let mut out = base_cx.clone();
+        for i in 0..n {
+            if let Some(p) = scene.nodes[i]
+                .parent
+                .as_deref()
+                .and_then(|p| scene.index(p))
+                && (include_unlocked
+                    || w_locked[p]
+                    || referenced_container[p]
+                    || previous.is_some())
+            {
+                out.push(Constraint::separation(
+                    p,
+                    i,
+                    -rects[p].w / 2. + o.container_padding + rects[i].w / 2.,
+                ));
+                out.push(Constraint::separation(
+                    i,
+                    p,
+                    -rects[p].w / 2. + o.container_padding + rects[i].w / 2.,
+                ));
+            }
+        }
+        out.extend_from_slice(sep);
+        out
+    };
+    let build_cy = |rects: &[Rect], sep: &[Constraint], include_unlocked: bool| {
+        let mut out = base_cy.clone();
+        for i in 0..n {
+            if let Some(p) = scene.nodes[i]
+                .parent
+                .as_deref()
+                .and_then(|p| scene.index(p))
+                && (include_unlocked
+                    || h_locked[p]
+                    || referenced_container[p]
+                    || previous.is_some())
+            {
+                let extra = if h_locked[p] {
+                    0.
+                } else {
+                    top_extra(&scene.nodes[i])
+                };
+                out.push(Constraint::separation(
+                    p,
+                    i,
+                    -rects[p].h / 2.
+                        + o.container_padding
+                        + header_height(&scene.nodes[p])
+                        + extra
+                        + rects[i].h / 2.,
+                ));
+                out.push(Constraint::separation(
+                    i,
+                    p,
+                    -rects[p].h / 2. + o.container_padding + rects[i].h / 2.,
+                ));
+            }
+        }
+        out.extend_from_slice(sep);
+        out
+    };
+    let mut sep_cx = Vec::new();
+    let mut sep_cy = Vec::new();
     let preserve_series = readable_routes && crate::series::recognized(scene);
     // Straighten only opposing single-fanout ports, on their tangential coordinate.
     let sides: BTreeMap<_, _> = requests.iter().cloned().map(|p| (p.key, p.side)).collect();
@@ -808,18 +1042,39 @@ fn layout_pass(
             scene.index(&e.source.node).unwrap(),
             scene.index(&e.target.node).unwrap(),
         );
-        if scene
-            .edges
-            .iter()
-            .filter(|x| x.source.node == e.source.node)
-            .count()
-            != 1
-            || scene
+        let pair_bundle = previous.is_none()
+            && !readable_routes
+            && a != b
+            && matches!(
+                e.source.constraint,
+                PortConstraint::Free | PortConstraint::FixedSide { .. }
+            )
+            && matches!(
+                e.target.constraint,
+                PortConstraint::Free | PortConstraint::FixedSide { .. }
+            )
+            && scene
                 .edges
                 .iter()
-                .filter(|x| x.target.node == e.target.node)
+                .filter(|x| {
+                    (x.source.node == e.source.node && x.target.node == e.target.node)
+                        || (x.source.node == e.target.node && x.target.node == e.source.node)
+                })
+                .count()
+                >= 2;
+        if !pair_bundle
+            && (scene
+                .edges
+                .iter()
+                .filter(|x| x.source.node == e.source.node)
                 .count()
                 != 1
+                || scene
+                    .edges
+                    .iter()
+                    .filter(|x| x.target.node == e.target.node)
+                    .count()
+                    != 1)
         {
             continue;
         }
@@ -854,8 +1109,10 @@ fn layout_pass(
         .iter()
         .map(|n| ancestors(scene, &n.id))
         .collect();
-    for _ in 0..n * 2 + 4 {
+    for _ in 0..n * 2 + 8 {
         let (xs, ys) = if let Some(prior) = previous {
+            let cx = build_cx(&rects, &sep_cx, true);
+            let cy = build_cy(&rects, &sep_cy, true);
             let px: Vec<_> = scene
                 .nodes
                 .iter()
@@ -871,10 +1128,81 @@ fn layout_pass(
                 solver::project_stable(&desired_y, &weights, &cy, &py, o.weights.flip)?,
             )
         } else {
-            (
-                solver::project(&desired_x, &weights, &cx)?,
-                solver::project(&desired_y, &weights, &cy)?,
-            )
+            let xs = match solver::project(&desired_x, &weights, &build_cx(&rects, &sep_cx, true)) {
+                Ok(xs) => xs,
+                Err(_)
+                    if (0..n).any(|i| {
+                        scene.nodes[i].container && !w_locked[i] && !referenced_container[i]
+                    }) =>
+                {
+                    let free =
+                        solver::project(&desired_x, &weights, &build_cx(&rects, &sep_cx, false))?;
+                    for i in (0..n).rev() {
+                        if !scene.nodes[i].container || w_locked[i] || referenced_container[i] {
+                            continue;
+                        }
+                        if let Some((left, right)) = scene
+                            .nodes
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, c)| c.parent.as_deref() == Some(&scene.nodes[i].id))
+                            .map(|(j, _)| (free[j] - rects[j].w / 2., free[j] + rects[j].w / 2.))
+                            .reduce(|a, b| (a.0.min(b.0), a.1.max(b.1)))
+                        {
+                            let req = if let Some(px) = pins[i].0 {
+                                2. * (px - left + o.container_padding)
+                                    .max(right + o.container_padding - px)
+                            } else {
+                                right - left + 2. * o.container_padding
+                            };
+                            rects[i].w = rects[i].w.max(req);
+                        }
+                    }
+                    solver::project(&desired_x, &weights, &build_cx(&rects, &sep_cx, true))?
+                }
+                Err(err) => return Err(err),
+            };
+            let ys = match solver::project(&desired_y, &weights, &build_cy(&rects, &sep_cy, true)) {
+                Ok(ys) => ys,
+                Err(_)
+                    if (0..n).any(|i| {
+                        scene.nodes[i].container && !h_locked[i] && !referenced_container[i]
+                    }) =>
+                {
+                    let free =
+                        solver::project(&desired_y, &weights, &build_cy(&rects, &sep_cy, false))?;
+                    for i in (0..n).rev() {
+                        if !scene.nodes[i].container || h_locked[i] || referenced_container[i] {
+                            continue;
+                        }
+                        if let Some((top, bottom)) = scene
+                            .nodes
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, c)| c.parent.as_deref() == Some(&scene.nodes[i].id))
+                            .map(|(j, c)| {
+                                (
+                                    free[j] - rects[j].h / 2. - top_extra(c),
+                                    free[j] + rects[j].h / 2.,
+                                )
+                            })
+                            .reduce(|a, b| (a.0.min(b.0), a.1.max(b.1)))
+                        {
+                            let header = header_height(&scene.nodes[i]);
+                            let req = if let Some(py) = pins[i].1 {
+                                2. * (py - top + o.container_padding + header)
+                                    .max(bottom + o.container_padding - py)
+                            } else {
+                                bottom - top + 2. * o.container_padding + header
+                            };
+                            rects[i].h = rects[i].h.max(req);
+                        }
+                    }
+                    solver::project(&desired_y, &weights, &build_cy(&rects, &sep_cy, true))?
+                }
+                Err(err) => return Err(err),
+            };
+            (xs, ys)
         };
         for i in 0..n {
             rects[i].x = xs[i];
@@ -905,40 +1233,74 @@ fn layout_pass(
                         scene.nodes[a].id, scene.nodes[b].id, o.margin
                     )));
                 }
+                let body = |i| {
+                    if exact {
+                        rects[i]
+                    } else {
+                        with_top_extra(&scene.nodes[i], rects[i])
+                    }
+                };
                 let envelope = |i| {
                     if exact {
                         rects[i]
                     } else {
-                        stub_envelope(rects[i], stub_sides[i], o.stub)
+                        with_top_extra(
+                            &scene.nodes[i],
+                            stub_envelope(rects[i], stub_sides[i], o.stub),
+                        )
                     }
                 };
+                let fresh_unpinned =
+                    previous.is_none() && pins[a] == (None, None) && pins[b] == (None, None);
                 if !envelope(a)
                     .inflate(o.margin / 2.)
-                    .intersects(rects[b].inflate(o.margin / 2.))
+                    .intersects(body(b).inflate(o.margin / 2.))
                     && !envelope(b)
                         .inflate(o.margin / 2.)
-                        .intersects(rects[a].inflate(o.margin / 2.))
+                        .intersects(body(a).inflate(o.margin / 2.))
+                    && !(fresh_unpinned
+                        && envelope(a)
+                            .inflate(o.margin / 2.)
+                            .intersects(envelope(b).inflate(o.margin / 2.)))
                 {
                     continue;
                 }
                 let dx = (rects[a].x - rects[b].x).abs();
                 let dy = (rects[a].y - rects[b].y).abs();
-                let x_extra = if rects[a].x <= rects[b].x {
-                    stub_sides[a][1] || stub_sides[b][3]
+                let x_stubs = if exact {
+                    0
+                } else if rects[a].x <= rects[b].x {
+                    usize::from(stub_sides[a][1])
+                        + usize::from(fresh_unpinned && stub_sides[b][3])
+                        + usize::from(!fresh_unpinned && !stub_sides[a][1] && stub_sides[b][3])
                 } else {
-                    stub_sides[a][3] || stub_sides[b][1]
+                    usize::from(stub_sides[a][3])
+                        + usize::from(fresh_unpinned && stub_sides[b][1])
+                        + usize::from(!fresh_unpinned && !stub_sides[a][3] && stub_sides[b][1])
                 };
-                let xgap = (rects[a].w + rects[b].w) / 2.
-                    + o.margin
-                    + if x_extra && !exact { o.stub } else { 0. };
-                let y_extra = if rects[a].y <= rects[b].y {
-                    stub_sides[a][2] || stub_sides[b][0]
+                let xgap = (rects[a].w + rects[b].w) / 2. + o.margin + x_stubs as f64 * o.stub;
+                let y_stubs = if exact {
+                    0
+                } else if rects[a].y <= rects[b].y {
+                    usize::from(stub_sides[a][2])
+                        + usize::from(fresh_unpinned && stub_sides[b][0])
+                        + usize::from(!fresh_unpinned && !stub_sides[a][2] && stub_sides[b][0])
                 } else {
-                    stub_sides[a][0] || stub_sides[b][2]
+                    usize::from(stub_sides[a][0])
+                        + usize::from(fresh_unpinned && stub_sides[b][2])
+                        + usize::from(!fresh_unpinned && !stub_sides[a][0] && stub_sides[b][2])
+                };
+                let title_extra = if exact {
+                    0.
+                } else if rects[a].y <= rects[b].y {
+                    top_extra(&scene.nodes[b])
+                } else {
+                    top_extra(&scene.nodes[a])
                 };
                 let ygap = (rects[a].h + rects[b].h) / 2.
                     + o.margin
-                    + if y_extra && !exact { o.stub } else { 0. };
+                    + title_extra
+                    + y_stubs as f64 * o.stub;
                 let row_align = scene.relations.iter().any(|r| {
                     !r.distribute
                         && r.axis == Axis::Row
@@ -961,7 +1323,7 @@ fn layout_pass(
                 };
                 let (left, right) = if va <= vb { (a, b) } else { (b, a) };
                 let c = Constraint::separation(left, right, if use_x { xgap } else { ygap });
-                let cs = if use_x { &mut cx } else { &mut cy };
+                let cs = if use_x { &mut sep_cx } else { &mut sep_cy };
                 if !cs.iter().any(|old| {
                     !old.equality
                         && old.coefficients == c.coefficients
@@ -995,9 +1357,7 @@ fn layout_pass(
                     .iter()
                     .any(|e| e.source.node == node.id || e.target.node == node.id)
                 || scene.relations.iter().any(|r| r.members.contains(&node.id))
-                || relatives
-                    .iter()
-                    .any(|(x, y)| x.is_some_and(|(j, _)| j == i) || y.is_some_and(|(j, _)| j == i))
+                || referenced_container[i]
             {
                 continue;
             }
@@ -1006,7 +1366,7 @@ fn layout_pass(
                 .iter()
                 .enumerate()
                 .filter(|(_, c)| c.parent.as_deref() == Some(&node.id))
-                .map(|(j, _)| rects[j])
+                .map(|(j, c)| with_top_extra(c, rects[j]))
                 .reduce(Rect::union)
             {
                 rects[i] = Rect::new(
@@ -1021,7 +1381,15 @@ fn layout_pass(
     for (i, node) in scene.nodes.iter().enumerate() {
         out.nodes.insert(node.id.clone(), rects[i]);
     }
-    assign_ports(scene, o, &requests, &rects, &mut out)?;
+    assign_ports(
+        scene,
+        o,
+        &requests,
+        &rects,
+        &pins,
+        previous.is_none() && !readable_fan,
+        &mut out,
+    )?;
     crate::routing::route_all(scene, o, previous, &mut out)?;
     crate::routing::nudge_channels(scene, o, &mut out);
     let coordinated_fan = readable_fan && crate::routing::coordinate_fan(scene, o, &mut out);
@@ -1040,20 +1408,24 @@ fn layout_pass(
         readable_routes && crate::scope_feedback::coordinate(scene, o, &mut out);
     let coordinated_loops =
         readable_routes && crate::routing::coordinate_outer_routes(scene, o, &mut out);
+    let has_hard_geometry = annotations
+        .iter()
+        .any(|list| list.iter().any(|a| a.name == "pin"))
+        || scene.edges.iter().any(|e| {
+            effective_annotations(scene, &e.id, &e.annotations, o.variant.as_deref())
+                .iter()
+                .any(|a| a.name == "route")
+        })
+        || scene.relations.iter().any(|r| r.gap_grid.is_some());
     out.labels = match crate::labels::place(scene, o, &out) {
         Ok(labels) => labels,
-        Err(Error::Layout(message))
-            if message.starts_with("no feasible label position")
-                && previous.is_none()
-                && spacing < 2.25
-                && scene.relations.is_empty()
-                && scene.layout_rules.is_empty()
-                && scene.nodes.iter().all(|n| n.annotations.is_empty())
-                && scene.edges.iter().all(|e| e.annotations.is_empty()) =>
-        {
-            // Caption space is part of fresh layout feasibility. Retry with
-            // more whitespace rather than rejecting an unconstrained graph.
-            return layout_pass(scene, options, None, spacing * 1.5);
+        Err(Error::Layout(message)) if message.starts_with("no feasible label position") => {
+            if previous.is_none() && spacing < 2.25 && !has_hard_geometry {
+                // Caption space is part of fresh layout feasibility. Retry with
+                // more whitespace rather than rejecting an unconstrained graph.
+                return layout_pass(scene, options, None, spacing * 1.5);
+            }
+            crate::labels::place_with_fallback(scene, o, &out)?
         }
         Err(error) => return Err(error),
     };
@@ -1310,6 +1682,18 @@ fn attachment_pair(
                 if (before.x - v.x) * bx + (before.y - v.y) * by < -1e-6 {
                     cost += 100000.;
                 }
+                let ra = rects[ai];
+                let rb = rects[bi];
+                let mixed_axes = matches!(sa, Side::E | Side::W) != matches!(sb, Side::E | Side::W);
+                let x_sep =
+                    rb.left() - ra.right() >= 2. * o.stub || ra.left() - rb.right() >= 2. * o.stub;
+                let y_ov = ra.top() < rb.bottom() && rb.top() < ra.bottom();
+                let y_sep =
+                    rb.top() - ra.bottom() >= 2. * o.stub || ra.top() - rb.bottom() >= 2. * o.stub;
+                let x_ov = ra.left() < rb.right() && rb.left() < ra.right();
+                if mixed_axes && ((x_sep && y_ov) || (y_sep && x_ov)) {
+                    cost += o.weights.bend;
+                }
                 if let Some(prior) = prior {
                     for (key, side) in [(port_key(e, true), sa), (port_key(e, false), sb)] {
                         if prior.ports.get(&key).is_some_and(|p| p.side != side) {
@@ -1358,9 +1742,17 @@ fn port_target(
         }
         _ => {
             if matches!(side, Side::E | Side::W) {
-                b.y
+                match other_side {
+                    Side::N => b.top(),
+                    Side::S => b.bottom(),
+                    _ => b.y,
+                }
             } else {
-                b.x
+                match other_side {
+                    Side::W => b.left(),
+                    Side::E => b.right(),
+                    _ => b.x,
+                }
             }
         }
     }
@@ -1445,13 +1837,64 @@ fn grow_port_perimeters(
     rects: &mut [Rect],
     o: &LayoutOptions,
 ) -> Result<(), Error> {
+    let port_sides: BTreeMap<&str, (usize, Side)> = requests
+        .iter()
+        .map(|p| (p.key.as_str(), (p.node, p.side)))
+        .collect();
+    let has_lock = |idx: usize| {
+        effective_annotations(
+            scene,
+            &scene.nodes[idx].id,
+            &scene.nodes[idx].annotations,
+            o.variant.as_deref(),
+        )
+        .iter()
+        .any(|a| a.name == "pin" && a.attrs.contains_key("lock"))
+    };
     for (i, r) in rects.iter_mut().enumerate() {
+        let locked = has_lock(i);
         for side in [Side::N, Side::E, Side::S, Side::W] {
             let ports: Vec<_> = requests
                 .iter()
                 .filter(|p| p.node == i && p.side == side)
                 .collect();
             let mut length = ports.len().saturating_sub(1) as f64 * o.port_spacing + 2. * o.corner;
+            if !locked && ports.len() >= 2 {
+                let opp = match side {
+                    Side::N => Side::S,
+                    Side::S => Side::N,
+                    Side::E => Side::W,
+                    Side::W => Side::E,
+                };
+                let mut facing_counts: BTreeMap<usize, usize> = BTreeMap::new();
+                for e in &scene.edges {
+                    let Some(&(sa_i, sa)) = port_sides.get(port_key(e, true).as_str()) else {
+                        continue;
+                    };
+                    let Some(&(sb_i, sb)) = port_sides.get(port_key(e, false).as_str()) else {
+                        continue;
+                    };
+                    if sa_i == sb_i {
+                        continue;
+                    }
+                    if sa_i == i && sa == side && sb == opp && !has_lock(sb_i) {
+                        *facing_counts.entry(sb_i).or_default() += 1;
+                    } else if sb_i == i && sb == side && sa == opp && !has_lock(sa_i) {
+                        *facing_counts.entry(sa_i).or_default() += 1;
+                    }
+                }
+                for (peer_idx, count) in facing_counts {
+                    if count >= 2 {
+                        let peer_ports = requests
+                            .iter()
+                            .filter(|q| q.node == peer_idx && q.side == opp)
+                            .count();
+                        length = length.max(
+                            peer_ports.saturating_sub(1) as f64 * o.port_spacing + 2. * o.corner,
+                        );
+                    }
+                }
+            }
             let peer_edges: Vec<_> = scene
                 .edges
                 .iter()
@@ -1469,14 +1912,6 @@ fn grow_port_perimeters(
                     }
                 })
                 .collect();
-            let locked = effective_annotations(
-                scene,
-                &scene.nodes[i].id,
-                &scene.nodes[i].annotations,
-                o.variant.as_deref(),
-            )
-            .iter()
-            .any(|a| a.name == "pin" && a.attrs.contains_key("lock"));
             if ports.len() > 1
                 && peers.len() == 1
                 && !locked
@@ -1553,13 +1988,40 @@ fn grow_port_perimeters(
     }
     Ok(())
 }
-fn assign_ports(
+fn assign_ports<'a>(
     scene: &SceneGraph,
     o: &LayoutOptions,
-    requests: &[PortRequest],
+    requests: &'a [PortRequest],
     rects: &[Rect],
+    pins: &[(Option<f64>, Option<f64>)],
+    align_facing: bool,
     out: &mut Layout,
 ) -> Result<(), Error> {
+    let mut side_orders: Vec<(usize, Side, Vec<&'a PortRequest>)> = Vec::new();
+    let write_port = |node: &Node, r: Rect, side: Side, t: f64, key: &str, out: &mut Layout| {
+        let box_point = match side {
+            Side::N => Point::new(r.left() + t, r.top()),
+            Side::E => Point::new(r.right(), r.top() + t),
+            Side::S => Point::new(r.left() + t, r.bottom()),
+            Side::W => Point::new(r.left(), r.top() + t),
+        };
+        let shape = if node.container && node.shape != "sql_table" {
+            "container"
+        } else {
+            &node.shape
+        };
+        let point = crate::shapes::attachment(shape, r, side, t);
+        let (nx, ny) = side.normal();
+        out.ports.insert(
+            key.to_string(),
+            PortPlacement {
+                point,
+                stub: box_point.offset(nx * o.stub, ny * o.stub),
+                side,
+                key: key.to_string(),
+            },
+        );
+    };
     for (i, node) in scene.nodes.iter().enumerate() {
         for side in [Side::N, Side::E, Side::S, Side::W] {
             let mut ps: Vec<_> = requests
@@ -1742,28 +2204,205 @@ fn assign_ports(
                 if reverse {
                     t = len - t;
                 }
-                let box_point = match side {
-                    Side::N => Point::new(r.left() + t, r.top()),
-                    Side::E => Point::new(r.right(), r.top() + t),
-                    Side::S => Point::new(r.left() + t, r.bottom()),
-                    Side::W => Point::new(r.left(), r.top() + t),
-                };
-                let shape = if node.container && node.shape != "sql_table" {
-                    "container"
+                write_port(node, r, side, t, &p.key, out);
+            }
+            let final_ps: Vec<&'a PortRequest> = ordered.into_iter().map(|(j, _)| ps[j]).collect();
+            if !final_ps.is_empty() {
+                side_orders.push((i, side, final_ps));
+            }
+        }
+    }
+    if align_facing {
+        let mut facing_peers: BTreeMap<String, Vec<(usize, String)>> = BTreeMap::new();
+        for e in &scene.edges {
+            let ai = scene.index(&e.source.node).unwrap();
+            let bi = scene.index(&e.target.node).unwrap();
+            if ai == bi || pins[ai] != (None, None) || pins[bi] != (None, None) {
+                continue;
+            }
+            let ka = port_key(e, true);
+            let kb = port_key(e, false);
+            let (Some(pa), Some(pb)) = (out.ports.get(&ka), out.ports.get(&kb)) else {
+                continue;
+            };
+            let valid_facing = match (pa.side, pb.side) {
+                (Side::E, Side::W) => rects[ai].right() + 2. * o.stub <= rects[bi].left() + 1e-6,
+                (Side::W, Side::E) => rects[bi].right() + 2. * o.stub <= rects[ai].left() + 1e-6,
+                (Side::S, Side::N) => rects[ai].bottom() + 2. * o.stub <= rects[bi].top() + 1e-6,
+                (Side::N, Side::S) => rects[bi].bottom() + 2. * o.stub <= rects[ai].top() + 1e-6,
+                _ => false,
+            };
+            if valid_facing {
+                facing_peers
+                    .entry(ka.clone())
+                    .or_default()
+                    .push((bi, kb.clone()));
+                facing_peers.entry(kb).or_default().push((ai, ka));
+            }
+        }
+        if !facing_peers.is_empty() {
+            let mut side_distinct_peers: BTreeMap<(usize, Side), BTreeSet<usize>> = BTreeMap::new();
+            for e in &scene.edges {
+                let ai = scene.index(&e.source.node).unwrap();
+                let bi = scene.index(&e.target.node).unwrap();
+                if ai == bi {
+                    continue;
+                }
+                if let Some(pa) = out.ports.get(&port_key(e, true)) {
+                    side_distinct_peers
+                        .entry((ai, pa.side))
+                        .or_default()
+                        .insert(bi);
+                }
+                if let Some(pb) = out.ports.get(&port_key(e, false)) {
+                    side_distinct_peers
+                        .entry((bi, pb.side))
+                        .or_default()
+                        .insert(ai);
+                }
+            }
+            for sweep in 0..4 {
+                let idxs: Vec<usize> = if sweep % 2 == 0 {
+                    (0..side_orders.len()).collect()
                 } else {
-                    &node.shape
+                    (0..side_orders.len()).rev().collect()
                 };
-                let point = crate::shapes::attachment(shape, r, side, t);
-                let (nx, ny) = side.normal();
-                out.ports.insert(
-                    p.key.clone(),
-                    PortPlacement {
-                        point,
-                        stub: box_point.offset(nx * o.stub, ny * o.stub),
-                        side,
-                        key: p.key.clone(),
-                    },
-                );
+                for idx in idxs {
+                    let (i, side, ref ps) = side_orders[idx];
+                    let r = rects[i];
+                    let horiz_side = matches!(side, Side::N | Side::S);
+                    let len = if horiz_side { r.w } else { r.h };
+                    let reverse = matches!(side, Side::S | Side::W);
+                    let count = ps.len();
+                    if len < 2. * o.corner - 1e-6 {
+                        continue;
+                    }
+                    let mut desired = Vec::with_capacity(count);
+                    let mut weights = Vec::with_capacity(count);
+                    let mut cs = Vec::new();
+                    cs.push(Constraint {
+                        coefficients: vec![(0, 1.)],
+                        rhs: o.corner,
+                        equality: false,
+                    });
+                    cs.push(Constraint {
+                        coefficients: vec![(count - 1, -1.)],
+                        rhs: -(len - o.corner),
+                        equality: false,
+                    });
+                    let mut any_facing = false;
+                    for (j, p) in ps.iter().enumerate() {
+                        let base_t = (j + 1) as f64 * len / (count + 1) as f64;
+                        let fixed = match p.spec {
+                            PortConstraint::FixedRatio { ratio, .. } => Some(if reverse {
+                                len - ratio * len
+                            } else {
+                                ratio * len
+                            }),
+                            PortConstraint::FixedPos { offset_grid, .. } => Some(if reverse {
+                                len - offset_grid * o.grid
+                            } else {
+                                offset_grid * o.grid
+                            }),
+                            _ => None,
+                        };
+                        if let Some(v) = fixed {
+                            desired.push(v);
+                            weights.push(1.);
+                            cs.push(Constraint::fixed(j, v));
+                        } else if let Some(peers) = facing_peers.get(&p.key) {
+                            let mut targets = Vec::new();
+                            for (peer_idx, peer_key) in peers {
+                                let peer_side = out.ports[peer_key].side;
+                                if count == 1
+                                    && side_distinct_peers
+                                        .get(&(*peer_idx, peer_side))
+                                        .is_some_and(|s| s.len() >= 3)
+                                {
+                                    continue;
+                                }
+                                let pr = rects[*peer_idx];
+                                let (ov_lo, ov_hi) = if horiz_side {
+                                    (
+                                        (r.left() + o.corner).max(pr.left() + o.corner),
+                                        (r.right() - o.corner).min(pr.right() - o.corner),
+                                    )
+                                } else {
+                                    (
+                                        (r.top() + o.corner).max(pr.top() + o.corner),
+                                        (r.bottom() - o.corner).min(pr.bottom() - o.corner),
+                                    )
+                                };
+                                if ov_lo > ov_hi + 1e-6 {
+                                    continue;
+                                }
+                                let peer_pt = out.ports[peer_key].point;
+                                let coord = if horiz_side {
+                                    peer_pt.x.clamp(ov_lo, ov_hi)
+                                } else {
+                                    peer_pt.y.clamp(ov_lo, ov_hi)
+                                };
+                                let (p0, p1) = if horiz_side {
+                                    (
+                                        Point::new(coord, r.bottom().min(pr.bottom())),
+                                        Point::new(coord, r.top().max(pr.top())),
+                                    )
+                                } else {
+                                    (
+                                        Point::new(r.right().min(pr.right()), coord),
+                                        Point::new(r.left().max(pr.left()), coord),
+                                    )
+                                };
+                                let blocked = rects.iter().enumerate().any(|(k, rk)| {
+                                    k != i
+                                        && k != *peer_idx
+                                        && !scene.nodes[k].container
+                                        && rk.inflate(o.margin).blocks(p0, p1)
+                                });
+                                if !blocked {
+                                    let t_raw = if horiz_side {
+                                        coord - r.left()
+                                    } else {
+                                        coord - r.top()
+                                    };
+                                    let param = if reverse { len - t_raw } else { t_raw };
+                                    targets.push(param.clamp(o.corner, len - o.corner));
+                                }
+                            }
+                            if targets.is_empty() {
+                                desired.push(base_t);
+                                weights.push(1.);
+                            } else {
+                                any_facing = true;
+                                desired.push(targets.iter().sum::<f64>() / targets.len() as f64);
+                                weights.push(12.);
+                            }
+                        } else {
+                            desired.push(base_t);
+                            weights.push(1.);
+                        }
+                        if j > 0 {
+                            cs.push(Constraint::separation(j - 1, j, o.port_spacing));
+                        }
+                    }
+                    if !any_facing {
+                        continue;
+                    }
+                    if let Ok(positions) = solver::project(&desired, &weights, &cs)
+                        && positions
+                            .iter()
+                            .all(|&pos| pos >= o.corner - 1e-5 && pos <= len - o.corner + 1e-5)
+                    {
+                        let node = &scene.nodes[i];
+                        for (j, p) in ps.iter().enumerate() {
+                            let mut t = positions[j];
+                            if reverse {
+                                t = len - t;
+                            }
+                            write_port(node, r, side, t, &p.key, out);
+                        }
+                    }
+                }
             }
         }
     }
@@ -2456,4 +3095,245 @@ fn validate_model(scene: &SceneGraph, o: &LayoutOptions) -> Result<(), Error> {
         }
     }
     Ok(())
+}
+
+fn order_flat_ranks(scene: &SceneGraph, ranks: &[usize], rects: &mut [Rect], o: &LayoutOptions) {
+    let explicit_side = |ep: &Endpoint| -> Option<Side> {
+        ep.constraint.side().or_else(|| {
+            let idx = scene.index(&ep.node)?;
+            let port_id = ep.port.as_ref()?;
+            scene.nodes[idx].ports.get(port_id)?.constraint.side()
+        })
+    };
+    let mut degree = vec![0usize; scene.nodes.len()];
+    for e in &scene.edges {
+        if let Some(a) = scene.index(&e.source.node) {
+            degree[a] += 1;
+        }
+        if let Some(b) = scene.index(&e.target.node) {
+            degree[b] += 1;
+        }
+    }
+    let mut satellites: Vec<(usize, usize, Side)> = Vec::new();
+    let mut is_sat = vec![false; scene.nodes.len()];
+    for (i, node) in scene.nodes.iter().enumerate() {
+        if degree[i] != 1
+            || effective_annotations(scene, &node.id, &node.annotations, o.variant.as_deref())
+                .iter()
+                .any(|a| a.name == "pin")
+        {
+            continue;
+        }
+        if let Some(edge) = scene
+            .edges
+            .iter()
+            .find(|e| e.source.node == node.id || e.target.node == node.id)
+        {
+            let hub_ep = if edge.source.node == node.id {
+                &edge.target
+            } else {
+                &edge.source
+            };
+            if let Some(hub) = scene.index(&hub_ep.node)
+                && hub != i
+                && degree[hub] >= 2
+                && let Some(side @ (Side::N | Side::S)) = explicit_side(hub_ep)
+            {
+                satellites.push((i, hub, side));
+                is_sat[i] = true;
+            }
+        }
+    }
+    let mut effective_ranks = ranks.to_vec();
+    let mut by_rank: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for (i, &r) in effective_ranks.iter().enumerate() {
+        if !is_sat[i] {
+            by_rank.entry(r).or_default().push(i);
+        }
+    }
+    if !satellites.is_empty() {
+        for i in 0..scene.nodes.len() {
+            if is_sat[i] {
+                continue;
+            }
+            let id = &scene.nodes[i].id;
+            let has_in = scene.edges.iter().any(|e| &e.target.node == id);
+            if has_in {
+                continue;
+            }
+            let min_succ = scene
+                .edges
+                .iter()
+                .filter(|e| &e.source.node == id)
+                .filter_map(|e| scene.index(&e.target.node))
+                .filter(|&t| !is_sat[t])
+                .map(|t| effective_ranks[t])
+                .min();
+            if let Some(sr) = min_succ
+                && sr > effective_ranks[i] + 1
+            {
+                let target_r = sr - 1;
+                if by_rank.get(&target_r).map_or(0, Vec::len) < 4 {
+                    let old_r = effective_ranks[i];
+                    if let Some(v) = by_rank.get_mut(&old_r) {
+                        v.retain(|&x| x != i);
+                        if v.is_empty() {
+                            by_rank.remove(&old_r);
+                        }
+                    }
+                    effective_ranks[i] = target_r;
+                    by_rank.entry(target_r).or_default().push(i);
+                }
+            }
+        }
+    }
+    let ranks = &effective_ranks[..];
+    if !by_rank.values().any(|m| m.len() > 1) && satellites.is_empty() {
+        return;
+    }
+    let caption_h = scene
+        .edges
+        .iter()
+        .map(|e| crate::labels::text_height(&crate::labels::connection_text(scene, e)))
+        .fold(0., f64::max);
+    let row_gap = (caption_h + 48.).max(64.);
+    let has_explicit_ports = scene
+        .nodes
+        .iter()
+        .any(|n| n.shape == "sql_table" || !n.ports.is_empty());
+    let corridor = if has_explicit_ports {
+        160.
+    } else {
+        o.margin.max(48.)
+    };
+    let mut x = 0.;
+    let mut prev_r = 0usize;
+    let mut prev_w = 0.;
+    for (idx, (&r, members)) in by_rank.iter().enumerate() {
+        let w = members.iter().map(|&i| rects[i].w).fold(0., f64::max);
+        if idx == 0 {
+            x = r as f64 * 240.;
+        } else {
+            x += ((r - prev_r) as f64 * 240.).max((prev_w + w) / 2. + 2. * o.stub + corridor);
+        }
+        for &i in members {
+            rects[i].x = x;
+        }
+        prev_r = r;
+        prev_w = w;
+    }
+    let stack = |members: &[usize], rects: &mut [Rect]| {
+        if members.is_empty() {
+            return;
+        }
+        let total: f64 = members
+            .iter()
+            .map(|&i| top_extra(&scene.nodes[i]) + rects[i].h)
+            .sum::<f64>()
+            + (members.len() - 1) as f64 * row_gap;
+        let mut cursor = -total / 2.;
+        for &i in members {
+            let extra = top_extra(&scene.nodes[i]);
+            rects[i].y = cursor + extra + rects[i].h / 2.;
+            cursor += extra + rects[i].h + row_gap;
+        }
+    };
+    for members in by_rank.values() {
+        stack(members, rects);
+    }
+    let endpoint_y = |ep: &Endpoint, rects: &[Rect]| -> Option<(usize, f64)> {
+        let idx = scene.index(&ep.node)?;
+        let r = rects[idx];
+        if let Some(port_id) = &ep.port
+            && let Some(port) = scene.nodes[idx].ports.get(port_id)
+        {
+            match port.constraint {
+                PortConstraint::FixedRatio {
+                    side: Side::W | Side::E,
+                    ratio,
+                } => return Some((idx, r.top() + ratio * r.h)),
+                PortConstraint::FixedPos {
+                    side: Side::W | Side::E,
+                    offset_grid,
+                } => return Some((idx, r.top() + offset_grid * o.grid)),
+                _ => {}
+            }
+        }
+        Some((idx, r.y))
+    };
+    let rank_keys: Vec<usize> = by_rank.keys().copied().collect();
+    for sweep in 0..4 {
+        let keys: Vec<usize> = if sweep % 2 == 0 {
+            rank_keys.clone()
+        } else {
+            rank_keys.iter().copied().rev().collect()
+        };
+        for r in keys {
+            let members = by_rank.get_mut(&r).unwrap();
+            if members.len() < 2 {
+                continue;
+            }
+            let mut keyed: Vec<(f64, usize, usize)> = members
+                .iter()
+                .map(|&i| {
+                    let id = &scene.nodes[i].id;
+                    let mut ys = Vec::new();
+                    for e in &scene.edges {
+                        if &e.source.node == id {
+                            if let Some((other, y)) = endpoint_y(&e.target, rects)
+                                && !is_sat[other]
+                                && ranks[other] != r
+                                && (sweep > 0 || ranks[other] < r)
+                            {
+                                ys.push(y);
+                            }
+                        } else if &e.target.node == id
+                            && let Some((other, y)) = endpoint_y(&e.source, rects)
+                            && !is_sat[other]
+                            && ranks[other] != r
+                            && (sweep > 0 || ranks[other] < r)
+                        {
+                            ys.push(y);
+                        }
+                    }
+                    let bary = if ys.is_empty() {
+                        rects[i].y
+                    } else {
+                        ys.iter().sum::<f64>() / ys.len() as f64
+                    };
+                    (bary, i, i)
+                })
+                .collect();
+            keyed.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+            *members = keyed.into_iter().map(|(_, _, i)| i).collect();
+            stack(members, rects);
+        }
+    }
+    for (hub_side_key, group) in {
+        let mut grouped: BTreeMap<(usize, u8), Vec<usize>> = BTreeMap::new();
+        for &(sat, hub, side) in &satellites {
+            grouped
+                .entry((hub, u8::from(side == Side::S)))
+                .or_default()
+                .push(sat);
+        }
+        grouped
+    } {
+        let (hub, is_south) = hub_side_key;
+        let hub_r = rects[hub];
+        let gap = (row_gap + 24.).max(88.);
+        let total_w: f64 =
+            group.iter().map(|&i| rects[i].w).sum::<f64>() + (group.len() - 1) as f64 * 32.;
+        let mut cursor_x = hub_r.x - total_w / 2.;
+        for &sat in &group {
+            rects[sat].x = cursor_x + rects[sat].w / 2.;
+            cursor_x += rects[sat].w + 32.;
+            if is_south == 0 {
+                rects[sat].y = hub_r.top() - top_extra(&scene.nodes[hub]) - gap - rects[sat].h / 2.;
+            } else {
+                rects[sat].y =
+                    hub_r.bottom() + gap + top_extra(&scene.nodes[sat]) + rects[sat].h / 2.;
+            }
+        }
+    }
 }

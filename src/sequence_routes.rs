@@ -327,20 +327,45 @@ pub(crate) fn coordinate(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) 
     l.routes.extend(routes);
     true
 }
-/// Parallel sends use opposite clockwise attachment orders at their ends,
-/// including a bundle that shares a side rather than facing across a gap.
+/// Parallel and antiparallel links sharing attachment sides use consistent
+/// non-crossing port order at both ends, including U-turn bundles.
 pub(crate) fn parallel_order(
     scene: &SceneGraph,
     e: &Edge,
     source: bool,
     sa: Side,
     sb: Side,
+    endpoint_sides: &BTreeMap<String, Side>,
     base: f64,
 ) -> Option<f64> {
+    if e.source.node == e.target.node {
+        return None;
+    }
+    let u_id = e.source.node.as_str().min(e.target.node.as_str());
+    let v_id = e.source.node.as_str().max(e.target.node.as_str());
+    let (su, sv) = if e.source.node == u_id {
+        (sa, sb)
+    } else {
+        (sb, sa)
+    };
     let pairs: Vec<_> = scene
         .edges
         .iter()
-        .filter(|other| other.source.node == e.source.node && other.target.node == e.target.node)
+        .filter(|other| {
+            let ou = other.source.node.as_str().min(other.target.node.as_str());
+            let ov = other.source.node.as_str().max(other.target.node.as_str());
+            if (ou, ov) != (u_id, v_id) {
+                return false;
+            }
+            let osa = endpoint_sides.get(&port_key(other, true)).copied();
+            let osb = endpoint_sides.get(&port_key(other, false)).copied();
+            let (osu, osv) = if other.source.node == u_id {
+                (osa, osb)
+            } else {
+                (osb, osa)
+            };
+            osu == Some(su) && osv == Some(sv)
+        })
         .collect();
     if pairs.len() < 2 {
         return None;
@@ -355,6 +380,7 @@ pub(crate) fn parallel_order(
         return None;
     }
     let index = pairs.iter().position(|other| other.id == e.id)?;
-    let same_clockwise = matches!(sa, Side::N | Side::E) == matches!(sb, Side::N | Side::E);
-    Some(base + index as f64 * 1e-4 * if !source && same_clockwise { -1. } else { 1. })
+    let on_u = ep.node == u_id;
+    let same_clockwise = matches!(su, Side::N | Side::E) == matches!(sv, Side::N | Side::E);
+    Some(base + index as f64 * 1e-4 * if !on_u && same_clockwise { -1. } else { 1. })
 }

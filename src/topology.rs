@@ -415,6 +415,14 @@ pub fn optimize(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions) -> Sh
             states: 0,
             budget: o.shape_budget.saturating_sub(stats.searched_states),
         };
+        if n >= 6
+            && (0..n).any(|v| {
+                search.endpoints.iter().filter(|&&(a, _)| a == v).count() >= 4
+                    || search.endpoints.iter().filter(|&&(_, b)| b == v).count() >= 4
+            })
+        {
+            continue;
+        }
         let identity: Vec<_> = (0..n).collect();
         let original_cost = search.complete_cost(&identity);
         search.cells = cells;
@@ -505,10 +513,107 @@ pub fn coffman_graham(scene: &SceneGraph, width: usize) -> Vec<usize> {
         levels[i] = level;
     }
     let last = levels.iter().copied().max().unwrap_or(0);
+    let mut inner_offsets: Vec<Vec<usize>> = Vec::with_capacity(count);
+    let mut group_spans = vec![1usize; count];
+    for (gi, g) in groups.iter().enumerate() {
+        if g.len() <= 1 {
+            inner_offsets.push(vec![0; g.len()]);
+            continue;
+        }
+        let m = g.len();
+        let mut entries: Vec<usize> = (0..m)
+            .filter(|&k| {
+                let id = &scene.nodes[g[k]].id;
+                scene.edges.iter().any(|e| {
+                    &e.target.node == id && owner[scene.index(&e.source.node).unwrap()] != gi
+                })
+            })
+            .collect();
+        if entries.is_empty() {
+            entries.push(0);
+        }
+        let mut dist = vec![usize::MAX; m];
+        let mut queue = std::collections::VecDeque::new();
+        for &e_idx in &entries {
+            dist[e_idx] = 0;
+            queue.push_back(e_idx);
+        }
+        while let Some(u) = queue.pop_front() {
+            let uid = &scene.nodes[g[u]].id;
+            for e in &scene.edges {
+                if &e.source.node == uid
+                    && let Some(v) = g
+                        .iter()
+                        .position(|&idx| scene.nodes[idx].id == e.target.node)
+                    && dist[v] == usize::MAX
+                {
+                    dist[v] = dist[u] + 1;
+                    queue.push_back(v);
+                }
+            }
+        }
+        for (k, d) in dist.iter_mut().enumerate() {
+            if *d == usize::MAX {
+                *d = k;
+            }
+        }
+        let mut order_in: Vec<usize> = (0..m).collect();
+        order_in.sort_by_key(|&k| (dist[k], k));
+        let mut inner = vec![0usize; m];
+        for &u in &order_in {
+            let uid = &scene.nodes[g[u]].id;
+            for e in &scene.edges {
+                if &e.source.node == uid
+                    && let Some(v) = g
+                        .iter()
+                        .position(|&idx| scene.nodes[idx].id == e.target.node)
+                    && dist[v] > dist[u]
+                {
+                    inner[v] = inner[v].max(inner[u] + 1);
+                }
+            }
+        }
+        group_spans[gi] = inner.iter().copied().max().unwrap_or(0) + 1;
+        inner_offsets.push(inner);
+    }
+    let mut step_span = vec![1usize; last + 1];
+    for i in 0..count {
+        let step = last - levels[i];
+        step_span[step] = step_span[step].max(group_spans[i]);
+    }
+    let mut step_start = vec![0usize; last + 1];
+    for s in 1..=last {
+        step_start[s] = step_start[s - 1] + step_span[s - 1];
+    }
     let mut ranks = vec![0; scene.nodes.len()];
     for (i, g) in groups.iter().enumerate() {
-        for (offset, &v) in g.iter().enumerate() {
-            ranks[v] = last - levels[i] + offset;
+        let base = step_start[last - levels[i]];
+        for (k, &v) in g.iter().enumerate() {
+            ranks[v] = base + inner_offsets[i][k];
+        }
+    }
+    let cap = width.max(1);
+    let max_rank = ranks.iter().copied().max().unwrap_or(0);
+    let mut counts = vec![0usize; max_rank + 1];
+    for &r in &ranks {
+        counts[r] += 1;
+    }
+    for (i, g) in groups.iter().enumerate() {
+        if g.len() == 1 && succ[i].is_empty() && !pred[i].is_empty() {
+            let v = g[0];
+            let min_rank = pred[i]
+                .iter()
+                .flat_map(|&p| &groups[p])
+                .map(|&u| ranks[u] + 1)
+                .max()
+                .unwrap_or(0);
+            if min_rank + 1 < ranks[v]
+                && let Some(target) = (min_rank..ranks[v]).find(|&r| counts[r] < cap)
+            {
+                counts[ranks[v]] -= 1;
+                ranks[v] = target;
+                counts[target] += 1;
+            }
         }
     }
     ranks

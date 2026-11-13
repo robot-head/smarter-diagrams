@@ -291,12 +291,18 @@ fn zone_title_at(
     let left = points.iter().map(|p| p.x).reduce(f64::min)?;
     let top = points.iter().map(|p| p.y).reduce(f64::min)?;
     let right = points.iter().map(|p| p.x).reduce(f64::max)?;
+    let bottom = points.iter().map(|p| p.y).reduce(f64::max)?;
     let w = crate::labels::text_width(&zone.label) + 16.;
     let h = crate::labels::text_height(&zone.label) + 4.;
     let clear = |r: Rect| {
         !occupied.iter().any(|old| r.inflate(4.).intersects(*old))
             && !scene.nodes.iter().any(|n| {
                 let node = l.nodes[&n.id];
+                if crate::layout::container_header_rect(n, node)
+                    .is_some_and(|h| r.inflate(4.).intersects(h))
+                {
+                    return true;
+                }
                 r.inflate(4.).intersects(node)
                     && !(n.container && node.inflate(-6.).encloses(r.inflate(4.)))
             })
@@ -318,12 +324,21 @@ fn zone_title_at(
     let columns = ((right - left - w).max(0.) / 16.).ceil() as usize;
     let columns = columns.min(128);
     for row in 0..scene.nodes.len() + l.labels.len() + 4 {
-        let y = top - h / 2. - 6. - row as f64 * 32.;
-        for col in 0..=columns + 1 {
-            let x = left + w / 2. + col as f64 * 16.;
-            r = Rect::new(x, y, w, h);
-            if clear(r) {
-                return Some(r);
+        let candidates_y = if row == 0 {
+            vec![top - h / 2. - 6., bottom + h / 2. + 6.]
+        } else {
+            vec![
+                top - h / 2. - 6. - row as f64 * 32.,
+                bottom + h / 2. + 6. + row as f64 * 32.,
+            ]
+        };
+        for y in candidates_y {
+            for col in 0..=columns + 1 {
+                let x = left + w / 2. + col as f64 * 16.;
+                r = Rect::new(x, y, w, h);
+                if clear(r) {
+                    return Some(r);
+                }
             }
         }
     }
@@ -402,6 +417,14 @@ pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
             l.zones
                 .values()
                 .flat_map(|z| z.iter().map(|p| Rect::new(p.x, p.y, 1., 1.))),
+        )
+        .chain(
+            scene
+                .zones
+                .iter()
+                .flat_map(|z| crate::zones::contours(scene, l, z))
+                .flatten()
+                .map(|p| Rect::new(p.x, p.y, 1., 1.)),
         )
         .chain(zone_titles(scene, l).into_iter().map(|(_, r)| r))
         .chain(

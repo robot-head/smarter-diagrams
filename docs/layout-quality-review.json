@@ -2,7 +2,7 @@
   "status": "complete",
   "reviewer": "Codex visual inspection",
   "reviewedAt": "2026-11-12",
-  "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+  "engineFingerprint": "5615827de7ff2e18ada3dc502d28b1d16e7e3aa4013d8ff549232643c7c0539a",
   "method": "Inspect every distinct SVG on Chromium contact sheets; reopen dense or ambiguous examples at native size. Reuse a review only when SVG SHA-256 bytes match. Scores are subjective visual judgments, separate from semantic and geometry assertions. After discovery, every one of the 220 distinct sources was recompiled in each of five complete confirmation passes; every SVG byte hash matched its inspected image.",
   "rubric": {
     "beauty": "5: no observed material spacing, alignment, shape, clipping or connector defect at readable/native zoom; 4 or below: a concrete visual improvement remains.",
@@ -54,7 +54,7 @@
     },
     {
       "id": "05-decision",
-      "svgSha256": "41c4ccd3f033a728771d4dc1da22f80467ab5ec3f04042ac462bc6b859d37e46",
+      "svgSha256": "5ad17df70c7f6eb3342ee379e96b39ef1c0186c51422964b4ee3175af5891095",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
@@ -62,7 +62,7 @@
     },
     {
       "id": "06-feedback",
-      "svgSha256": "014473ede59744457a0400b4e883d450f4e239ec3e4125f37e92562ac4b0fda9",
+      "svgSha256": "9bf7ffd18ca1abc1edb89c970d90289216d6a69c19938e703e51b220051d5a76",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
@@ -110,7 +110,7 @@
     },
     {
       "id": "12-butterfly",
-      "svgSha256": "de111bb9bfb68d2bcde77c39d9144f52aa274304695372b444d2a93b8dc02348",
+      "svgSha256": "e7cd085a880ce936bbf8fcd212478bade70c9cc254340f11fb4b960166a7d817",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
@@ -118,7 +118,7 @@
     },
     {
       "id": "13-mesh",
-      "svgSha256": "b1714f148956433dbe734558da6e938358eec7f17104f2367fc759553426753b",
+      "svgSha256": "c098f2064c23cb2795075c7103154370873870de72e193deb7f334a244a0a6c7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -142,7 +142,7 @@
     },
     {
       "id": "16-container",
-      "svgSha256": "d29f33e37ae4cff93c27db3c1e27939db0d3058d56541017beafe4f90f229d79",
+      "svgSha256": "e6f92b8ef554255516162b03f0da8c38bdd6599270d703f29d40ebee913ab915",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -150,7 +150,7 @@
     },
     {
       "id": "17-nested",
-      "svgSha256": "2619cc6dde1f6ea54b36711b6e10d29c79017dade40edd0825fe1aa356efd4cc",
+      "svgSha256": "655b6df945621ae349ba9d046574c4e5aaca62ffdff229ba75995e82914c2279",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -158,7 +158,7 @@
     },
     {
       "id": "18-cross-scope",
-      "svgSha256": "9184c4c35c64099e5be2ee59cbdb2b0799f6d79c2a1c59398b26dcf7985813b6",
+      "svgSha256": "de8f946b422d7319fbf94d9a25fbb97cb23c7724b400b9b467b4fd5783ea3240",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -178,15 +178,15 @@
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
-      "notes": "Insert and lookup are separate ordered tracks aimed at the correct visible rows under an external table title."
+      "notes": "Parallel insert and lookup edges attach cleanly to Orders table slots as straight horizontal lines with local captions."
     },
     {
       "id": "21-ports",
-      "svgSha256": "b62c1c751da6843a84c427b3e9c7aa90c79ab6a545cb5f8a62439f7f27b96a46",
+      "svgSha256": "3ea402049b894063e00b72db275794882963df4272abee76d9afe429449eef27",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
-      "notes": "Publish and acknowledgment directions are distinct; the input name remains beside the queue attachment."
+      "notes": "Facing publish and ack connectors run along straight horizontal lanes with clear port and edge captions."
     },
     {
       "id": "22-obstacle",
@@ -222,7 +222,7 @@
     },
     {
       "id": "fuzz-dag-1",
-      "svgSha256": "90cef3ddd1060cc6bd4cb0b0f3e3e628b983e77890479be19d719f9535a0426d",
+      "svgSha256": "d708302724cee582fea7f47b827bf8d0e28359da0ddb52c3be2c8fd25dade00d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -246,12 +246,11 @@
     },
     {
       "id": "fuzz-dag-4",
-      "svgSha256": "2712ba02c01578edb87a5122a291b88c7af7ccdda9c9e57b26b22958a7f75e2f",
+      "svgSha256": "37bade1f02fbca2a8e6ce3aa6ca5d20b54dcd51c5f668e088e3fc57709f8ae08",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
-      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-fuzz-dag-4.png"
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size."
     },
     {
       "id": "fuzz-dag-5",
@@ -263,7 +262,7 @@
     },
     {
       "id": "fuzz-dag-6",
-      "svgSha256": "9a97ab3a492b454b5c7d5536033fa3c60cdb27cec1a9365baa5d6e16a62de00d",
+      "svgSha256": "4d39239303cd2af2b77c44e939dd2081d7536d84860b13bb844116808a7ca7e4",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -295,16 +294,15 @@
     },
     {
       "id": "fuzz-cycle-2",
-      "svgSha256": "b3edbd549dd7a1dbdf62398453fb413fabdd765e01a1532344791937b5daec3a",
+      "svgSha256": "e4b1ae8f4fa0a511176d4d098476480c3daf96e820138b4edf326af4d068dec2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
-      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-fuzz-cycle-2.png"
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths. Also inspected at native size."
     },
     {
       "id": "fuzz-cycle-3",
-      "svgSha256": "be2dd7d41b569b8ca694a102f5aa3acba8f72883aeefc59be1483153c2bc74c8",
+      "svgSha256": "b48a46c307afeaedb031682e7737e5e77ca25071b08e8630546174cd08b2f590",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -344,7 +342,7 @@
     },
     {
       "id": "fuzz-parallel-0",
-      "svgSha256": "9965456b8b65ca670f5f11e88d8c7380a5917a354933fbc9ffa5bc72b923a184",
+      "svgSha256": "fd77e6009912bc1e074a70555a41274053ad950399fdbdf2106fc559045c2e97",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -352,7 +350,7 @@
     },
     {
       "id": "fuzz-parallel-1",
-      "svgSha256": "4e4772ad334b541231c931d0cb6cad96078d85ace83f1b31469fee060d7d7861",
+      "svgSha256": "e702fa6b77c5e18fe90634a297c2f29459afc59ce23b593546ffaf82669b9414",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -368,16 +366,15 @@
     },
     {
       "id": "fuzz-parallel-3",
-      "svgSha256": "81ab1df7000e170b74ce9f56727722769554d79a82693147d959329bfa838cb0",
+      "svgSha256": "22fe07592263bc6c84218f070cf8d5b7899793e63f8863e0c869d2e2e8574ee1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
-      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-fuzz-parallel-3.png"
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size."
     },
     {
       "id": "fuzz-parallel-4",
-      "svgSha256": "6634b063ce94624f413fbd988b3e38cc97c386a75888436f5fa6b84e41ebbe2a",
+      "svgSha256": "089575cce1a498a5ae151a690db6d37ffc33e55e381355fe9937611a7a6452ae",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -385,7 +382,7 @@
     },
     {
       "id": "fuzz-parallel-5",
-      "svgSha256": "e1c74e320c48ee372f581d1eb0284dd62b9e8fd785a8a471a394c3ceddec8f47",
+      "svgSha256": "37f2557146356fd9f9d44e1aedb8621a95fe42a2d96f7a58ac9800dc205dfac9",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -393,7 +390,7 @@
     },
     {
       "id": "fuzz-parallel-6",
-      "svgSha256": "f80dc6fb2a4ca1ee02a9abf7dbcb482e2536c37f129e6395ebccc86e19617069",
+      "svgSha256": "3e33453d796f3807424cc20e81cdcd8988eb8ae688ba256f0306ff99f191bdc5",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -401,12 +398,11 @@
     },
     {
       "id": "fuzz-parallel-7",
-      "svgSha256": "ee5c363b9af70251fca0fbeb4b716e3e2f7375b15473ac45ad5392e25fc2daf1",
+      "svgSha256": "4eebb3308636cba62e484f4075a0f14ecf1248f87867d699dea7287d04f8467c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
-      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-fuzz-parallel-7.png"
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size."
     },
     {
       "id": "fuzz-pinned-0",
@@ -442,7 +438,7 @@
     },
     {
       "id": "fuzz-pinned-4",
-      "svgSha256": "28627eeab6c0a7d9578074d4c033f49460054981694d7c084c38bdda2a914399",
+      "svgSha256": "b279e9e630cc3957ac7aa8a360d4839d632fd5d55808aad554f1f74e7a779f75",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -586,7 +582,7 @@
     },
     {
       "id": "07-multiple-retries",
-      "svgSha256": "ee6859f9205a19570962d00ee63a57fb08f7409b0fdd49f96a43ce64df5ca0a1",
+      "svgSha256": "bafbdbdea9e789419bef51c714648f309a06175ffc3e44783c8a4cf03280aee2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
@@ -594,11 +590,11 @@
     },
     {
       "id": "08-cross-ownership",
-      "svgSha256": "a2bb85c38f1d8049c8f99ee4fb7a83b2b87f610a3a638a7dcd6bc26e030abd76",
+      "svgSha256": "8867a41f84ee9c56e1c2d68763c08ce1832dd2955152f9979fdc55c7582debe1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
-      "notes": "West, East and Shared services retain their ownership; every disjoint trusted island carries the same scope title."
+      "notes": "Shared trusted scope forms one contiguous Gestalt splat across West, East, and Shared services while excluding non-member workers and Browser."
     },
     {
       "id": "09-many-record-slots",
@@ -610,7 +606,7 @@
     },
     {
       "id": "10-many-named-ports",
-      "svgSha256": "6448418ae046ccf5af709b8e19d0adb765ec545208ad3d7dd6fc4f85f3424ab1",
+      "svgSha256": "ebba46a50f9491b081aa72069d7d6e484e6f11d23a5b6ea805119f5c98606b43",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
@@ -626,7 +622,7 @@
     },
     {
       "id": "12-independent-systems",
-      "svgSha256": "03501e365b26991e07e1f00b979e0e6cb80c55f2b0ee13fb4128637cdcc0c7de",
+      "svgSha256": "b83529a49fb2d2b88a1dc65bf950c2bec11e893b17b5d2556c9a8f560d5c1d89",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
@@ -634,12 +630,11 @@
     },
     {
       "id": "c0ffee01-dag",
-      "svgSha256": "d1e85569a19a221112b1ad6d9be5a1046fad0eed82159a49debdb0c08a87ab0f",
+      "svgSha256": "f32ea1ae8cfeea52aaa5e134a3c068d73696c6740e48368b699180e1861a1edd",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
-      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-c0ffee01-dag.png"
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size."
     },
     {
       "id": "c0ffee01-cycle",
@@ -651,7 +646,7 @@
     },
     {
       "id": "c0ffee01-parallel",
-      "svgSha256": "e6a54704abbd48f73a7543f61a37b54cb4b6339ed334a41a8d7db39e4c220fc6",
+      "svgSha256": "5921e8247e04f03e49c572d0a51db9c0428c003ce39bdaab52583a8a40afa71e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -691,7 +686,7 @@
     },
     {
       "id": "c0ffee01-scoped",
-      "svgSha256": "c1f28c65bde1062f2fef8ec2f01b7a5c8810cdef208135bf109671217305e26d",
+      "svgSha256": "d480ec6e6cf91e1e1c08ace4add847a33b41d4aaff192946ff19ed6e397539cf",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -699,7 +694,7 @@
     },
     {
       "id": "a11ce002-dag",
-      "svgSha256": "af4e6cd8caae2f9e1871ffade02009c8dd97dc156d6b1a624ed59ab255fadf67",
+      "svgSha256": "86ae759952bc947081a2f05d1b834d2309043b1aa947746caf697fe359241b95",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -707,7 +702,7 @@
     },
     {
       "id": "a11ce002-cycle",
-      "svgSha256": "628262165a740c8bfa39ed54b1b9e27832b176cb79dd3ca05d00d98031fc1a08",
+      "svgSha256": "7623047058b8bff0cf12da2b7f12708d22be0759dc8bdd8cd94cda91d1225c38",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -715,12 +710,11 @@
     },
     {
       "id": "a11ce002-parallel",
-      "svgSha256": "74883004e2d44da9d29bd1880f824a7710ce3e8f288b95def46c8848e8cbd029",
+      "svgSha256": "f95d31b8f19b4b42cfb977344d5db1dd902895ed7c66585f82e2be16e40cbaef",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
-      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-01/baseline/detail-a11ce002-parallel.png"
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size."
     },
     {
       "id": "a11ce002-tree",
@@ -740,7 +734,7 @@
     },
     {
       "id": "a11ce002-sparse-mesh",
-      "svgSha256": "0b383b78261a677d403e475612c6b9405dcd884f4f8420bb2aa35dfd651d5171",
+      "svgSha256": "b200526ac68e4d4192815831811b13984431bf609083d6a087ef0737dc475f36",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -756,7 +750,7 @@
     },
     {
       "id": "a11ce002-scoped",
-      "svgSha256": "6a27a846dd0d97cabc35e20fb2a87c045c72fe34086609d9c28cd83e55865676",
+      "svgSha256": "8147f6c17f892320696c60b43f5a92569746af12f0c229b286809ba3f07a5367",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -764,7 +758,7 @@
     },
     {
       "id": "5eed1203-dag",
-      "svgSha256": "7236931094d49ebff4f48f274a220241ee3c5c17d36f0335d926e60efc28a286",
+      "svgSha256": "ff2e5c12b20605a11a6fad3549391f67e65c2e62932a2ebf0fe2dc7140049de7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -772,7 +766,7 @@
     },
     {
       "id": "5eed1203-cycle",
-      "svgSha256": "c5d6f3eb4cf234319aa4d17d93e5f9b39553cb811f646613ce3614d42a228f30",
+      "svgSha256": "6867f25258bd9f70ede48bec3b1d0805d91ec5713e9c9699e847d35955b564da",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -780,7 +774,7 @@
     },
     {
       "id": "5eed1203-parallel",
-      "svgSha256": "7b3539bc454d3c4ebb2c49dbc4b354f375a2a8eb48bc07bea55360ce35524dec",
+      "svgSha256": "c69972fb5720dc69c2bf83f7aeced432b5e56757cbbcc1a6d7b5d51383ed856a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -820,7 +814,7 @@
     },
     {
       "id": "5eed1203-scoped",
-      "svgSha256": "634caf4ec6219ac2d8fb705cb195eaef14eb315ae472c11403d549b950f651bb",
+      "svgSha256": "12b5eff6bcf66fec4e5c3ba21579240ab9b062299b12c43998df258f454283ec",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
@@ -828,7 +822,7 @@
     },
     {
       "id": "d1a60001-dag",
-      "svgSha256": "6134d78d57dba5fba92e123e47e3373ae62b87356085312d8b885fa201fb1afa",
+      "svgSha256": "a1d704fc6d1aaed851a364e00ff833ca5c398f1a18b2f7af139d3c234f464ef1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -836,16 +830,15 @@
     },
     {
       "id": "d1a60001-cycle",
-      "svgSha256": "7e81bd330862fac7095f5aea5b1ccc823bd60808aef5965bfdea8879757dc731",
+      "svgSha256": "76648daa0b33dbf1cba8b8c4543f5fc5060b68c2ec08342abf32bdb957994beb",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
-      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-01/exploration/detail-d1a60001-cycle.png"
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths. Also inspected at native size."
     },
     {
       "id": "d1a60001-parallel",
-      "svgSha256": "fea36c14fad3e30affae27cdc67f81c571eaee7909baa2fdeff370c3debe9a81",
+      "svgSha256": "368aecceb287935111d87acd471b94412fcaba85048ae79a444b1e124e84007b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -885,7 +878,7 @@
     },
     {
       "id": "d1a60001-scoped",
-      "svgSha256": "f2b4d7049d16dcdcd4af0d256bd5e963b7583516d5327823b2fcdd401374b8a9",
+      "svgSha256": "05f6d3908030b41d72cbda98f1e364d51443c779f2c0eb4e35b5f1ec8e3dd13e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -893,7 +886,7 @@
     },
     {
       "id": "c0ffee77-dag",
-      "svgSha256": "5169da567326409e726ea26b6f9c6ffee6b18fcb82a97c7a4a48beadbac3b634",
+      "svgSha256": "e8df8f6d7bc5d1a2adda29d24e5fabf106f2c595095591b1376ad42322cab12c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -901,7 +894,7 @@
     },
     {
       "id": "c0ffee77-cycle",
-      "svgSha256": "075ecb4a1bc05d56f9414514feab7d29a8070cb12e3a312eb776bfbf7a4318c6",
+      "svgSha256": "e1a87f3bc903bb8cd31faee7cec6b9f2b82eecdcc429d972abbf503239b84fd4",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -909,7 +902,7 @@
     },
     {
       "id": "c0ffee77-parallel",
-      "svgSha256": "797ec04818d42837ce0bb40f78bdf4f2e934736d195311cc2267731b39f6e3d8",
+      "svgSha256": "2aabb91072c2535f34a8aeb955bd4fe9ac4160eea2714f76beb8a34479e9b91d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -949,7 +942,7 @@
     },
     {
       "id": "c0ffee77-scoped",
-      "svgSha256": "f0ed9278cb5f8f9234199aec2cb8727063669dd2ced9bc985db5affa55c2597e",
+      "svgSha256": "f3dc808d53736d0e388b31ada4bd995eec468c3716aa1464bf06eaa467181b71",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -957,7 +950,7 @@
     },
     {
       "id": "5eedf00d-dag",
-      "svgSha256": "b043b247e4c0a07c82278f55af55f9a72051d3545b8bb077483d0ed6d2b7a72a",
+      "svgSha256": "65eb4807593086b616f12cdf01c951e97bd0ece5a36efa4e441890fbb1bdc05e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -965,7 +958,7 @@
     },
     {
       "id": "5eedf00d-cycle",
-      "svgSha256": "3a152ffe93b0dfe3c4ac2d39878ef2f92a26f6fa1cbcca89ba593f2cd97cc3c6",
+      "svgSha256": "82c47d51eccc2ef37f5197729b8a6e42a02e2b540a4726700661d3a679e59b27",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -1013,7 +1006,7 @@
     },
     {
       "id": "5eedf00d-scoped",
-      "svgSha256": "591e4782c2f874152c623d42de5fcae4605852d9ed29b675e8250ab42b611d5a",
+      "svgSha256": "89e342d02da91d41fe105eb068c33f61ee5e1490b34ae6b8a86e0d3607d32ad9",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -1021,16 +1014,15 @@
     },
     {
       "id": "10293847-dag",
-      "svgSha256": "a929417dc99c3c43e4391499a940dc594531be0620c5e1111cb84bee3d94361f",
+      "svgSha256": "0f67ab90824ce1864e3ecb7b80e40839017f4551084760e4bd2b09decbd62fbd",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
-      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-02/exploration/detail-10293847-dag.png"
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size."
     },
     {
       "id": "10293847-cycle",
-      "svgSha256": "c10722e85046b1b62ca8b6e34d6a623de7d3e06e0b6de4101062830df1f05ae0",
+      "svgSha256": "165163401cf24afb060b6848f7d652dbe5dc840a83532790af32ae0c7d948c2d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1078,7 +1070,7 @@
     },
     {
       "id": "10293847-scoped",
-      "svgSha256": "108efb6b0677c53605a141fdee647d22a2c10239b9c2675fb57bc19013dda64a",
+      "svgSha256": "eb2207fa48602bcba2ee8a1af62ee7c5486a56062487a3f61e301b35270d61d6",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1086,7 +1078,7 @@
     },
     {
       "id": "7f4a7c15-dag",
-      "svgSha256": "9407dfc1dcf606bb4978b96953d48b92b7601be077e3b92acf776dad34972f8b",
+      "svgSha256": "301cadd8deba75c485c6fc54160b9e99935097024f32dbb7127506a519637332",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1094,7 +1086,7 @@
     },
     {
       "id": "7f4a7c15-cycle",
-      "svgSha256": "81a2deffaf8c10d88ca647d03d2761c513ba2debca954d9b35ac98ef03cdd7d5",
+      "svgSha256": "329eff57e26196d3543d713cca3f9b6cf86c1aad084284d0b0888f2c329cbd03",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1102,7 +1094,7 @@
     },
     {
       "id": "7f4a7c15-parallel",
-      "svgSha256": "02b54872cf71e486ef90765471f49d7fa1296833b7279fe85d7ecc1f0166bd0e",
+      "svgSha256": "e131d5b3d9e89beb0f99e94b54a6da5f283194f3305c810bfb52649be90efb1c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1142,7 +1134,7 @@
     },
     {
       "id": "7f4a7c15-scoped",
-      "svgSha256": "295c58ec9be532eec23cdad8b70c9b1c039e5a56dcdf87860c3961069171a952",
+      "svgSha256": "95135ccbd951e15fde7a442e472a7309c332ab447898610740c05e6a4e365092",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1150,7 +1142,7 @@
     },
     {
       "id": "91e10da5-dag",
-      "svgSha256": "eb93b58428d679a6569f156275a9d9e03170590d1ab11f75cb99976218f97e77",
+      "svgSha256": "8be4ebf29737c15cb63ef74f719b1aa5fe9915eb3bac104ec08a1dc4c9a16f0b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1158,7 +1150,7 @@
     },
     {
       "id": "91e10da5-cycle",
-      "svgSha256": "d20921be86b86d4b99f9d7bdddfa01f816dd400eb71e9114da48cbf19d53ddcb",
+      "svgSha256": "82d16b22fcad1711f2e8538dfea83b76b42a6aecb621e2763dca4c7e1a3a67b6",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1206,7 +1198,7 @@
     },
     {
       "id": "91e10da5-scoped",
-      "svgSha256": "31f042dcd4d3f704badd15b18c8101d5aa999e8e8ae7f6c7a91a8b7c1b1059a6",
+      "svgSha256": "a6af71abd8ab53b8bf25d05e3138dff59862302be7f00e986312e554be46baef",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
@@ -1214,7 +1206,7 @@
     },
     {
       "id": "abc12345-dag",
-      "svgSha256": "fa8867a43f5273a05b2cf9b7442fc2e2f27fba5a0ba2b75fa71fb8be0bb6aeae",
+      "svgSha256": "bf139d60bac94bbb12aecfc09a2b4c88f5628a2fdfb01616d9c78f8dfb6f956d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1222,16 +1214,15 @@
     },
     {
       "id": "abc12345-cycle",
-      "svgSha256": "9cb810fb35cb6cab0140d7c8c1256a9b601081a8313ae3c1eca78597a674b6df",
+      "svgSha256": "0a341478584ac727dc351a7870dbc189a9b72c3b020dc7b497ef49d9d800c61c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
-      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-03/exploration/detail-abc12345-cycle.png"
+      "notes": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths. Also inspected at native size."
     },
     {
       "id": "abc12345-parallel",
-      "svgSha256": "ae32297df41a817d5f2870ce87b5f81737f383a6e53741688c039e0209ebbdd7",
+      "svgSha256": "3a79f3815e9dbc8a6883516910bce36c6134d9df8d6555de6f41d43429f000ad",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1271,7 +1262,7 @@
     },
     {
       "id": "abc12345-scoped",
-      "svgSha256": "bc9fbcf8ae985f99c48fd263cff37dc37d69d27bb1a4e21a86ca3fb590bb607f",
+      "svgSha256": "d356f4f28f99576c6e41310c6dcdb5261476cd0a6476af92e47af4fd21c3e498",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1279,12 +1270,11 @@
     },
     {
       "id": "13579bdf-dag",
-      "svgSha256": "4452c2df3a4cff78120622ddb480bb686ea61569b34975cb59a4ab99b09e6dea",
+      "svgSha256": "d63dfa575702ce91015a4842cf5522f582d4c32f8043669a15884b03da92e57f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
-      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-03/exploration/detail-13579bdf-dag.png"
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size."
     },
     {
       "id": "13579bdf-cycle",
@@ -1296,7 +1286,7 @@
     },
     {
       "id": "13579bdf-parallel",
-      "svgSha256": "4ef563236c5840c5de8ad0ccd64d094f25ead025a3b7f8b19f8343a0e75d84b8",
+      "svgSha256": "87552762282b6535e7901a3a7de380a17f9e25115e2edfdfef2dbe7bccecde77",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1336,7 +1326,7 @@
     },
     {
       "id": "13579bdf-scoped",
-      "svgSha256": "b09832145e5841bf59f454bcd77dd33842e994d58672abc5a03103c747112559",
+      "svgSha256": "f243484ec595bda4f0e1b36865b97b9afde915a761f0b6f43771b926cc8e467d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1344,7 +1334,7 @@
     },
     {
       "id": "2468ace1-dag",
-      "svgSha256": "1acfde5c950b0a99b9042cc4a0b8282a5c4aee48a5358aa11e1b455cfe42050f",
+      "svgSha256": "36be78be2961face93a17ac58920a884274913deec28d46233cd47fcb87bce50",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1360,7 +1350,7 @@
     },
     {
       "id": "2468ace1-parallel",
-      "svgSha256": "60baa0bc693b366b50304ee45e911a81fdc64f70601b4d13798a3ae4bf7920e2",
+      "svgSha256": "eae31ba22e7732bfcbc39a75abd0bcda0576bdbf5b7dccbc48831cc9d03c5388",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1400,7 +1390,7 @@
     },
     {
       "id": "2468ace1-scoped",
-      "svgSha256": "36118e36265a51b2255148edf043becfa3ccf1750a096ff1698ad247722a59a1",
+      "svgSha256": "e167270e8421bd2d8351eb5668f74b9b7f8f078457bf7c0cbdaa9bbaf1322f1a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1408,16 +1398,15 @@
     },
     {
       "id": "8badf00d-dag",
-      "svgSha256": "b166c8887a067178465c38167d764095bfab737e0d49fe0e51cc02fc118fabb1",
+      "svgSha256": "2e699ba97ea3caec684f2fec697e206fb77569fd1e10e24c74538793af30ecae",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
-      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-04/exploration/detail-8badf00d-dag.png"
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size."
     },
     {
       "id": "8badf00d-cycle",
-      "svgSha256": "6352a4681958690ff06963f65ff0415217e3f37a997535cb0a708514946494c7",
+      "svgSha256": "0312224172109ba910424121300c2090d59f2e238fd9d855439e96ccfc8c6f22",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1425,7 +1414,7 @@
     },
     {
       "id": "8badf00d-parallel",
-      "svgSha256": "34a5d22c65fdcc4e918b2205237e044d1258092c2977ffb737c260fc4e7cd97d",
+      "svgSha256": "fde085ec0fcde22880c187490265599e599dbf7fc43ce561278d00d16c029ecf",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1465,7 +1454,7 @@
     },
     {
       "id": "8badf00d-scoped",
-      "svgSha256": "2a0bab9025dccd1287649dfa5957c0187f2587afe8412efabf9585634e6ecf78",
+      "svgSha256": "71b970026345fa6692274c983f44bebdf309b95c1a634917f0c3e1248104bee8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1473,7 +1462,7 @@
     },
     {
       "id": "6c8e9cf5-dag",
-      "svgSha256": "826262e670fc27e0a1ef0163f54fb7cfbf0aea34754ece98658314a6effd717c",
+      "svgSha256": "b9b9ad09e9fbd98865e5720076b384ea39d1e75fd6ca3aab6255741ebb55ca8d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1481,7 +1470,7 @@
     },
     {
       "id": "6c8e9cf5-cycle",
-      "svgSha256": "9121972fc642c844b7fa5cee8a7175a77ed8a366d26a73e59fa402777609d7b7",
+      "svgSha256": "2ae38e4e7bd0768b80704de39aa89d93760d8bb83b6242f6afd6ea2c00e860c1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1529,7 +1518,7 @@
     },
     {
       "id": "6c8e9cf5-scoped",
-      "svgSha256": "28e8affd51245900e0b8425b92f0df2ed642e5b69caedfb30b4d0fce78fd9f99",
+      "svgSha256": "05346b53af5024a32a2bf131b7289d114d0d64a91446744d38dc0aef0e764a34",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1537,7 +1526,7 @@
     },
     {
       "id": "a341316c-dag",
-      "svgSha256": "b45dd9ee68525f1eec0200dffe49222efa90a3aa3135563dfcf65ab40869c623",
+      "svgSha256": "fec74c1536662490f290d7dfd315a94f22032c640e4f217e98a73d95906f1d52",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1545,7 +1534,7 @@
     },
     {
       "id": "a341316c-cycle",
-      "svgSha256": "8f2f1a8fd02cbc71e70d5ad65023b5468decbda7e52773c2e9284bc7d44156f1",
+      "svgSha256": "a04d449d708d11a30e5b738774fcfddf3249d881c473067eb6dc6a9669e66247",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1553,7 +1542,7 @@
     },
     {
       "id": "a341316c-parallel",
-      "svgSha256": "bda14d2cda7395fcc5dc47bbfb6654e756fad7ac7e91cbed0bf0e977fcbfeb8e",
+      "svgSha256": "8d3db043d82e951ecdd9554a977087c51fcfb19af471a2760d3bf2651f4858c0",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1593,7 +1582,7 @@
     },
     {
       "id": "a341316c-scoped",
-      "svgSha256": "d9746853ab1897e5f60e8b21851aa47105fcdc407fe3a0cfd38b4edc138e5dcd",
+      "svgSha256": "64e88b7550cee69410e184ab2760cb7b069cd1def708582ec146cdab4ad8b788",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1601,16 +1590,15 @@
     },
     {
       "id": "deadbeef-dag",
-      "svgSha256": "54cf07cc7d7b658c6e8abb1646ee0b6ffa4147a9784f127cf0f2a020c2a76df1",
+      "svgSha256": "d76f219b18cfe8bd3d907fa7f79beadf08124bbfa396380bd6d0670ade52a8c1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
-      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-05/exploration/detail-deadbeef-dag.png"
+      "notes": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size."
     },
     {
       "id": "deadbeef-cycle",
-      "svgSha256": "10dfe46d226925fb4e0af25ddaed5097e52dd3fc96c72644b99f4b9cd632a5db",
+      "svgSha256": "0d10847729b292b45ddcf88107eb43326270f920c3d7553d81d0116f00e9e1e1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1618,7 +1606,7 @@
     },
     {
       "id": "deadbeef-parallel",
-      "svgSha256": "da6b21ded0fc359e728c7b6a200da0cc57ca2acd54a7894d1168c67aa2544514",
+      "svgSha256": "79bbffb42d2149f4630f999b5c529a1acf72901e5859f8d8e83ff1d5f5aa0b8f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1658,7 +1646,7 @@
     },
     {
       "id": "deadbeef-scoped",
-      "svgSha256": "4b629d1a6f29344a60270b5275933f0eef88351f165bb60bc359cfa303495fc6",
+      "svgSha256": "d65cfcd1a77fef7c28598bb750ae52b66a8b96b3535491f86e23c71fb7c8a241",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1666,7 +1654,7 @@
     },
     {
       "id": "41c64e6d-dag",
-      "svgSha256": "b1d5043e09a197e322d3736ea6172591d8b5d33515a2ef368e4d77b2cc241345",
+      "svgSha256": "cb48457507be02644c266c446b2af6713c21533cf5ee78988ba8eba19708e9f3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1674,7 +1662,7 @@
     },
     {
       "id": "41c64e6d-cycle",
-      "svgSha256": "f195fe4a1829cad74038dd5c892a94fcae8374f4ebb3ed07888e1454524b02e9",
+      "svgSha256": "609c33f067ec8d8788f39a10649cf1fb0d2c3710e4f44c7dc42b3e2c7907346f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1682,7 +1670,7 @@
     },
     {
       "id": "41c64e6d-parallel",
-      "svgSha256": "39a40df04ee947ecb21148fc0db55cd657f035dfdf7b974f1101c64f3d98b63a",
+      "svgSha256": "75edd23bb3e40b9c64ff3893863dfa2497c47dc7994981980e2598d89d5a7721",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1722,7 +1710,7 @@
     },
     {
       "id": "41c64e6d-scoped",
-      "svgSha256": "758663828072e1c13e7279d397828d3bccaec3d7d578b5bde98e14756711ec1a",
+      "svgSha256": "01d02b29c42dc718be735339b477318a28d7cfe2725344b7c93b294b461e5a27",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1738,7 +1726,7 @@
     },
     {
       "id": "9e3779b9-cycle",
-      "svgSha256": "fe28ca4393e69396612431053a2e78509734ac0f6e5c0f0961c6a655d0d95083",
+      "svgSha256": "ebc0220569532316147692bdeaffc1ddd545ccd7ed2d40da5817f8d879d677dd",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1746,12 +1734,11 @@
     },
     {
       "id": "9e3779b9-parallel",
-      "svgSha256": "203369607b42ef22cdfa73d1e6803bfff6933f117bc6c838f628868f0c66b6f6",
+      "svgSha256": "930dec2d97986e562d8dfb6efda7172a83087b9bb7e6fab907401ebf01c32758",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
-      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size.",
-      "nativeEvidence": "artifacts/layout-quality/final/round-05/exploration/detail-9e3779b9-parallel.png"
+      "notes": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size."
     },
     {
       "id": "9e3779b9-tree",
@@ -1787,7 +1774,7 @@
     },
     {
       "id": "9e3779b9-scoped",
-      "svgSha256": "c212a73e608ef741de02f498eb768c1a47b015b91127b36b88327de1738b1f23",
+      "svgSha256": "8343897aec247bfd1c265b25102b1469b5e9c6501fc71233a99a3666c8a6aba3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",

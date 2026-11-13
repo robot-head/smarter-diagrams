@@ -43,7 +43,7 @@ module.exports=async(browser,base)=>{
  const parallel=rendered.find(r=>r.id==='c0ffee77-parallel');assert.equal(parallel.expected.length,15);assert(Math.abs(parallel.layout.nodes.n8.y-parallel.layout.nodes.n9.y)<.01);
  const ports=rendered.find(r=>r.id==='10-many-named-ports');
  for(let i=0;i<4;i++)for(const key of [`queue#in${i}`,`queue#ack${i}`])assert(ports.expected.includes(key),`missing port ${key}`);
- assert.equal(rendered.find(r=>r.id==='08-cross-ownership').svg.match(/data-zone-label=/g).length,3);
+ assert.equal(rendered.find(r=>r.id==='08-cross-ownership').svg.match(/data-zone-label=/g).length,1);
  fs.writeFileSync('artifacts/wasm-quality-results.json',JSON.stringify(rendered.map(r=>({id:r.id,metrics:metrics(r.layout),captions:r.expected.length,drag:r.drag?{exactRelease:r.drag.exactRelease,node:r.drag.node}:undefined})),null,2));
  await page.close();console.log('Wasm quality: all 43 mixed-feature/regression sources, caption emission, graph crossing minima, local labels, scope islands, and nine drag/reopen cases passed.');
 };

@@ -1,8 +1,8 @@
 //! Rectilinear union contours with holes for unrelated nodes. Membership never
-//! implies ownership. Root-level members share an enclosure; ownership clipping
-//! can retain separate islands for members in nested containers.
+//! implies ownership: members across containers share one contiguous Gestalt
+//! splat while routing cleanly around non-member nodes and container titles.
 use crate::{layout::*, model::*};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
 pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<Vec<Point>> {
     let members: BTreeSet<_> = scene
@@ -16,59 +16,309 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
         })
         .map(|n| n.id.clone())
         .collect();
+    if members.is_empty() {
+        return Vec::new();
+    }
     let padding = value(&zone.attrs, "padding").unwrap_or(1.5) * GRID;
+    let mut exclusions = Vec::new();
+    for n in &scene.nodes {
+        if members.contains(&n.id) {
+            continue;
+        }
+        let rect = layout.nodes[&n.id];
+        if members.iter().any(|m| ancestors(scene, m).contains(&n.id)) {
+            if let Some(hr) = container_header_rect(n, rect) {
+                exclusions.push(hr.inflate(4.));
+            }
+        } else {
+            exclusions.push(rect.inflate(8.));
+            if let Some(tr) = sql_table_title_rect(n, rect) {
+                exclusions.push(tr.inflate(6.));
+            }
+        }
+    }
+    let mut member_rects = Vec::new();
     let mut includes = Vec::new();
     let mut owner_envelopes: BTreeMap<Option<String>, Rect> = BTreeMap::new();
     for id in &members {
-        let mut r = layout.nodes[id].inflate(padding);
-        for parent in ancestors(scene, id)
-            .iter()
-            .filter(|p| !members.contains(*p))
-        {
-            let p = layout.nodes[parent];
-            let (left, right, top, bottom) = (
-                r.left().max(p.left() + 6.),
-                r.right().min(p.right() - 6.),
-                r.top()
-                    .max(p.top() + header_height(scene.node(parent).unwrap()) + 8.),
-                r.bottom().min(p.bottom() - 6.),
-            );
-            r = Rect::new(
-                (left + right) / 2.,
-                (top + bottom) / 2.,
-                right - left,
-                bottom - top,
-            );
-        }
+        let r = layout.nodes[id].inflate(padding);
         if r.w > 0. && r.h > 0. {
             owner_envelopes
                 .entry(scene.node(id).unwrap().parent.clone())
                 .and_modify(|old| *old = old.union(r))
                 .or_insert(r);
+            member_rects.push(r);
             includes.push(r);
         }
     }
-    // Members sharing an owner form one enclosure inside that owner's clip.
-    // Different ownership regions remain separate, with matching scope titles.
-    includes.extend(owner_envelopes.into_values());
-    let exclusions: Vec<_> = scene
-        .nodes
-        .iter()
-        .filter(|n| {
-            !members.contains(&n.id) && !members.iter().any(|m| ancestors(scene, m).contains(&n.id))
-        })
-        .map(|n| layout.nodes[&n.id].inflate(8.))
-        .collect();
+    for env in owner_envelopes.into_values() {
+        if !exclusions.iter().any(|ex| ex.intersects(env)) {
+            includes.push(env);
+        }
+    }
+    // Connect nearby member halos along aligned spans whenever clear of exclusions.
+    let m_len = member_rects.len();
+    if m_len >= 2 {
+        let rect_dist = |a: Rect, b: Rect| {
+            let dx = (b.left() - a.right()).max(a.left() - b.right()).max(0.);
+            let dy = (b.top() - a.bottom()).max(a.top() - b.bottom()).max(0.);
+            dx + dy
+        };
+        let mut in_tree = vec![false; m_len];
+        in_tree[0] = true;
+        for _ in 1..m_len {
+            let mut best = (f64::INFINITY, 0usize, 0usize);
+            for (u, &ru) in member_rects.iter().enumerate() {
+                if !in_tree[u] {
+                    continue;
+                }
+                for (v, &rv) in member_rects.iter().enumerate() {
+                    if in_tree[v] {
+                        continue;
+                    }
+                    let d = rect_dist(ru, rv);
+                    if d < best.0 {
+                        best = (d, u, v);
+                    }
+                }
+            }
+            if !best.0.is_finite() {
+                break;
+            }
+            in_tree[best.2] = true;
+            if best.0 > 640. {
+                continue;
+            }
+            let (ra, rb) = (member_rects[best.1], member_rects[best.2]);
+            let (ox0, ox1) = (ra.left().max(rb.left()), ra.right().min(rb.right()));
+            if ox1 - ox0 >= 24. {
+                let (ty, by) = (ra.top().min(rb.top()), ra.bottom().max(rb.bottom()));
+                let bridge = Rect::new((ox0 + ox1) / 2., (ty + by) / 2., ox1 - ox0, by - ty);
+                if !exclusions.iter().any(|ex| ex.intersects(bridge)) {
+                    includes.push(bridge);
+                }
+            }
+            let (oy0, oy1) = (ra.top().max(rb.top()), ra.bottom().min(rb.bottom()));
+            if oy1 - oy0 >= 24. {
+                let (lx, rx) = (ra.left().min(rb.left()), ra.right().max(rb.right()));
+                let bridge = Rect::new((lx + rx) / 2., (oy0 + oy1) / 2., rx - lx, oy1 - oy0);
+                if !exclusions.iter().any(|ex| ex.intersects(bridge)) {
+                    includes.push(bridge);
+                }
+            }
+        }
+    }
+    // Bridge remaining nearby member components around exclusions via rectilinear corridors.
+    let dedup_coords = |coords: &mut Vec<f64>| {
+        coords.sort_by(f64::total_cmp);
+        coords.dedup_by(|a, b| (*a - *b).abs() < 1e-6);
+    };
+    for _ in 0..m_len {
+        let mut xs = Vec::new();
+        let mut ys = Vec::new();
+        for r in &includes {
+            xs.extend([r.left() - 28., r.left(), r.right(), r.right() + 28.]);
+            ys.extend([r.top() - 28., r.top(), r.bottom(), r.bottom() + 28.]);
+        }
+        for ex in &exclusions {
+            xs.extend([ex.left() - 28., ex.left(), ex.right(), ex.right() + 28.]);
+            ys.extend([ex.top() - 28., ex.top(), ex.bottom(), ex.bottom() + 28.]);
+        }
+        dedup_coords(&mut xs);
+        dedup_coords(&mut ys);
+        if xs.len() < 2 || ys.len() < 2 {
+            break;
+        }
+        let w = xs.len() - 1;
+        let h = ys.len() - 1;
+        let mut blocked = vec![false; w * h];
+        let mut filled = vec![false; w * h];
+        for y in 0..h {
+            let py = (ys[y] + ys[y + 1]) / 2.;
+            for x in 0..w {
+                let p = Point::new((xs[x] + xs[x + 1]) / 2., py);
+                let blk = exclusions.iter().any(|r| r.contains(p));
+                blocked[y * w + x] = blk;
+                filled[y * w + x] = !blk && includes.iter().any(|r| r.contains(p));
+            }
+        }
+        let mut comp = vec![usize::MAX; w * h];
+        let mut num_comp = 0usize;
+        for start in 0..w * h {
+            if !filled[start] || comp[start] != usize::MAX {
+                continue;
+            }
+            let cid = num_comp;
+            num_comp += 1;
+            let mut stack = vec![start];
+            comp[start] = cid;
+            while let Some(cur) = stack.pop() {
+                let (cx, cy) = (cur % w, cur / w);
+                for (nx, ny) in [
+                    (cx.wrapping_sub(1), cy),
+                    (cx + 1, cy),
+                    (cx, cy.wrapping_sub(1)),
+                    (cx, cy + 1),
+                ] {
+                    if nx < w && ny < h {
+                        let ni = ny * w + nx;
+                        if filled[ni] && comp[ni] == usize::MAX {
+                            comp[ni] = cid;
+                            stack.push(ni);
+                        }
+                    }
+                }
+            }
+        }
+        if num_comp <= 1 {
+            break;
+        }
+        let open_span = |cx: usize, cy: usize, horizontal_move: bool| -> f64 {
+            if horizontal_move {
+                let mut y0 = cy;
+                while y0 > 0 && !blocked[(y0 - 1) * w + cx] {
+                    y0 -= 1;
+                }
+                let mut y1 = cy + 1;
+                while y1 < h && !blocked[y1 * w + cx] {
+                    y1 += 1;
+                }
+                ys[y1] - ys[y0]
+            } else {
+                let mut x0 = cx;
+                while x0 > 0 && !blocked[cy * w + x0 - 1] {
+                    x0 -= 1;
+                }
+                let mut x1 = cx + 1;
+                while x1 < w && !blocked[cy * w + x1] {
+                    x1 += 1;
+                }
+                xs[x1] - xs[x0]
+            }
+        };
+        let states = w * h * 5;
+        let mut best_pts: Option<(f64, Vec<Point>)> = None;
+        for src_cid in 0..num_comp {
+            let mut dist = vec![f64::INFINITY; states];
+            let mut prev = vec![usize::MAX; states];
+            let mut heap = BinaryHeap::<(std::cmp::Reverse<u64>, usize)>::new();
+            for (idx, &cid) in comp.iter().enumerate() {
+                if cid == src_cid {
+                    let s = idx * 5 + 4;
+                    dist[s] = 0.;
+                    heap.push((std::cmp::Reverse(0f64.to_bits()), s));
+                }
+            }
+            let mut reached = None;
+            while let Some((std::cmp::Reverse(bits), s)) = heap.pop() {
+                let d = f64::from_bits(bits);
+                if d > dist[s] + 1e-9 {
+                    continue;
+                }
+                if best_pts.as_ref().is_some_and(|(bd, _)| d >= *bd) {
+                    break;
+                }
+                let (cell_idx, dir) = (s / 5, s % 5);
+                if comp[cell_idx] != usize::MAX && comp[cell_idx] != src_cid {
+                    reached = Some((d, s));
+                    break;
+                }
+                let (cx, cy) = (cell_idx % w, cell_idx / w);
+                let mx = (xs[cx] + xs[cx + 1]) / 2.;
+                let my = (ys[cy] + ys[cy + 1]) / 2.;
+                for (ndir, nx, ny) in [
+                    (0usize, cx + 1, cy),
+                    (1usize, cx, cy + 1),
+                    (2usize, cx.wrapping_sub(1), cy),
+                    (3usize, cx, cy.wrapping_sub(1)),
+                ] {
+                    if nx >= w || ny >= h {
+                        continue;
+                    }
+                    let ncell = ny * w + nx;
+                    if blocked[ncell] {
+                        continue;
+                    }
+                    let nmx = (xs[nx] + xs[nx + 1]) / 2.;
+                    let nmy = (ys[ny] + ys[ny + 1]) / 2.;
+                    let mut step = (mx - nmx).abs() + (my - nmy).abs();
+                    if dir < 4 && dir != ndir {
+                        step += 80.;
+                    }
+                    if open_span(nx, ny, ndir == 0 || ndir == 2) < 20. {
+                        step += 2000.;
+                    }
+                    let ns = ncell * 5 + ndir;
+                    let nd = d + step;
+                    if nd + 1e-9 < dist[ns] {
+                        dist[ns] = nd;
+                        prev[ns] = s;
+                        heap.push((std::cmp::Reverse(nd.to_bits()), ns));
+                    }
+                }
+            }
+            if let Some((cost, mut cur)) = reached {
+                let mut cells = Vec::new();
+                let mut pts = Vec::new();
+                while cur != usize::MAX {
+                    let cell_idx = cur / 5;
+                    let (cx, cy) = (cell_idx % w, cell_idx / w);
+                    if cells.last() != Some(&(cx, cy)) {
+                        cells.push((cx, cy));
+                        pts.push(Point::new(
+                            (xs[cx] + xs[cx + 1]) / 2.,
+                            (ys[cy] + ys[cy + 1]) / 2.,
+                        ));
+                    }
+                    cur = prev[cur];
+                }
+                let boundary_pt = |a: (usize, usize), b: (usize, usize)| {
+                    if a.0 != b.0 {
+                        let bx = xs[a.0.max(b.0)];
+                        Point::new(bx, (ys[a.1] + ys[a.1 + 1]) / 2.)
+                    } else {
+                        let by = ys[a.1.max(b.1)];
+                        Point::new((xs[a.0] + xs[a.0 + 1]) / 2., by)
+                    }
+                };
+                let empty_len = if pts.len() >= 2 {
+                    let p_start = boundary_pt(cells[0], cells[1]);
+                    let p_end = boundary_pt(cells[cells.len() - 2], cells[cells.len() - 1]);
+                    if pts.len() == 2 {
+                        p_start.manhattan_distance(p_end)
+                    } else {
+                        p_start.manhattan_distance(pts[1])
+                            + pts[1..pts.len() - 1]
+                                .windows(2)
+                                .map(|p| p[0].manhattan_distance(p[1]))
+                                .sum::<f64>()
+                            + pts[pts.len() - 2].manhattan_distance(p_end)
+                    }
+                } else {
+                    0.
+                };
+                if empty_len <= 680. && best_pts.as_ref().is_none_or(|(bcost, _)| cost < *bcost) {
+                    best_pts = Some((cost, pts));
+                }
+            }
+        }
+        let Some((_, pts)) = best_pts else {
+            break;
+        };
+        for seg in crate::routing::coalesced(&pts).windows(2) {
+            let (lx, rx) = (seg[0].x.min(seg[1].x) - 14., seg[0].x.max(seg[1].x) + 14.);
+            let (ty, by) = (seg[0].y.min(seg[1].y) - 14., seg[0].y.max(seg[1].y) + 14.);
+            includes.push(Rect::new((lx + rx) / 2., (ty + by) / 2., rx - lx, by - ty));
+        }
+    }
     let mut xs = Vec::new();
     let mut ys = Vec::new();
     for r in includes.iter().chain(&exclusions) {
         xs.extend([r.left(), r.right()]);
         ys.extend([r.top(), r.bottom()]);
     }
-    xs.sort_by(f64::total_cmp);
-    xs.dedup();
-    ys.sort_by(f64::total_cmp);
-    ys.dedup();
+    dedup_coords(&mut xs);
+    dedup_coords(&mut ys);
     if xs.len() < 2 || ys.len() < 2 {
         return Vec::new();
     }

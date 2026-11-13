@@ -38,24 +38,14 @@ pub fn obstacles(scene: &SceneGraph, l: &Layout, e: &Edge, margin: f64) -> Vec<R
         .collect();
     // Routes may cross an owning frame, but its title still needs a reserved
     // channel. Excluding the whole ancestor used to let peer loops strike it.
-    for n in scene.nodes.iter().filter(|n| {
-        n.container
-            && n.shape != "sql_table"
-            && exclude.contains(&n.id)
-            && n.id != e.source.node
-            && n.id != e.target.node
-    }) {
-        let r = l.nodes[&n.id];
-        let width = crate::labels::text_width(&n.label) * 16. / 15. + 8.;
-        bodies.push(
-            Rect::new(
-                r.left() + 12. + width / 2.,
-                r.top() + 19. + (header_height(n) - 24.) / 2.,
-                width,
-                28. + header_height(n) - 24.,
-            )
-            .inflate(margin / 2.),
-        );
+    for n in scene
+        .nodes
+        .iter()
+        .filter(|n| exclude.contains(&n.id) && n.id != e.source.node && n.id != e.target.node)
+    {
+        if let Some(header) = crate::layout::container_header_rect(n, l.nodes[&n.id]) {
+            bodies.push(header.inflate(margin / 2.));
+        }
     }
     bodies
 }
@@ -106,6 +96,24 @@ pub fn route_all(
                     Route {
                         edge: key.clone(),
                         points: vec![p.point, p.stub],
+                    },
+                );
+            }
+        }
+        for n in &scene.nodes {
+            if let Some(title) = crate::layout::sql_table_title_rect(n, l.nodes[&n.id]) {
+                let t = title.inflate(4.);
+                congestion.routes.insert(
+                    format!("@reserved-title:{}", n.id),
+                    Route {
+                        edge: n.id.clone(),
+                        points: vec![
+                            Point::new(t.left(), t.top()),
+                            Point::new(t.right(), t.top()),
+                            Point::new(t.right(), t.bottom()),
+                            Point::new(t.left(), t.bottom()),
+                            Point::new(t.left(), t.top()),
+                        ],
                     },
                 );
             }
@@ -496,13 +504,26 @@ fn search(
         xs.extend([r.left(), r.right()]);
         ys.extend([r.top(), r.bottom()]);
     }
+    let gap = o.lane_spacing.max(8.);
+    for p in [start, target] {
+        if routed
+            .routes
+            .iter()
+            .any(|(id, r)| !id.starts_with("@reserved-") && r.points.contains(&p))
+        {
+            xs.extend([p.x - gap, p.x + gap]);
+            ys.extend([p.y - gap, p.y + gap]);
+        }
+    }
     for (id, route) in &routed.routes {
         if id.starts_with("@reserved-port:")
             && let Some(p) = route.points.last()
         {
-            let gap = o.lane_spacing.max(8.);
             xs.extend([p.x - gap, p.x, p.x + gap]);
             ys.extend([p.y - gap, p.y, p.y + gap]);
+        } else if id.starts_with("@reserved-title:") && route.points.len() >= 3 {
+            xs.extend([route.points[0].x - gap, route.points[1].x + gap]);
+            ys.extend([route.points[0].y - gap, route.points[2].y + gap]);
         }
     }
     if let Some(min) = xs.iter().copied().reduce(f64::min) {
@@ -598,6 +619,15 @@ fn search(
                         cost += 2. * o.weights.crossing
                             + collinear_overlap(p, v, pair[0], pair[1]) / o.grid * o.weights.bend;
                     }
+                }
+                if v.distance(target) > 1e-6
+                    && r.points.iter().any(|pt| {
+                        pt.distance(start) > 1e-6
+                            && pt.distance(target) > 1e-6
+                            && pt.distance(v) < 1e-6
+                    })
+                {
+                    cost += o.weights.crossing;
                 }
             }
             let g = q.g + cost;
@@ -919,9 +949,28 @@ pub fn nudge_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
         index: usize,
         start: f64,
         end: f64,
-        entry: i8,
+        legs: [(f64, i8); 2],
         locked: bool,
     }
+    let pair_cost = |a: &Segment, b: &Segment| -> i32 {
+        let mut cost = 0;
+        for (pos, side) in a.legs {
+            if side > 0 && pos >= b.start - 1e-6 && pos <= b.end + 1e-6 {
+                cost += 2;
+            }
+        }
+        for (pos, side) in b.legs {
+            if side < 0 && pos >= a.start - 1e-6 && pos <= a.end + 1e-6 {
+                cost += 2;
+            }
+        }
+        let a_bias = a.legs[0].1 as i32 + a.legs[1].1 as i32;
+        let b_bias = b.legs[0].1 as i32 + b.legs[1].1 as i32;
+        if a_bias > b_bias {
+            cost += 1;
+        }
+        cost
+    };
     let mut channels: BTreeMap<(bool, u64), Vec<Segment>> = BTreeMap::new();
     for e in &scene.edges {
         let r = &l.routes[&e.id];
@@ -933,10 +982,21 @@ pub fn nudge_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
             let horizontal = (a.y - b.y).abs() < 1e-6;
             let coordinate = if horizontal { a.y } else { a.x };
             let before = r.points[i - 1];
-            let entry = if horizontal {
-                (before.y - a.y).signum()
-            } else {
-                (a.x - before.x).signum()
+            let after = r.points[i + 2];
+            let leg = |pt: Point, other: Point| -> (f64, i8) {
+                let (pos, delta) = if horizontal {
+                    (pt.x, other.y - pt.y)
+                } else {
+                    (pt.y, other.x - pt.x)
+                };
+                let side = if delta.abs() <= 1e-6 {
+                    0
+                } else if delta > 0. {
+                    1
+                } else {
+                    -1
+                };
+                (pos, side)
             };
             let (start, end) = if horizontal {
                 (a.x.min(b.x), a.x.max(b.x))
@@ -961,7 +1021,7 @@ pub fn nudge_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
                     index: i,
                     start,
                     end,
-                    entry: entry as i8,
+                    legs: [leg(a, before), leg(b, after)],
                     locked,
                 });
         }
@@ -984,9 +1044,54 @@ pub fn nudge_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
             if group.len() < 2 {
                 continue;
             }
-            group.sort_by(|a, b| a.entry.cmp(&b.entry).then(a.edge.cmp(&b.edge)));
-            if group.windows(2).any(|p| p[0].edge == p[1].edge) {
-                continue;
+            {
+                let mut seen = std::collections::BTreeSet::new();
+                if !group.iter().all(|s| seen.insert(&s.edge)) {
+                    continue;
+                }
+            }
+            group.sort_by(|a, b| {
+                let ab = a.legs[0].1 as i32 + a.legs[1].1 as i32;
+                let bb = b.legs[0].1 as i32 + b.legs[1].1 as i32;
+                ab.cmp(&bb).then(a.edge.cmp(&b.edge))
+            });
+            let total_cost = |items: &[Segment]| -> i32 {
+                let mut total = 0;
+                for p in 0..items.len() {
+                    for q in p + 1..items.len() {
+                        total += pair_cost(&items[p], &items[q]);
+                    }
+                }
+                total
+            };
+            if group.len() <= 24 {
+                let mut current = total_cost(&group);
+                for _ in 0..group.len() * 2 {
+                    if current == 0 {
+                        break;
+                    }
+                    let mut best_move = None;
+                    for from in 0..group.len() {
+                        for to in 0..group.len() {
+                            if from == to {
+                                continue;
+                            }
+                            let mut trial = group.clone();
+                            let item = trial.remove(from);
+                            trial.insert(to, item);
+                            let score = total_cost(&trial);
+                            if score < current {
+                                current = score;
+                                best_move = Some(trial);
+                            }
+                        }
+                    }
+                    if let Some(next) = best_move {
+                        group = next;
+                    } else {
+                        break;
+                    }
+                }
             }
             let mut constraints = Vec::new();
             let mut valid = true;
