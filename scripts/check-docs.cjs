@@ -26,8 +26,14 @@ for (const file of files(path.join(root, 'site')).filter(file => file.endsWith('
     const source = match[3], label = `${path.relative(root, file)}:${text.slice(0, match.index).split('\n').length}`;
     if (match[1] === 'diagram') { checkDiagram(source, label, /\bexpect-error\b/.test(match[2])); continue; }
     if (match[1] === 'toml') {
-      const result = spawnSync('python3', ['-c', 'import sys,tomllib; tomllib.loads(sys.stdin.read())'], { input: source, encoding: 'utf8' });
-      if (result.status !== 0) throw Error(`${label}: ${result.stderr || result.error}`);
+      const args = ['-c', 'import sys,tomllib; tomllib.loads(sys.stdin.read())'];
+      const opts = { input: source, encoding: 'utf8' };
+      let result = spawnSync('python3', args, opts);
+      if (result.error || result.status !== 0) {
+        const fallback = spawnSync('python', args, opts);
+        if (!fallback.error || result.error) result = fallback;
+      }
+      if (result.error || result.status !== 0) throw Error(`${label}: ${result.stderr || result.error}`);
       configurations++; continue;
     }
     if (match[1] === 'json') {
