@@ -106,6 +106,7 @@ fn documented_connector_artifacts_stay_connected_and_labels_leave_the_ink_clear(
         (include_str!("../site/language/basics.md"), vec![0, 1, 3]),
         (include_str!("../site/language/ports.md"), vec![3, 4]),
     ] {
+        let page = page.replace("\r\n", "\n");
         let sources: Vec<_> = page
             .split("```diagram\n")
             .skip(1)
