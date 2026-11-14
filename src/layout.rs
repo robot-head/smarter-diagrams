@@ -3871,7 +3871,15 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
     for (i, node) in scene.nodes.iter().enumerate() {
         out.nodes.insert(node.id.clone(), rects[i]);
     }
-    assign_ports(scene, o, &requests, &rects, previous.is_none(), &mut out)?;
+    assign_ports(
+        scene,
+        o,
+        &requests,
+        &rects,
+        &pins,
+        previous.is_none(),
+        &mut out,
+    )?;
     crate::routing::route_all(scene, o, previous, &mut out)?;
     crate::routing::nudge_channels(scene, o, &mut out);
 
@@ -4397,6 +4405,9 @@ fn corridor_straddle_bias(
     if bypass_above {
         bias[side_index(Side::N)] -= 4. * o.grid + o.weights.bend;
         bias[side_index(inner_side)] += 16. * o.grid;
+    }
+    if !bypass_below && !bypass_above && !u_others.is_empty() {
+        bias[side_index(inner_side)] -= o.weights.bend;
     }
     bias
 }
@@ -5205,6 +5216,7 @@ fn assign_ports<'a>(
     o: &LayoutOptions,
     requests: &'a [PortRequest],
     rects: &[Rect],
+    pins: &[(Option<f64>, Option<f64>)],
     align_facing: bool,
     out: &mut Layout,
 ) -> Result<(), Error> {
@@ -5583,14 +5595,32 @@ fn assign_ports<'a>(
             }
         }
     }
-    if align_facing {
+    let edge_allows_facing_align = |e: &Edge| -> bool {
+        let (Some(ai), Some(bi)) = (scene.index(&e.source.node), scene.index(&e.target.node))
+        else {
+            return false;
+        };
+        if ai == bi {
+            return false;
+        }
+        let ka = port_key(e, true);
+        let kb = port_key(e, false);
+        let fixed_endpoint = req_by_key
+            .get(ka.as_str())
+            .is_some_and(|r| is_fixed_spec(&r.spec))
+            || req_by_key
+                .get(kb.as_str())
+                .is_some_and(|r| is_fixed_spec(&r.spec));
+        fixed_endpoint || (align_facing && pins[ai] == (None, None) && pins[bi] == (None, None))
+    };
+    if scene.edges.iter().any(edge_allows_facing_align) {
         let mut facing_peers: BTreeMap<String, Vec<(usize, String)>> = BTreeMap::new();
         for e in &scene.edges {
-            let ai = scene.index(&e.source.node).unwrap();
-            let bi = scene.index(&e.target.node).unwrap();
-            if ai == bi {
+            if !edge_allows_facing_align(e) {
                 continue;
             }
+            let ai = scene.index(&e.source.node).unwrap();
+            let bi = scene.index(&e.target.node).unwrap();
             let ka = port_key(e, true);
             let kb = port_key(e, false);
             let (Some(pa), Some(pb)) = (out.ports.get(&ka), out.ports.get(&kb)) else {
@@ -5902,6 +5932,9 @@ fn assign_ports<'a>(
             )
         };
         for e in &scene.edges {
+            if !edge_allows_facing_align(e) {
+                continue;
+            }
             let (Some(ai), Some(bi)) = (scene.index(&e.source.node), scene.index(&e.target.node))
             else {
                 continue;
@@ -6577,10 +6610,16 @@ fn local_query(
             .collect(),
         ..Default::default()
     };
-    let local = layout(&graph, o, Some(&partial_prior)).ok()?;
-    if local.nodes.get(&root) != Some(&bounds) {
+    let mut local = layout(&graph, o, Some(&partial_prior)).ok()?;
+    let &root_rect = local.nodes.get(&root)?;
+    let same_bounds = (root_rect.x - bounds.x).abs() <= 1e-6
+        && (root_rect.y - bounds.y).abs() <= 1e-6
+        && (root_rect.w - bounds.w).abs() <= 1e-6
+        && (root_rect.h - bounds.h).abs() <= 1e-6;
+    if !same_bounds {
         return None;
     }
+    local.nodes.insert(root.clone(), bounds);
     let mut out = Layout {
         nodes: prior.nodes.clone(),
         ports: prior.ports.clone(),

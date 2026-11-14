@@ -2,7 +2,7 @@
   "status": "complete",
   "reviewer": "Codex visual inspection",
   "reviewedAt": "2026-11-13",
-  "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
+  "engineFingerprint": "e91dbaf2990e154af363b2f8afd10ae6f45a0eddb9b7e7d128f90c8e563a4f49",
   "method": "Inspect every distinct SVG on Chromium contact sheets; reopen dense or ambiguous examples at native size. Reuse a review only when SVG SHA-256 bytes match. Scores are subjective visual judgments, separate from semantic and geometry assertions. After discovery, every one of the 220 distinct sources was recompiled in each of five complete confirmation passes; every SVG byte hash matched its inspected image.",
   "rubric": {
     "beauty": "5: no observed material spacing, alignment, shape, clipping or connector defect at readable/native zoom; 4 or below: a concrete visual improvement remains.",
@@ -238,7 +238,7 @@
     },
     {
       "id": "fuzz-dag-3",
-      "svgSha256": "ad85f012a91a08e6c52a9588609ebdd6128ab2fbf0fc1d5d292100bcd74d3f42",
+      "svgSha256": "6963c98938ccf0088db2784efa3d59ad5f2da7d99d0a0d07cd2d6ad5a22ab95f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -246,7 +246,7 @@
     },
     {
       "id": "fuzz-dag-4",
-      "svgSha256": "4d5ae43c01b36a336c2fb471443c296f0b4a40cbd0959bd28e197b446901701f",
+      "svgSha256": "094f31be69039a2f71dd05b443b306d098467dd5008fa5c82b4c7e5d31a78354",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -342,7 +342,7 @@
     },
     {
       "id": "fuzz-parallel-0",
-      "svgSha256": "b1cf994c6d1d08f5f6a87a2476a8a911985096d1551f3d71fce957bb8f6175ab",
+      "svgSha256": "f06d63acf933de77405a5777ed038dca1af42b6a5cf71de31d66a49ea88b3ff2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -350,7 +350,7 @@
     },
     {
       "id": "fuzz-parallel-1",
-      "svgSha256": "5224475521fde6e2b0ab56829acbb1cd10b78970ac4a31ab7d993d5cb969c49c",
+      "svgSha256": "b6bb5639af074c8cec1916a049b4dd72953dbdf593c41a91898ed96047a1ecc0",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -374,7 +374,7 @@
     },
     {
       "id": "fuzz-parallel-4",
-      "svgSha256": "f548f43594f589b21d3c3cd59b4751bd2b7dd9db77bdc8376bbdb6d046c20442",
+      "svgSha256": "a2a5a3e8f49dd6fdd94766e7aca3f1c421a78aae4917a3808340fb23ece8e7dc",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -390,7 +390,7 @@
     },
     {
       "id": "fuzz-parallel-6",
-      "svgSha256": "292c5cc2b416a1c0783703e1a9405e4907f631d9abab6f7176b27d785a8e7364",
+      "svgSha256": "c6bd46ba77c90c4527c4dc594947267854a098cee66ce3da8932482cf06164d5",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -406,7 +406,7 @@
     },
     {
       "id": "fuzz-pinned-0",
-      "svgSha256": "d66622708b4886685226651e59fffebef87e7a27b15dc7139bd0db060b5f6ef4",
+      "svgSha256": "1301b8721422924052752d198cf4c69306ae2d96bc992144704655847b13ce9b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -414,7 +414,7 @@
     },
     {
       "id": "fuzz-pinned-1",
-      "svgSha256": "512a0164e2464ec038f74e099b92180363eb829235eedcd6825431b4907f7a24",
+      "svgSha256": "edecece2ed9e9c6d676a2b7d482ccc35d2ba767d29d81cbba8bf453ade5c1be6",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -422,7 +422,7 @@
     },
     {
       "id": "fuzz-pinned-2",
-      "svgSha256": "fe02b1b0f718fe55e1d146c3356a2ee89888fd9a4dd92f4d31275a85b27a1312",
+      "svgSha256": "d34e18e5b10442a789575487365043ce5e0feae7190bfd33bc9bc206639db975",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -430,7 +430,7 @@
     },
     {
       "id": "fuzz-pinned-3",
-      "svgSha256": "1e5fdc8d1714254bc5ac3f87c20e5b3390171861eb6290644e5d84cecbd0b22f",
+      "svgSha256": "39bb5050955a89a98a65fc5f6070652888509c9f766ae89aca1b2d77db3ff0bb",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -438,7 +438,7 @@
     },
     {
       "id": "fuzz-pinned-4",
-      "svgSha256": "c2389f16b4a746369c8db5e238443829ce2d074e29dcaec5c37a5b81ddc178a3",
+      "svgSha256": "70e6aa29b324e467c48e7ad2266c9de8f1c52d4b66a001cd4496b92e946f4610",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -446,7 +446,7 @@
     },
     {
       "id": "fuzz-pinned-5",
-      "svgSha256": "fdda61120262a6aa62ddce9548b9d62fc86c4d76203477a13ea9187a21691412",
+      "svgSha256": "51c8a0c073aae898b1f97916aa3a8f382aed3dc261b2aa68a75183a3b386c648",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -454,7 +454,7 @@
     },
     {
       "id": "fuzz-pinned-6",
-      "svgSha256": "f74aae9da200ffdd0ddd9eea41fea93461a5b6fdd9dc135ad152d730deaf8af7",
+      "svgSha256": "ed3e8313f1b72b81a80103ddb889b0d0eec3e01684326ee046b5fceb1f444c73",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -462,7 +462,7 @@
     },
     {
       "id": "fuzz-pinned-7",
-      "svgSha256": "990083fef1a4b9871a86bdb60d9aa1db7be9f6b71c8f400b0a91e627edb9de6b",
+      "svgSha256": "38f56824655badc78848964a547fc7a0acfd980bb773f89d1176373cd4af53ff",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -630,7 +630,7 @@
     },
     {
       "id": "c0ffee01-dag",
-      "svgSha256": "cb9d477475b37e9969d2e4c7906dbbc82d88f199bedc4135a4add59bab371d05",
+      "svgSha256": "64d312e1737fc99484b1c86ea8251b0407a654f90d2e55869d51ddb9436f433e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
@@ -694,7 +694,7 @@
     },
     {
       "id": "a11ce002-dag",
-      "svgSha256": "2ceae65cfe8dedf76b147a878d098722b9f34d93491089dc30e236ed5af0bd2c",
+      "svgSha256": "9f913a58e86b1e589f999e24be04314f411935138a4f33758bccf92c0fe4026d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -822,7 +822,7 @@
     },
     {
       "id": "d1a60001-dag",
-      "svgSha256": "32cb111363acc0437b892aaaee04c224290229528a6ba6e3ebe6e441eaba6f12",
+      "svgSha256": "5fc7a2771d10d39016639a0ae85b03b5c0a2672bb114fee54a8ba33fbb52b4c9",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -902,7 +902,7 @@
     },
     {
       "id": "c0ffee77-parallel",
-      "svgSha256": "94edb05f34ed8ec9e5a508f22c4e5c5b3cb7f183bf2bfaa918855b3cfb1fc85f",
+      "svgSha256": "977f9f5a7f298a6d035353783aaa142062043f578067309a12666dbf7397d593",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -966,7 +966,7 @@
     },
     {
       "id": "5eedf00d-parallel",
-      "svgSha256": "862d364c4667480c135acdadce46266ff9a31d90791cd1ededf1baef1dfd59dd",
+      "svgSha256": "6c10ebc393cf77c43a91360f3817ab76e602b8871b1c144c24270680e3074345",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -1030,7 +1030,7 @@
     },
     {
       "id": "10293847-parallel",
-      "svgSha256": "2c305fff172a6c9e818ee5108523181eeb87c642230fda8f11bc261e837eea29",
+      "svgSha256": "c802846d5d34e7a8c4c02c16a5c3a7e828d2e9046b8bd52ac7f3643c4785ca39",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1142,7 +1142,7 @@
     },
     {
       "id": "91e10da5-dag",
-      "svgSha256": "2feeed8fa81bfbfe178c2ef7e9bacbcb0bb12eaffc4a56adf8e6f8ec9e063fe9",
+      "svgSha256": "115663c8cb2d508ca210731c054fca54d109391ef4d3db090a6884025d46f439",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1206,7 +1206,7 @@
     },
     {
       "id": "abc12345-dag",
-      "svgSha256": "958635701b33ab4be707ef22e4d5753340fb1931008687709004a0a7aa85b23e",
+      "svgSha256": "b5875000afd0b68a145fa7cbf6581c7070bed5b09fbae62cb01caa7004f4c043",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1222,7 +1222,7 @@
     },
     {
       "id": "abc12345-parallel",
-      "svgSha256": "39850ac356e1143847f3ae6b369ab61de9deb56831acffa1c1a18cbf4754cb23",
+      "svgSha256": "c00484d83caaf794cd21e81488a358fb6141abac78415916feb6ad7c2af92571",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1334,7 +1334,7 @@
     },
     {
       "id": "2468ace1-dag",
-      "svgSha256": "1551465cd626d4ff5815fc2803f11638d862ee72742e9a325a3c741f6e8b8db8",
+      "svgSha256": "5d076d95456a1b6cdb0b01d1efe5e7d875b38df5c54635045093681d1c11f58a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1398,7 +1398,7 @@
     },
     {
       "id": "8badf00d-dag",
-      "svgSha256": "aa45711d76052a596ffb247df4c15df9c27953816b038a603eb3f42e19521fe4",
+      "svgSha256": "4d0e740799d2d547bc563c63c348593c4c38bf036364ce33bcef6c6a2f995d32",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1414,7 +1414,7 @@
     },
     {
       "id": "8badf00d-parallel",
-      "svgSha256": "c0d2ad9bb336f529628d48fce4b5c5df29a06b0807d14af136b8bafb526f3877",
+      "svgSha256": "372f30934d7c3002f90e275f99c43816bdde3651000c9139fd6d7c164e3f5549",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1606,7 +1606,7 @@
     },
     {
       "id": "deadbeef-parallel",
-      "svgSha256": "a2d0fd2b0a679b761784e46785fc97276647ce760fb2b1781b597b264596f433",
+      "svgSha256": "66e4bb6206fd52f29fc9231e0efd7f42d2e621c214afc10838de4c5d3cce0699",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1718,7 +1718,7 @@
     },
     {
       "id": "9e3779b9-dag",
-      "svgSha256": "162b7f91900a7e83a17a81150643a65299085ab9e79b5d8697dccc24e705d519",
+      "svgSha256": "68c778f75607e5ea18b57aaf0ff167fe660a36dc3530faaeb6a80a5ebb186b29",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",

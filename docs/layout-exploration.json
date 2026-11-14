@@ -1,6 +1,6 @@
 {
-  "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
-  "baseRevision": "e53f434c2b0e7df13226f4116882869228eff00d",
+  "engineFingerprint": "e91dbaf2990e154af363b2f8afd10ae6f45a0eddb9b7e7d128f90c8e563a4f49",
+  "baseRevision": "1461f609d09fd6db407e4df2d2e8088d2e70ef4d",
   "method": "Current semantic, native geometry, Chromium paint and repeated-compilation checks, followed by individual visual inspection. Earlier findings and scores are preserved under historicalAudits.",
   "knownDiagnostics": {},
   "counts": {
@@ -16,7 +16,7 @@
   },
   "currentReview": {
     "coverage": "39 unchanged authored/seeded cases individually inspected; diagnostic controls are unscored. Dense examples use native/readable zoom in addition to the contact sheet overview.",
-    "minimumFittedTextBelow8px": 7,
+    "minimumFittedTextBelow8px": 8,
     "remainingPriorities": [],
     "resolvedPriorities": [
       {
@@ -335,16 +335,16 @@
       },
       {
         "id": "c0ffee01-dag",
-        "svgSha256": "cb9d477475b37e9969d2e4c7906dbbc82d88f199bedc4135a4add59bab371d05",
+        "svgSha256": "64d312e1737fc99484b1c86ea8251b0407a654f90d2e55869d51ddb9436f433e",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
-        "minFitTextPx": 8.508438927800674,
+        "minFitTextPx": 7.516268263435723,
         "routeMetrics": {
-          "properCrossings": 12,
+          "properCrossings": 11,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.9990647867979652,
-          "calloutCount": 2,
+          "maxDetourRatio": 1.7451137940317671,
+          "calloutCount": 1,
           "mostRemoteCallout": {
             "feature": "n6->n11",
             "text": "validate\norganization\naccess",
@@ -475,21 +475,17 @@
       },
       {
         "id": "a11ce002-dag",
-        "svgSha256": "2ceae65cfe8dedf76b147a878d098722b9f34d93491089dc30e236ed5af0bd2c",
+        "svgSha256": "9f913a58e86b1e589f999e24be04314f411935138a4f33758bccf92c0fe4026d",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text.",
-        "minFitTextPx": 9.427374301675979,
+        "minFitTextPx": 8.881578947368421,
         "routeMetrics": {
-          "properCrossings": 14,
+          "properCrossings": 16,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 3.2654718402000444,
-          "calloutCount": 2,
-          "mostRemoteCallout": {
-            "feature": "n3->n6",
-            "text": "validate\norganization\naccess",
-            "centerToAnchorPx": 126
-          }
+          "maxDetourRatio": 1.7324974295205549,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
         },
         "paintFailures": []
       },

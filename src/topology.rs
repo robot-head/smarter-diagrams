@@ -3418,8 +3418,8 @@ mod stage1a {
                 col_w[cols[u]] = col_w[cols[u]].max(rects[u].w);
                 row_h[rows[u]] = row_h[rows[u]].max(rects[u].h);
             }
-            let x_gap = (cap_w + 16.0).max(40.0).max(2.0 * o.stub + 8.0);
-            let y_gap = (cap_h + 24.0).max(40.0).max(2.0 * o.stub + 8.0);
+            let x_gap = (cap_w + 64.0).max(2.0 * o.stub + 48.0);
+            let y_gap = (cap_h + 40.0).max(2.0 * o.stub + 32.0);
             let mut col_x = vec![0.0f64; num_cols];
             for c in 1..num_cols {
                 col_x[c] = col_x[c - 1] + (col_w[c - 1] + col_w[c]) * 0.5 + x_gap;

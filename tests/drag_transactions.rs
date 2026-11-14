@@ -786,3 +786,120 @@ fn distribute_perpendicular_gap_and_scoped_container_drags_behave_cleanly() {
     assert!(scoped_doc.source().contains("# keep"));
     assert!(scoped_doc.snapshot().scene.relations.is_empty());
 }
+
+#[test]
+fn simulation_drop_continuity_preserves_displayed_ports_and_routes() {
+    for target in [(305.3, 37.4), (305.3, 10.0)] {
+        let mut doc = simulation();
+        let mut drag = doc.begin_drag().unwrap();
+        drag.update(&[at("gateway", target.0, target.1)]).unwrap();
+        let shown = drag.snapshot();
+        doc.commit_drag(&drag).unwrap();
+        let reopened = compile(doc.source()).unwrap();
+        assert_eq!(reopened.layout.nodes, shown.layout.nodes);
+        assert_eq!(reopened.layout.ports, shown.layout.ports);
+        assert_eq!(reopened.layout.routes, shown.layout.routes);
+    }
+
+    let opts = LayoutOptions::default();
+    let base = compile("client -> db\ndb: Ledger [shape: database]\n").unwrap();
+    let proposal = model::lower(&syntax::parse(
+        "client -> db\ndb: Accounts [shape: sql_table] { port id: uuid [side: W, pos: 1] }\n",
+    ));
+    let diff = spatial::compare(&base.scene, &proposal, &base.layout, &opts).unwrap();
+    assert_eq!(
+        diff.layout.ports["client->db:source"].point,
+        Point::new(56.0, 0.0)
+    );
+    assert!(
+        spatial::diff_svg(&diff, 0.5)
+            .unwrap()
+            .contains("M 56.00 0.00")
+    );
+}
+
+#[test]
+fn serpentine_container_label_edit_uses_local_query() {
+    let mut source = String::from("cluster {\n inner4: Short\n");
+    for i in 0..8 {
+        source.push_str(&format!(" inner{i} -> inner{}\n", i + 1));
+    }
+    source.push_str("}\n");
+    for i in 0..39 {
+        source.push_str(&format!("outside{i} -> outside{}\n", i + 1));
+    }
+    let d = compile(&source).unwrap();
+    let edited = source.replace("Short", "A longer service");
+    let next = compile_with(&edited, &LayoutOptions::default(), Some(&d.layout)).unwrap();
+    assert!(
+        next.layout.solved_nodes <= 10,
+        "expected container-local solve, got {} nodes",
+        next.layout.solved_nodes
+    );
+    assert_eq!(next.layout.nodes["outside20"], d.layout.nodes["outside20"]);
+
+    let mut document = Document::new(&source).unwrap();
+    let start = source.find("Short").unwrap();
+    let patch = edit::TextPatch::replace(
+        &source,
+        syntax::Span::new(start, start + 5),
+        "A longer service",
+    );
+    document.patch(document.revision(), &[patch]).unwrap();
+    assert!(
+        document.snapshot().layout.solved_nodes <= 10,
+        "expected patch local solve, got {} nodes",
+        document.snapshot().layout.solved_nodes
+    );
+}
+
+#[test]
+fn many_record_slots_drag_reopen_preserves_neighbor_perimeters() {
+    let source = concat!(
+        "checkout: Checkout\n",
+        "audit: Audit service\n",
+        "report: Reporting\n",
+        "orders: Orders [shape: sql_table] {\n",
+        "port id: uuid [side: W,pos: 1]\n",
+        "port customer_id: uuid [side: W,pos: 2]\n",
+        "port status: text [side: W,pos: 3]\n",
+        "port created_at: text [side: W,pos: 4]\n",
+        "port total: decimal [side: W,pos: 5]\n",
+        "port audit_id: uuid [side: W,pos: 6]\n",
+        "}\n",
+        "checkout -> orders#id: insert\n",
+        "checkout -> orders#customer_id: identify\n",
+        "checkout -> orders#status: update\n",
+        "audit -> orders#created_at: timestamp\n",
+        "audit -> orders#audit_id: correlate\n",
+        "report -> orders#total: aggregate\n",
+    );
+    let mut doc = Document::new(source).unwrap();
+    let initial = doc.snapshot().layout.clone();
+    let old = initial.nodes["audit"];
+    let mut drag = doc.begin_drag().unwrap();
+    for dx in [0.1, -0.1, 1.0, 4.0] {
+        drag.update(&[at("audit", old.x + dx, old.y + 4.0)])
+            .unwrap();
+    }
+    let preview_svg = drag.snapshot().to_svg();
+    doc.commit_drag(&drag).unwrap();
+    assert_eq!(doc.snapshot().to_svg(), preview_svg);
+
+    let reopened = compile(doc.source()).unwrap();
+    let moved = reopened.layout.nodes["audit"];
+    assert!((moved.x - (old.x + 4.0)).abs() < 0.01);
+    assert!((moved.y - (old.y + 4.0)).abs() < 0.01);
+    for id in ["checkout", "orders", "report"] {
+        let before = initial.nodes[id];
+        let after = reopened.layout.nodes[id];
+        assert!(
+            (after.x - before.x).abs() < 0.01
+                && (after.y - before.y).abs() < 0.01
+                && (after.w - before.w).abs() < 0.01
+                && (after.h - before.h).abs() < 0.01,
+            "{id} changed from {before:?} to {after:?}"
+        );
+    }
+    assert!((reopened.layout.nodes["checkout"].h - 104.0).abs() < 0.01);
+}
