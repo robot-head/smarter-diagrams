@@ -1671,13 +1671,12 @@ mod stage1a {
         fas: &FasResult,
         o: &LayoutOptions,
     ) -> Option<FoldResult> {
-        if members.len() < 7 {
+        if members.len() < 5 {
             return None;
         }
-        if members
-            .iter()
-            .any(|&u| scene.nodes[u].container || is_node_pinned(scene, u, o))
-        {
+        if members.iter().any(|&u| {
+            scene.nodes[u].container || scene.nodes[u].parent.is_some() || is_node_pinned(scene, u, o)
+        }) {
             return None;
         }
         if rule_row_span(scene, members) > 4 {
@@ -1694,10 +1693,10 @@ mod stage1a {
         let min_r = members.iter().map(|&u| ranks[u]).min()?;
         let max_r = members.iter().map(|&u| ranks[u]).max()?;
         let longest_path = (max_r - min_r) as usize;
-        if longest_path < 6 {
+        let span = longest_path + 1;
+        if span < 5 {
             return None;
         }
-        let span = longest_path + 1;
         let mut rank_groups = vec![Vec::new(); span];
         for &u in members {
             rank_groups[(ranks[u] - min_r) as usize].push(u);
@@ -1712,21 +1711,155 @@ mod stage1a {
                     .then_with(|| scene.nodes[a].id.cmp(&scene.nodes[b].id))
             });
         }
+
+        // Detect consecutive rank pairs connected by multi-edge parallel bundles
+        // so boustrophedon row turns never split parallel captions across rows.
+        let mut pair_mult: HashMap<(usize, usize), usize> = HashMap::new();
+        for e in &scene.edges {
+            let (Some(su), Some(sv)) = (scene.index(&e.source.node), scene.index(&e.target.node))
+            else {
+                continue;
+            };
+            if !mset.contains(&su) || !mset.contains(&sv) || su == sv {
+                continue;
+            }
+            let key = (su.min(sv), su.max(sv));
+            *pair_mult.entry(key).or_insert(0) += 1;
+        }
+        let mut parallel_adj = vec![false; span];
+        for ((u, v), cnt) in pair_mult {
+            if cnt >= 2 {
+                let ru = (ranks[u] - min_r) as usize;
+                let rv = (ranks[v] - min_r) as usize;
+                let (lo, hi) = (ru.min(rv), ru.max(rv));
+                if hi == lo + 1 {
+                    parallel_adj[lo] = true;
+                }
+            }
+        }
+
+        let build_modulo = |cw: usize| -> (Vec<usize>, Vec<usize>, usize, usize) {
+            let num_rows = span.div_ceil(cw);
+            let mut row_of_r = vec![0usize; span];
+            let mut col_of_r = vec![0usize; span];
+            for r in 0..span {
+                let row = r / cw;
+                let off = r % cw;
+                row_of_r[r] = row;
+                col_of_r[r] = if row.is_multiple_of(2) {
+                    off
+                } else {
+                    cw - 1 - off
+                };
+            }
+            let splits = (0..span.saturating_sub(1))
+                .filter(|&r| parallel_adj[r] && row_of_r[r] != row_of_r[r + 1])
+                .count();
+            (row_of_r, col_of_r, num_rows, splits)
+        };
+
+        let build_walk = |cw: usize| -> (Vec<usize>, Vec<usize>, usize, usize) {
+            let mut row_of_r = vec![0usize; span];
+            let mut col_of_r = vec![0usize; span];
+            let mut start = 0usize;
+            let mut row = 0usize;
+            let mut start_col = 0usize;
+            let mut dir: isize = 1;
+            while start < span {
+                let max_slots = if dir > 0 {
+                    cw - start_col
+                } else {
+                    start_col + 1
+                };
+                let mut len = max_slots.min(span - start);
+                if len >= 2 && start + len < span && parallel_adj[start + len - 1] {
+                    let new_len = len - 1;
+                    let new_end_col =
+                        (start_col as isize + dir * (new_len as isize - 1)) as usize;
+                    let next_max = if dir > 0 {
+                        new_end_col + 1
+                    } else {
+                        cw - new_end_col
+                    };
+                    if next_max >= 2 {
+                        len = new_len;
+                    }
+                }
+                for off in 0..len {
+                    let r = start + off;
+                    row_of_r[r] = row;
+                    col_of_r[r] = (start_col as isize + dir * off as isize) as usize;
+                }
+                start_col = (start_col as isize + dir * (len as isize - 1)) as usize;
+                dir = -dir;
+                start += len;
+                row += 1;
+            }
+            let num_rows = row.max(1);
+            let splits = (0..span.saturating_sub(1))
+                .filter(|&r| parallel_adj[r] && row_of_r[r] != row_of_r[r + 1])
+                .count();
+            (row_of_r, col_of_r, num_rows, splits)
+        };
+
+        struct FoldChoice {
+            best_splits: usize,
+            mod_splits: usize,
+            da: f64,
+            non_base: bool,
+            row_of_r: Vec<usize>,
+            col_of_r: Vec<usize>,
+            num_rows: usize,
+        }
         let base_w =
             ((members.len() as f64 * o.target_aspect_ratio).sqrt().ceil() as usize).clamp(3, 4);
-        let w = [3usize, 4usize]
-            .into_iter()
-            .min_by(|&a, &b| {
-                let est_ar = |cw: usize| (cw as f64 * 150.0) / (span.div_ceil(cw) as f64 * 96.0);
-                let da = (est_ar(a) - o.target_aspect_ratio).abs();
-                let db = (est_ar(b) - o.target_aspect_ratio).abs();
-                da.total_cmp(&db).then_with(|| (a != base_w).cmp(&(b != base_w)))
-            })
-            .unwrap_or(base_w);
-        let num_rows = span.div_ceil(w);
+        let mut best_choice: Option<FoldChoice> = None;
+        for cw in [3usize, 4usize] {
+            let (m_row, m_col, m_rows, m_splits) = build_modulo(cw);
+            let (row_of_r, col_of_r, num_rows, best_splits) = if m_splits == 0 {
+                (m_row, m_col, m_rows, m_splits)
+            } else {
+                let (w_row, w_col, w_rows, w_splits) = build_walk(cw);
+                if w_splits < m_splits {
+                    (w_row, w_col, w_rows, w_splits)
+                } else {
+                    (m_row, m_col, m_rows, m_splits)
+                }
+            };
+            let est_ar = (cw as f64 * 150.0) / (num_rows as f64 * 96.0);
+            let da = (est_ar - o.target_aspect_ratio).abs();
+            let non_base = cw != base_w;
+            let replace = match &best_choice {
+                None => true,
+                Some(b) => {
+                    (best_splits, m_splits) < (b.best_splits, b.mod_splits)
+                        || ((best_splits, m_splits) == (b.best_splits, b.mod_splits)
+                            && (da.total_cmp(&b.da).is_lt()
+                                || (da.total_cmp(&b.da).is_eq() && !non_base && b.non_base)))
+                }
+            };
+            if replace {
+                best_choice = Some(FoldChoice {
+                    best_splits,
+                    mod_splits: m_splits,
+                    da,
+                    non_base,
+                    row_of_r,
+                    col_of_r,
+                    num_rows,
+                });
+            }
+        }
+        let FoldChoice {
+            row_of_r,
+            col_of_r,
+            num_rows,
+            ..
+        } = best_choice?;
+
         let mut row_heights = vec![1usize; num_rows];
         for (r, g) in rank_groups.iter().enumerate() {
-            let row = r / w;
+            let row = row_of_r[r];
             row_heights[row] = row_heights[row].max(g.len());
         }
         let mut row_base = vec![0usize; num_rows];
@@ -1737,9 +1870,8 @@ mod stage1a {
         let mut out_order = order.to_vec();
         let mut fold_row = vec![0usize; scene.nodes.len()];
         for (r, g) in rank_groups.iter().enumerate() {
-            let row = r / w;
-            let off = r % w;
-            let col = if row % 2 == 0 { off } else { w - 1 - off };
+            let row = row_of_r[r];
+            let col = col_of_r[r];
             for (slot, &u) in g.iter().enumerate() {
                 out_ranks[u] = col as i32;
                 out_order[u] = (row_base[row] + slot) as i32;
@@ -1761,7 +1893,7 @@ mod stage1a {
             let row_v = fold_row[sv];
             if rv == ru + 1 {
                 if row_u == row_v {
-                    side_hints[ei] = if row_u.is_multiple_of(2) {
+                    side_hints[ei] = if out_ranks[sv] > out_ranks[su] {
                         Some((Side::E, Side::W))
                     } else {
                         Some((Side::W, Side::E))
@@ -1775,6 +1907,8 @@ mod stage1a {
                 } else if row_u + 1 == num_rows {
                     side_hints[ei] = Some((Side::S, Side::S));
                 }
+            } else if rv > ru + 1 && row_v == row_u + 1 && out_ranks[su] == out_ranks[sv] {
+                side_hints[ei] = Some((Side::S, Side::N));
             }
         }
         Some(FoldResult {
@@ -2388,6 +2522,134 @@ mod stage1a {
         true
     }
 
+    fn owner_grouped_ranks(scene: &SceneGraph) -> Vec<i32> {
+        let n = scene.nodes.len();
+        if n == 0 {
+            return Vec::new();
+        }
+        if !scene.nodes.iter().any(|nd| nd.container) {
+            let fas = eades_lin_smyth_fas(scene);
+            return gansner_ranks(scene, n, &fas);
+        }
+        let mut root_of = vec![0usize; n];
+        for (i, slot) in root_of.iter_mut().enumerate() {
+            let mut cur = i;
+            let mut steps = 0usize;
+            while let Some(pid) = scene.nodes[cur].parent.as_deref()
+                && steps < n
+                && let Some(pidx) = scene.index(pid)
+            {
+                cur = pidx;
+                steps += 1;
+            }
+            *slot = cur;
+        }
+        let mut macro_roots: Vec<usize> = Vec::new();
+        let mut root_to_macro: HashMap<usize, usize> = HashMap::new();
+        for (i, &r) in root_of.iter().enumerate() {
+            if (scene.nodes[i].parent.is_none() || r == i)
+                && let std::collections::hash_map::Entry::Vacant(e) = root_to_macro.entry(r)
+            {
+                let mi = macro_roots.len();
+                e.insert(mi);
+                macro_roots.push(r);
+            }
+        }
+        let m = macro_roots.len();
+        let mut macro_nodes = Vec::with_capacity(m);
+        for &r in &macro_roots {
+            let mut nd = scene.nodes[r].clone();
+            nd.parent = None;
+            macro_nodes.push(nd);
+        }
+        let mut macro_edges = Vec::new();
+        for e in &scene.edges {
+            if let (Some(su), Some(sv)) = (scene.index(&e.source.node), scene.index(&e.target.node))
+            {
+                let mu = root_to_macro[&root_of[su]];
+                let mv = root_to_macro[&root_of[sv]];
+                if mu != mv {
+                    let mut me = e.clone();
+                    me.source.node = macro_nodes[mu].id.clone();
+                    me.target.node = macro_nodes[mv].id.clone();
+                    macro_edges.push(me);
+                }
+            }
+        }
+        let mut macro_scene = SceneGraph {
+            nodes: macro_nodes,
+            edges: macro_edges,
+            ..Default::default()
+        };
+        macro_scene.node_index.clear();
+        let macro_fas = eades_lin_smyth_fas(&macro_scene);
+        let macro_r = gansner_ranks(&macro_scene, m, &macro_fas);
+
+        let mut by_mr: BTreeMap<i32, Vec<usize>> = BTreeMap::new();
+        for (mi, &mr) in macro_r.iter().enumerate() {
+            by_mr.entry(mr).or_default().push(mi);
+        }
+        let mut ranks = vec![0i32; n];
+        let mut cursor = 0i32;
+        for (_, mut units) in by_mr {
+            units.sort_by(|&a, &b| scene.nodes[macro_roots[a]].id.cmp(&scene.nodes[macro_roots[b]].id));
+            let mut any_leaf = false;
+            for &mi in &units {
+                let r = macro_roots[mi];
+                let has_kids = (0..n).any(|u| u != r && root_of[u] == r);
+                if !has_kids {
+                    ranks[r] = cursor;
+                    any_leaf = true;
+                }
+            }
+            if any_leaf {
+                cursor += 1;
+            }
+            for &mi in &units {
+                let r = macro_roots[mi];
+                let r_id = scene.nodes[r].id.as_str();
+                let children: Vec<usize> = (0..n).filter(|&u| u != r && root_of[u] == r).collect();
+                if children.is_empty() {
+                    continue;
+                }
+                let child_set: HashSet<usize> = children.iter().copied().collect();
+                let mut sub_nodes = Vec::with_capacity(children.len());
+                for &u in &children {
+                    let mut nd = scene.nodes[u].clone();
+                    if nd.parent.as_deref() == Some(r_id) {
+                        nd.parent = None;
+                    }
+                    sub_nodes.push(nd);
+                }
+                let mut sub_edges = Vec::new();
+                for e in &scene.edges {
+                    if let (Some(su), Some(sv)) =
+                        (scene.index(&e.source.node), scene.index(&e.target.node))
+                        && child_set.contains(&su)
+                        && child_set.contains(&sv)
+                    {
+                        sub_edges.push(e.clone());
+                    }
+                }
+                let mut sub_scene = SceneGraph {
+                    nodes: sub_nodes,
+                    edges: sub_edges,
+                    ..Default::default()
+                };
+                sub_scene.node_index.clear();
+                let sub_ranks = owner_grouped_ranks(&sub_scene);
+                let min_s = *sub_ranks.iter().min().unwrap_or(&0);
+                let max_s = *sub_ranks.iter().max().unwrap_or(&0);
+                for (li, &u) in children.iter().enumerate() {
+                    ranks[u] = cursor + (sub_ranks[li] - min_s);
+                }
+                ranks[r] = cursor;
+                cursor += (max_s - min_s + 1).max(1);
+            }
+        }
+        ranks
+    }
+
     fn build_canonical_ltr(
         scene: &SceneGraph,
         _sizes: &[Point],
@@ -2407,7 +2669,7 @@ mod stage1a {
                 search_states: 0,
             };
         }
-        let mut ranks = gansner_ranks(scene, n, fas);
+        let mut ranks = owner_grouped_ranks(scene);
         let mut side_hints = vec![None; scene.edges.len()];
         let mut states = 1usize;
         let mut domus_overrides: Vec<(Vec<usize>, Vec<i32>)> = Vec::new();
@@ -2566,23 +2828,31 @@ mod stage1a {
                 col_w[c] = col_w[c].max(w);
             }
             let mut gap_w = vec![56.0f64; num_ranks - 1];
+            let mut hop_cap_w = vec![0.0f64; num_ranks - 1];
+            let mut max_cap_w = 0.0f64;
             for e in &scene.edges {
                 if let (Some(su), Some(sv)) =
                     (scene.index(&e.source.node), scene.index(&e.target.node))
+                    && su != sv
                 {
-                    let c0 = (ranks[su] - min_r) as usize;
-                    let c1 = (ranks[sv] - min_r) as usize;
-                    let (lo, hi) = (c0.min(c1), c0.max(c1));
-                    if hi == lo + 1 {
-                        let cap = connection_text(scene, e);
-                        if !cap.is_empty() {
-                            gap_w[lo] = gap_w[lo].max(text_width(&cap) + 40.0);
+                    let cap = connection_text(scene, e);
+                    if !cap.is_empty() {
+                        let cw = text_width(&cap);
+                        max_cap_w = max_cap_w.max(cw);
+                        let c0 = (ranks[su] - min_r) as usize;
+                        let c1 = (ranks[sv] - min_r) as usize;
+                        let (lo, hi) = (c0.min(c1), c0.max(c1));
+                        if hi == lo + 1 {
+                            hop_cap_w[lo] = hop_cap_w[lo].max(cw);
+                            gap_w[lo] = gap_w[lo].max(cw + 40.0);
                         }
                     }
                 }
             }
-            let lr_span: f64 = col_w.iter().sum::<f64>() + gap_w.iter().sum::<f64>();
-            if lr_span > 900.0 {
+            let sum_hop_cap: f64 = hop_cap_w.iter().sum();
+            let node_sum: f64 = col_w.iter().sum();
+            let lr_span: f64 = node_sum + gap_w.iter().sum::<f64>();
+            if max_cap_w >= 180.0 || sum_hop_cap >= 260.0 || lr_span > 900.0 {
                 return true;
             }
         }
@@ -2696,11 +2966,15 @@ mod stage1a {
 
     fn try_hub_ns_mount(scene: &SceneGraph, canonical: &TopologyPlan) -> Option<TopologyPlan> {
         let n = scene.nodes.len();
-        if n < 4 || canonical.fold_row.iter().any(|&r| r > 0) {
+        if n < 4
+            || canonical.fold_row.iter().any(|&r| r > 0)
+            || scene.nodes.iter().any(|nd| nd.container || nd.parent.is_some())
+        {
             return None;
         }
         let mut adj_ranks: Vec<BTreeSet<i32>> = vec![BTreeSet::new(); n];
         let mut deg = vec![0usize; n];
+        let mut pair_mult: HashMap<(usize, usize), usize> = HashMap::new();
         for e in &scene.edges {
             if let (Some(su), Some(sv)) = (scene.index(&e.source.node), scene.index(&e.target.node))
                 && su != sv
@@ -2709,6 +2983,7 @@ mod stage1a {
                 deg[sv] += 1;
                 adj_ranks[su].insert(canonical.ranks[sv]);
                 adj_ranks[sv].insert(canonical.ranks[su]);
+                *pair_mult.entry((su.min(sv), su.max(sv))).or_insert(0) += 1;
             }
         }
         let hub = (0..n)
@@ -2724,6 +2999,7 @@ mod stage1a {
             if let (Some(su), Some(sv)) = (scene.index(&e.source.node), scene.index(&e.target.node))
                 && (su == hub || sv == hub)
                 && su != sv
+                && pair_mult.get(&(su.min(sv), su.max(sv))).copied().unwrap_or(0) <= 1
             {
                 let rank_gap = (canonical.ranks[sv] - canonical.ranks[su]).abs();
                 if rank_gap >= 2 {
@@ -3302,6 +3578,122 @@ mod tests {
             (lx1 - lx0) / (ly1 - ly0).max(1.0) < 2.5,
             "folded 8-node chain aspect ratio should be < 2.5, got {:.2}",
             (lx1 - lx0) / (ly1 - ly0).max(1.0)
+        );
+    }
+
+    #[test]
+    fn serpentine_folds_five_stage_bypass_and_keeps_parallel_bundles_on_same_row() {
+        let bypass_src = "n0 -> n1 -> n2 -> n3 -> n4\nn2 -> n4: a\nn2 -> n4: b\nn3 -> n4: c\nn1 -> n4: ack\n";
+        let s_bypass = crate::model::lower(&crate::syntax::parse(bypass_src));
+        let o = LayoutOptions::default();
+        let sz_bypass = vec![Point::new(112.0, 52.0); s_bypass.nodes.len()];
+        let c_bypass = candidates(&s_bypass, &sz_bypass, &o);
+        assert!(
+            c_bypass.len() >= 2,
+            "folded 5-stage bypass should emit folded + unfolded candidates"
+        );
+        let folded = &c_bypass[0];
+        let n1 = s_bypass.index("n1").unwrap();
+        let n3 = s_bypass.index("n3").unwrap();
+        let n4 = s_bypass.index("n4").unwrap();
+        assert_eq!(folded.fold_row[n1], 0);
+        assert_eq!(folded.fold_row[n4], 1);
+        assert_eq!(folded.fold_row[n3], folded.fold_row[n4]);
+        assert_eq!(folded.ranks[n1], folded.ranks[n4]);
+        let bypass_ei = s_bypass
+            .edges
+            .iter()
+            .position(|e| e.source.node == "n1" && e.target.node == "n4")
+            .unwrap();
+        assert_eq!(folded.side_hints[bypass_ei], Some((Side::S, Side::N)));
+        assert!(c_bypass[1].fold_row.iter().all(|&r| r == 0));
+
+        let par_src = include_str!("../tests/fixtures/quality/c0ffee77-parallel.diagram");
+        let s_par = crate::model::lower(&crate::syntax::parse(par_src));
+        let sz_par = vec![Point::new(112.0, 52.0); s_par.nodes.len()];
+        let c_par = candidates(&s_par, &sz_par, &o);
+        let n8 = s_par.index("n8").unwrap();
+        let n9 = s_par.index("n9").unwrap();
+        assert_eq!(
+            c_par[0].fold_row[n8], c_par[0].fold_row[n9],
+            "parallel bundle n8->n9 must stay on the same fold row"
+        );
+        assert_ne!(c_par[0].ranks[n8], c_par[0].ranks[n9]);
+
+        let dual_split_src = "n0 -> n1 -> n2 -> n3 -> n4 -> n5 -> n6 -> n7 -> n8 -> n9\nn2 -> n3: b\nn7 -> n8: c\n";
+        let s_dual = crate::model::lower(&crate::syntax::parse(dual_split_src));
+        let sz_dual = vec![Point::new(112.0, 52.0); s_dual.nodes.len()];
+        let c_dual = candidates(&s_dual, &sz_dual, &o);
+        let d2 = s_dual.index("n2").unwrap();
+        let d3 = s_dual.index("n3").unwrap();
+        let d7 = s_dual.index("n7").unwrap();
+        let d8 = s_dual.index("n8").unwrap();
+        assert_eq!(c_dual[0].fold_row[d2], c_dual[0].fold_row[d3]);
+        assert_eq!(c_dual[0].fold_row[d7], c_dual[0].fold_row[d8]);
+    }
+
+    #[test]
+    fn long_caption_short_chain_emits_top_to_bottom_without_triggering_on_short_loops() {
+        let o = LayoutOptions::default();
+        let long_src = include_str!("../tests/fixtures/quality/14-long-labels.diagram");
+        let s_long = crate::model::lower(&crate::syntax::parse(long_src));
+        let sz_long = vec![Point::new(220.0, 68.0); s_long.nodes.len()];
+        let c_long = candidates(&s_long, &sz_long, &o);
+        assert!(
+            c_long.iter().any(|p| p.axis == FlowAxis::TopToBottom),
+            "short chain with long edge captions must emit TopToBottom candidate"
+        );
+
+        let retry_src = "api -> queue: enqueue\nqueue -> worker: consume\nworker -> db: persist\nworker -> queue: retry\n";
+        let s_retry = crate::model::lower(&crate::syntax::parse(retry_src));
+        let sz_retry = vec![Point::new(112.0, 52.0); s_retry.nodes.len()];
+        let c_retry = candidates(&s_retry, &sz_retry, &o);
+        assert!(
+            !c_retry.iter().any(|p| p.axis == FlowAxis::TopToBottom),
+            "short-caption 4-stage retry chain should stay LeftToRight"
+        );
+    }
+
+    #[test]
+    fn container_grouped_ranks_keep_raft_bundle_adjacent_and_compact() {
+        let raft_src = "cli: Admin Console [shape: actor]\n\
+            cp: Control Plane {\n\
+              leader: Raft Leader\n\
+              follower: Raft Follower\n\
+              store: WAL Store [shape: database]\n\
+              leader -> follower: appendEntries\n\
+              leader -> follower: installSnapshot\n\
+              follower -> leader: voteGranted\n\
+              leader -> leader: leaseRenew\n\
+              leader -> store: fsync\n\
+            }\n\
+            dp: Data Plane {\n\
+              envoy: Proxy Mesh\n\
+              metrics: StatsD [shape: queue]\n\
+              envoy <-> metrics: xDS / telemetry\n\
+            }\n\
+            cli -> cp.leader: apply\n\
+            cp.leader -> dp.envoy: push-config\n\
+            dp.metrics -> cp.follower: health\n";
+        let s_raft = crate::model::lower(&crate::syntax::parse(raft_src));
+        let o = LayoutOptions::default();
+        let sz_raft = vec![Point::new(112.0, 52.0); s_raft.nodes.len()];
+        let c_raft = candidates(&s_raft, &sz_raft, &o);
+        let leader = s_raft.index("cp.leader").unwrap();
+        let follower = s_raft.index("cp.follower").unwrap();
+        let metrics = s_raft.index("dp.metrics").unwrap();
+        assert_eq!(
+            (c_raft[0].ranks[follower] - c_raft[0].ranks[leader]).abs(),
+            1,
+            "intra-container parallel peers must keep adjacent ranks"
+        );
+        assert!(c_raft[0].ranks[metrics] > c_raft[0].ranks[follower]);
+
+        let doc = crate::compile(raft_src).unwrap();
+        let bounds = crate::render::bounds(&doc.scene, &doc.layout);
+        assert!(
+            bounds.w < 1150.0 && bounds.h < 650.0,
+            "expected compact container bounds, got {bounds:?}"
         );
     }
 }
