@@ -357,6 +357,14 @@ pub(crate) fn presentation(scene: &SceneGraph, stack: &Stack) -> Result<serde_js
                 .filter(|n| !n.container && n.id != source.id && n.id != target.id)
                 .map(|n| layout.nodes[&n.id].inflate(8.)),
         );
+        obstacles.extend(
+            scene
+                .nodes
+                .iter()
+                .filter(|n| n.id != source.id && n.id != target.id)
+                .filter_map(|n| crate::layout::sql_table_title_rect(n, layout.nodes[&n.id]))
+                .map(|tr| tr.inflate(8.)),
+        );
         let mut points = heading_route(a, b, &obstacles)?;
         for _ in 0..2 {
             if fixed_a.is_none() {
