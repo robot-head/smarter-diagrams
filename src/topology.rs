@@ -446,6 +446,10 @@ pub fn optimize_scaled(
         let rem_budget = o.shape_budget.saturating_sub(stats.searched_states);
         let (domus_opt, sat_used) =
             stage1a::domus_solve_component(scene, &members, rem_budget, &ext_dirs);
+        let mut budget = rem_budget.saturating_sub(sat_used);
+        if n >= 9 {
+            budget = budget.min(if n >= 11 { 192 } else { 384 });
+        }
         let mut search = Search {
             scene,
             options: o,
@@ -461,7 +465,7 @@ pub fn optimize_scaled(
             best_cost: f64::INFINITY,
             cache: BTreeMap::new(),
             states: 0,
-            budget: rem_budget.saturating_sub(sat_used),
+            budget,
         };
         let identity: Vec<_> = (0..n).collect();
         let original_cost = search.complete_cost(&identity);
@@ -748,7 +752,7 @@ pub fn coffman_graham(scene: &SceneGraph, width: usize) -> Vec<usize> {
 
 mod stage1a {
     use super::{FlowAxis, SideHints, TopologyPlan, components};
-    use crate::formal::satisfy;
+    use crate::formal::satisfy_bounded;
     use crate::labels::{connection_text, text_height, text_width};
     use crate::layout::{LayoutOptions, Point, Rect, effective_annotations};
     use crate::model::{Axis, SceneGraph, Side};
@@ -1895,6 +1899,30 @@ mod stage1a {
             col_of_r: Vec<usize>,
             num_rows: usize,
         }
+        let mut node_w = vec![0f64; scene.nodes.len()];
+        let mut node_h = vec![0f64; scene.nodes.len()];
+        for &u in members {
+            let nd = &scene.nodes[u];
+            let title = crate::labels::node_title(nd);
+            let mut w = crate::layout::title_width(nd).max(112.).max(
+                nd.ports
+                    .values()
+                    .map(|p| text_width(&p.label) + 32.)
+                    .fold(0., f64::max),
+            );
+            let mut h = if nd.ports.is_empty() {
+                48.
+            } else {
+                (nd.ports.len() as f64 + 2.) * o.grid
+            }
+            .max(title.split('\n').count() as f64 * 20. + 28.);
+            if matches!(nd.shape.as_str(), "diamond" | "decision") {
+                w *= if title.contains('\n') { 1.8 } else { 1.5 };
+                h = h.max(80.).max(text_height(&title) * 3.);
+            }
+            node_w[u] = w;
+            node_h[u] = h;
+        }
         let base_w =
             ((members.len() as f64 * o.target_aspect_ratio).sqrt().ceil() as usize).clamp(3, 4);
         let mut widths = vec![3usize, 4usize];
@@ -1907,7 +1935,57 @@ mod stage1a {
                 [(false, build_modulo(cw)), (true, build_walk(cw))]
             {
                 let (splits, cost) = tally(&row_of_r);
-                let est_ar = (cw as f64 * 150.0) / (num_rows as f64 * 96.0);
+                let mut col_w = vec![0f64; cw];
+                let mut row_h = vec![0f64; num_rows];
+                let row_cross_gap = 56.;
+                for (r, g) in rank_groups.iter().enumerate() {
+                    let row = row_of_r[r];
+                    let col = col_of_r[r];
+                    let mut cell_h = (g.len().saturating_sub(1)) as f64 * row_cross_gap;
+                    for &u in g {
+                        col_w[col] = col_w[col].max(node_w[u]);
+                        cell_h += node_h[u];
+                    }
+                    row_h[row] = row_h[row].max(cell_h);
+                }
+                let active_cols = col_of_r.iter().copied().max().map_or(1, |m| m + 1);
+                let mut col_gap = vec![72.0f64; active_cols.saturating_sub(1)];
+                for e in &scene.edges {
+                    let (Some(su), Some(sv)) =
+                        (scene.index(&e.source.node), scene.index(&e.target.node))
+                    else {
+                        continue;
+                    };
+                    if !mset.contains(&su) || !mset.contains(&sv) || su == sv {
+                        continue;
+                    }
+                    let ru = (ranks[su] - min_r) as usize;
+                    let rv = (ranks[sv] - min_r) as usize;
+                    if row_of_r[ru] != row_of_r[rv] || col_of_r[ru] == col_of_r[rv] {
+                        continue;
+                    }
+                    let text = connection_text(scene, e);
+                    if text.trim().is_empty() {
+                        continue;
+                    }
+                    let lo = col_of_r[ru].min(col_of_r[rv]);
+                    let hi = col_of_r[ru].max(col_of_r[rv]).min(col_gap.len());
+                    if hi > lo {
+                        let cspan = (hi - lo) as f64;
+                        let is_diamond =
+                            matches!(scene.nodes[su].shape.as_str(), "diamond" | "decision")
+                                || matches!(scene.nodes[sv].shape.as_str(), "diamond" | "decision");
+                        let extra = if is_diamond { 32. } else { 0. };
+                        let lw =
+                            (text_width(&text) + 2. * o.stub + 2. * o.margin + extra).min(180.);
+                        for g in &mut col_gap[lo..hi] {
+                            *g = g.max(lw / cspan);
+                        }
+                    }
+                }
+                let est_w = col_w[..active_cols].iter().sum::<f64>() + col_gap.iter().sum::<f64>();
+                let est_h = row_h.iter().sum::<f64>() + (num_rows.saturating_sub(1)) as f64 * 64.0;
+                let est_ar = est_w / est_h.max(1.0);
                 let da = (est_ar - o.target_aspect_ratio).abs();
                 // Irregular walks must buy a real reduction in turn cost.
                 let score = cost as f64 + 10. * da + if walk { 2. } else { 0. };
@@ -2170,7 +2248,7 @@ mod stage1a {
         ext_dirs: &[(usize, i32, i32)],
     ) -> (Option<DomusResult>, usize) {
         let m = members.len();
-        if m < 3 || budget == 0 {
+        if !(3..=10).contains(&m) || budget == 0 {
             return (None, 0);
         }
         let mut local = HashMap::with_capacity(m);
@@ -2197,7 +2275,7 @@ mod stage1a {
                     scene.nodes[members[b2]].id.as_str(),
                 ))
         });
-        if base_edges.len() < 3 {
+        if base_edges.len() < 3 || base_edges.len() > m + 2 {
             return (None, 0);
         }
         let mut adj = vec![Vec::new(); m];
@@ -2390,7 +2468,7 @@ mod stage1a {
                     }
                 }
             }
-            if let Ok(Some(model)) = satisfy(vars, &clauses) {
+            if let Ok(Some(model)) = satisfy_bounded(vars, &clauses, 4_096) {
                 let mut dirs = vec![0u8; ne];
                 for (ei, slot) in dirs.iter_mut().enumerate() {
                     for d in 0..4u8 {
@@ -2864,6 +2942,116 @@ mod stage1a {
                             .and_then(|e| scene.index(&e.source.node))
                             .is_none_or(|su| !cset.contains(&su))
                     });
+                }
+            }
+        }
+        if fold_row.iter().all(|&r| r == 0) {
+            let port_side_free = |node_idx: usize, port: &Option<String>| {
+                port.as_deref()
+                    .and_then(|pid| scene.nodes[node_idx].ports.get(pid))
+                    .is_none_or(|p| p.constraint.side().is_none())
+            };
+            let edge_sides_free = |e: &crate::model::Edge, su: usize, sv: usize| {
+                e.source.constraint.side().is_none()
+                    && e.target.constraint.side().is_none()
+                    && port_side_free(su, &e.source.port)
+                    && port_side_free(sv, &e.target.port)
+            };
+            for comp in &comps {
+                if comp.len() < 4 {
+                    continue;
+                }
+                let Some(min_r) = comp.iter().map(|&u| ranks[u]).min() else {
+                    continue;
+                };
+                let Some(max_r) = comp.iter().map(|&u| ranks[u]).max() else {
+                    continue;
+                };
+                let span = (max_r - min_r) as usize + 1;
+                if span < 3 {
+                    continue;
+                }
+                let mut rank_groups = vec![Vec::new(); span];
+                for &u in comp {
+                    rank_groups[(ranks[u] - min_r) as usize].push(u);
+                }
+                for g in &mut rank_groups {
+                    g.sort_by(|&a, &b| bk.order[a].cmp(&bk.order[b]).then_with(|| a.cmp(&b)));
+                }
+                for r in 1..span - 1 {
+                    if rank_groups[r - 1].len() != 1
+                        || rank_groups[r].len() != 2
+                        || rank_groups[r + 1].len() != 1
+                    {
+                        continue;
+                    }
+                    let u = rank_groups[r - 1][0];
+                    let m0 = rank_groups[r][0];
+                    let m1 = rank_groups[r][1];
+                    let w = rank_groups[r + 1][0];
+                    let scope = scene.nodes[u].parent.as_deref();
+                    if [u, m0, m1, w].iter().any(|&x| {
+                        scene.nodes[x].container || scene.nodes[x].parent.as_deref() != scope
+                    }) {
+                        continue;
+                    }
+                    let mut u_m0 = 0usize;
+                    let mut m0_w = 0usize;
+                    let mut u_m1_edges = Vec::new();
+                    let mut m1_w_edges = Vec::new();
+                    let mut clean = true;
+                    for (ei, e) in scene.edges.iter().enumerate() {
+                        let (Some(su), Some(sv)) =
+                            (scene.index(&e.source.node), scene.index(&e.target.node))
+                        else {
+                            continue;
+                        };
+                        if su == sv {
+                            if su == m0 || su == m1 {
+                                clean = false;
+                                break;
+                            }
+                            continue;
+                        }
+                        if (su == u && sv == w)
+                            || (su == w && sv == u)
+                            || (su == m0 && sv == m1)
+                            || (su == m1 && sv == m0)
+                        {
+                            clean = false;
+                            break;
+                        }
+                        if su == u && sv == m0 {
+                            u_m0 += 1;
+                        } else if su == m0 && sv == w {
+                            m0_w += 1;
+                        } else if su == u && sv == m1 {
+                            u_m1_edges.push(ei);
+                        } else if su == m1 && sv == w {
+                            m1_w_edges.push(ei);
+                        } else if su == m0 || sv == m0 || su == m1 || sv == m1 {
+                            clean = false;
+                            break;
+                        }
+                    }
+                    if !clean
+                        || u_m0 == 0
+                        || m0_w == 0
+                        || u_m1_edges.len() != 1
+                        || m1_w_edges.len() != 1
+                    {
+                        continue;
+                    }
+                    let e_in = u_m1_edges[0];
+                    let e_out = m1_w_edges[0];
+                    if side_hints[e_in].is_none()
+                        && side_hints[e_out].is_none()
+                        && edge_sides_free(&scene.edges[e_in], u, m1)
+                        && edge_sides_free(&scene.edges[e_out], m1, w)
+                    {
+                        side_hints[e_in] = Some((Side::S, Side::W));
+                        side_hints[e_out] = Some((Side::E, Side::S));
+                    }
                 }
             }
         }
@@ -3881,5 +4069,71 @@ mod tests {
             c[0].fold_row.iter().all(|&r| r == 0),
             "5-node component in a multi-component graph must stay unfolded"
         );
+    }
+
+    #[test]
+    fn wave5_topology_width_folding_branch_hints_and_domus_guards() {
+        // 1. Wide-labeled 8-stage linear pipeline chooses cw = 3 (columns 0..=2, fold rows 0..=2).
+        let wide_src = concat!(
+            "s0: \"Organization membership service 0\"\n",
+            "s1: \"Organization membership service 1\"\n",
+            "s2: \"Organization membership service 2\"\n",
+            "s3: \"Organization membership service 3\"\n",
+            "s4: \"Organization membership service 4\"\n",
+            "s5: \"Organization membership service 5\"\n",
+            "s6: \"Organization membership service 6\"\n",
+            "s7: \"Organization membership service 7\"\n",
+            "s0 -> s1 -> s2 -> s3 -> s4 -> s5 -> s6 -> s7\n",
+        );
+        let wide_s = scene_of(wide_src);
+        let o = LayoutOptions::default();
+        let wide_sz = vec![Point::new(220.0, 52.0); wide_s.nodes.len()];
+        let wide_c = candidates(&wide_s, &wide_sz, &o);
+        assert_eq!(
+            wide_c[0].ranks.iter().copied().max(),
+            Some(2),
+            "wide 8-stage pipeline should choose cw = 3 (max rank 2), got ranks {:?}",
+            wide_c[0].ranks
+        );
+        assert_eq!(
+            wide_c[0].fold_row.iter().copied().max(),
+            Some(2),
+            "wide 8-stage pipeline should fold across 3 rows (0..=2), got fold_row {:?}",
+            wide_c[0].fold_row
+        );
+
+        // 2. Unfolded clean 1->2->1 diamond emits (S, W) and (E, S) side_hints for slot 1.
+        let diamond_s = scene_of("a -> b\na -> c\nb -> d\nc -> d\n");
+        let diamond_sz = vec![Point::new(112.0, 52.0); diamond_s.nodes.len()];
+        let diamond_c = candidates(&diamond_s, &diamond_sz, &o);
+        let unfolded = diamond_c
+            .iter()
+            .find(|p| p.fold_row.iter().all(|&r| r == 0))
+            .expect("diamond should have an unfolded candidate");
+        assert!(
+            unfolded.side_hints.contains(&Some((Side::S, Side::W))),
+            "expected (Side::S, Side::W) hint in unfolded diamond: {:?}",
+            unfolded.side_hints
+        );
+        assert!(
+            unfolded.side_hints.contains(&Some((Side::E, Side::S))),
+            "expected (Side::E, Side::S) hint in unfolded diamond: {:?}",
+            unfolded.side_hints
+        );
+
+        // 3. domus_solve_component returns (None, 0) immediately when m > 10 or base_edges > m + 2.
+        let big_ring =
+            scene_of("n0 -> n1 -> n2 -> n3 -> n4 -> n5 -> n6 -> n7 -> n8 -> n9 -> n10 -> n0\n");
+        let big_members: Vec<usize> = (0..big_ring.nodes.len()).collect();
+        assert!(matches!(
+            stage1a::domus_solve_component(&big_ring, &big_members, 1000, &[]),
+            (None, 0)
+        ));
+        let dense_5 = scene_of("a -> b\na -> c\na -> d\na -> e\nb -> c\nb -> d\nb -> e\nc -> d\n");
+        let dense_members: Vec<usize> = (0..dense_5.nodes.len()).collect();
+        assert!(matches!(
+            stage1a::domus_solve_component(&dense_5, &dense_members, 1000, &[]),
+            (None, 0)
+        ));
     }
 }

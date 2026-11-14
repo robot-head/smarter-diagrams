@@ -1022,8 +1022,29 @@ fn build_plan_rects(
                         let extra = if is_diamond { 32. } else { 0. };
                         let lw =
                             crate::labels::text_width(&text) + 2. * o.stub + 2. * o.margin + extra;
-                        let per_hop = (lw.min(180.) / span).max(min_gap);
-                        for g in &mut gap_after[lo..hi] {
+                        let is_parallel = scene
+                            .edges
+                            .iter()
+                            .filter(|other| {
+                                let (Some(oa), Some(ob)) = (
+                                    scene.index(&other.source.node),
+                                    scene.index(&other.target.node),
+                                ) else {
+                                    return false;
+                                };
+                                (oa == a && ob == b) || (oa == b && ob == a)
+                            })
+                            .count()
+                            >= 2;
+                        for (ci, g) in gap_after[lo..hi].iter_mut().enumerate() {
+                            let c = lo + ci;
+                            let cap = if is_diamond && !is_parallel && corridor_edge_counts[c] <= 2
+                            {
+                                144.
+                            } else {
+                                180.
+                            };
+                            let per_hop = (lw.min(cap) / span).max(min_gap);
                             *g = g.max(per_hop * spacing);
                         }
                     }
@@ -1084,39 +1105,83 @@ fn build_plan_rects(
                     .push(i);
             }
             let mut fold_cursor_y = 0f64;
+            let mut prev_fold_center_y = 0f64;
+            let mut col_bottom = vec![f64::NEG_INFINITY; cols.len()];
             for (fi, &f) in folds.iter().enumerate() {
                 let mut col_max_half_up = 0f64;
                 let mut col_max_half_down = 0f64;
                 let mut fold_rel_y = Vec::new();
-                for ((ff, _), mut members) in by_fold_col
+                let row_cells: Vec<(usize, Vec<usize>)> = by_fold_col
                     .iter()
                     .filter(|((ff, _), _)| *ff == f)
-                    .map(|(k, v)| (*k, v.clone()))
-                {
-                    let _ = ff;
+                    .map(|((_, c), v)| (*c, v.clone()))
+                    .collect();
+                let has_single = row_cells.iter().any(|(_, m)| m.len() == 1);
+                let max_single_half_h = row_cells
+                    .iter()
+                    .filter(|(_, m)| m.len() == 1)
+                    .map(|(_, m)| (rects[m[0]].h + top_extra(&scene.nodes[m[0]])) * 0.5)
+                    .fold(0.0f64, f64::max);
+                let is_south_wing = |s1: usize| -> bool {
+                    scene.edges.iter().enumerate().any(|(ei, e)| {
+                        let Some(h) = plan.side_hints.get(ei).copied().flatten() else {
+                            return false;
+                        };
+                        let (Some(a), Some(b)) =
+                            (scene.index(&e.source.node), scene.index(&e.target.node))
+                        else {
+                            return false;
+                        };
+                        plan.fold_row[a] == f
+                            && plan.fold_row[b] == f
+                            && ((b == s1 && matches!(h, (Side::S, Side::W | Side::E)))
+                                || (a == s1 && matches!(h, (Side::E | Side::W, Side::S))))
+                    })
+                };
+                for (_, mut members) in row_cells {
                     members.sort_by_key(|&i| (plan.order[i], i));
                     let extra_gaps = guide_corridor_gaps(plan, &members, 24. * spacing);
-                    let total: f64 = members
-                        .iter()
-                        .map(|&i| top_extra(&scene.nodes[i]) + rects[i].h)
-                        .sum::<f64>()
-                        + (members.len().saturating_sub(1)) as f64 * row_cross_gap
-                        + extra_gaps.iter().sum::<f64>();
-                    let mut cursor = -total * 0.5;
-                    for (idx, i) in members.into_iter().enumerate() {
-                        let extra = top_extra(&scene.nodes[i]);
-                        let y = cursor + extra + rects[i].h * 0.5;
-                        col_max_half_up = col_max_half_up.max(-(y - extra - rects[i].h * 0.5));
-                        col_max_half_down = col_max_half_down.max(y + rects[i].h * 0.5);
-                        fold_rel_y.push((i, y));
-                        let guide_pad = extra_gaps.get(idx).copied().unwrap_or(0.);
-                        cursor += extra + rects[i].h + row_cross_gap + guide_pad;
+                    if has_single && members.len() == 2 && is_south_wing(members[1]) {
+                        let i0 = members[0];
+                        let i1 = members[1];
+                        let extra0 = top_extra(&scene.nodes[i0]);
+                        let extra1 = top_extra(&scene.nodes[i1]);
+                        let h0_half = rects[i0].h * 0.5;
+                        let h1_half = rects[i1].h * 0.5;
+                        let y0 = 0.0;
+                        let guide_pad = extra_gaps.first().copied().unwrap_or(0.);
+                        let wing_y = max_single_half_h + o.stub + h0_half.max(h1_half) + 20.;
+                        let stack_y = y0 + h0_half + row_cross_gap + guide_pad + extra1 + h1_half;
+                        let y1 = wing_y.max(stack_y);
+                        col_max_half_up = col_max_half_up.max(-(y0 - extra0 - h0_half));
+                        col_max_half_down = col_max_half_down.max(y1 + h1_half);
+                        fold_rel_y.push((i0, y0));
+                        fold_rel_y.push((i1, y1));
+                    } else {
+                        let total: f64 = members
+                            .iter()
+                            .map(|&i| top_extra(&scene.nodes[i]) + rects[i].h)
+                            .sum::<f64>()
+                            + (members.len().saturating_sub(1)) as f64 * row_cross_gap
+                            + extra_gaps.iter().sum::<f64>();
+                        let mut cursor = -total * 0.5;
+                        for (idx, i) in members.into_iter().enumerate() {
+                            let extra = top_extra(&scene.nodes[i]);
+                            let y = cursor + extra + rects[i].h * 0.5;
+                            col_max_half_up = col_max_half_up.max(-(y - extra - rects[i].h * 0.5));
+                            col_max_half_down = col_max_half_down.max(y + rects[i].h * 0.5);
+                            fold_rel_y.push((i, y));
+                            let guide_pad = extra_gaps.get(idx).copied().unwrap_or(0.);
+                            cursor += extra + rects[i].h + row_cross_gap + guide_pad;
+                        }
                     }
                 }
+                let mut row_center_y = 0f64;
                 if fi > 0 {
                     let prev_f = folds[fi - 1];
                     let mut cross_pair_counts: BTreeMap<(usize, usize), usize> = BTreeMap::new();
                     let mut has_cross_fold_caption = false;
+                    let mut cross_col_spans: Vec<(usize, usize, usize)> = Vec::new();
                     for e in &scene.edges {
                         let (Some(a), Some(b)) =
                             (scene.index(&e.source.node), scene.index(&e.target.node))
@@ -1130,6 +1195,10 @@ fn build_plan_rects(
                             if !crate::labels::connection_text(scene, e).trim().is_empty() {
                                 has_cross_fold_caption = true;
                             }
+                            let ca = cols.binary_search(&col_idx[a]).unwrap();
+                            let cb = cols.binary_search(&col_idx[b]).unwrap();
+                            let dst = if plan.fold_row[a] == f { a } else { b };
+                            cross_col_spans.push((dst, ca.min(cb), ca.max(cb)));
                         }
                     }
                     let has_cross_fold_parallel =
@@ -1142,14 +1211,43 @@ fn build_plan_rects(
                     } else {
                         2. * o.stub + 2. * o.margin + 8.
                     };
-                    fold_cursor_y += col_max_half_up + fold_gap * spacing;
+                    if has_cross_fold_parallel {
+                        row_center_y = fold_cursor_y + col_max_half_up + fold_gap * spacing;
+                    } else {
+                        let mut skyline_y = f64::NEG_INFINITY;
+                        for &(i, ry) in &fold_rel_y {
+                            let ci = cols.binary_search(&col_idx[i]).unwrap();
+                            let rel_top = ry - top_extra(&scene.nodes[i]) - rects[i].h * 0.5;
+                            if col_bottom[ci].is_finite() {
+                                skyline_y =
+                                    skyline_y.max(col_bottom[ci] + fold_gap * spacing - rel_top);
+                            }
+                            for &(dst, c_lo, c_hi) in &cross_col_spans {
+                                if dst == i {
+                                    for &cb in &col_bottom[c_lo..=c_hi] {
+                                        if cb.is_finite() {
+                                            skyline_y =
+                                                skyline_y.max(cb + fold_gap * spacing - rel_top);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        row_center_y = if skyline_y.is_finite() {
+                            skyline_y.max(prev_fold_center_y + o.stub)
+                        } else {
+                            fold_cursor_y + col_max_half_up + fold_gap * spacing
+                        };
+                    }
                 }
                 for (i, ry) in fold_rel_y {
                     let ci = cols.binary_search(&col_idx[i]).unwrap();
                     rects[i].x = col_x[ci];
-                    rects[i].y = fold_cursor_y + ry;
+                    rects[i].y = row_center_y + ry;
+                    col_bottom[ci] = col_bottom[ci].max(rects[i].bottom());
                 }
-                fold_cursor_y += col_max_half_down;
+                prev_fold_center_y = row_center_y;
+                fold_cursor_y = fold_cursor_y.max(row_center_y + col_max_half_down);
             }
         }
         FlowAxis::TopToBottom => {
@@ -1488,7 +1586,6 @@ fn solve_stage1b(
     env: &Stage1bEnv,
     rects: &mut [Rect],
     min_spans: &[(f64, f64)],
-    readable_routes: bool,
 ) -> Result<(), Error> {
     let n = env.scene.nodes.len();
     if n == 0 {
@@ -2035,6 +2132,7 @@ fn solve_stage1b(
     let mut l1_x = Vec::new();
     let mut l1_y = Vec::new();
     let mut face_peers_map: BTreeMap<(usize, Side), Vec<usize>> = BTreeMap::new();
+    let mut aligned_bundles: BTreeSet<(usize, usize)> = BTreeSet::new();
     if env.previous.is_none() {
         let mut side_counts: BTreeMap<(usize, Side), usize> = BTreeMap::new();
         for req in env.requests {
@@ -2143,14 +2241,12 @@ fn solve_stage1b(
 
         // Preserve tangential straightening on 1-to-1 / parallel bundles,
         // and center 1-to-many (deg >= 3) fan hubs on the median of their leaves.
-        let mut aligned_bundles: BTreeSet<(usize, usize)> = BTreeSet::new();
         for e in &env.scene.edges {
             let (a, b) = (
                 env.scene.index(&e.source.node).unwrap(),
                 env.scene.index(&e.target.node).unwrap(),
             );
-            let pair_bundle = !readable_routes
-                && a != b
+            let pair_bundle = a != b
                 && matches!(
                     e.source.constraint,
                     PortConstraint::Free | PortConstraint::FixedSide { .. }
@@ -2247,6 +2343,9 @@ fn solve_stage1b(
             }
         }
         for ((hub, side), peers) in &face_peers_map {
+            if aligned_bundles.iter().any(|&(a, b)| a == *hub || b == *hub) {
+                continue;
+            }
             let mut unique_peers: Vec<usize> = peers.clone();
             unique_peers.sort_unstable();
             unique_peers.dedup();
@@ -2386,6 +2485,9 @@ fn solve_stage1b(
         // Re-center 1-to-many (deg >= 3) fan hubs to the median midpoint after leaves shift.
         if env.previous.is_none() {
             for ((hub, side), peers) in &face_peers_map {
+                if aligned_bundles.iter().any(|&(a, b)| a == *hub || b == *hub) {
+                    continue;
+                }
                 let mut unique_peers: Vec<usize> = peers.clone();
                 unique_peers.sort_unstable();
                 unique_peers.dedup();
@@ -2877,10 +2979,16 @@ fn score_candidate_preview(
         let pr = Rect::new(p.stub.x, p.stub.y, 1., 1.);
         bounds = Some(bounds.map_or(pr, |b| b.union(pr)));
     }
+    for rt in layout.routes.values() {
+        for pt in &rt.points {
+            let pr = Rect::new(pt.x, pt.y, 1., 1.);
+            bounds = Some(bounds.map_or(pr, |b| b.union(pr)));
+        }
+    }
     for lb in &placed_labels {
         bounds = Some(bounds.map_or(*lb, |b| b.union(*lb)));
     }
-    let (bw, bh) = bounds.map_or((1., 1.), |b| (b.w.max(1.), b.h.max(1.)));
+    let (bw, bh) = bounds.map_or((1., 1.), |b| ((b.w + 48.).max(1.), (b.h + 48.).max(1.)));
     let vw = 730.;
     let vh = 450.;
     let fit_scale = (vw / bw).min(vh / bh).min(1.);
@@ -3302,7 +3410,7 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
             };
             order_flat_ranks(scene, &flat_ranks, &mut rects, o, spacing);
         }
-        if !locks.has_pos_pin {
+        if !locks.has_pos_pin && !plan.is_some_and(|p| p.side_hints.iter().any(Option::is_some)) {
             shape_stats = crate::topology::optimize_scaled(scene, &mut rects, o, spacing);
         }
         concept_sides = crate::topology::readable_concept(scene, &mut rects, o, true);
@@ -3536,6 +3644,16 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
 
     let mut min_spans: Vec<(f64, f64)> = base_sizes.iter().map(|s| (s.x, s.y)).collect();
     let mut requests = sync_requests(&rects, previous);
+    for (i, r) in rects.iter_mut().enumerate() {
+        if !scene.nodes[i].container {
+            if !locks.w_locked[i] {
+                r.w = base_sizes[i].x;
+            }
+            if !locks.h_locked[i] {
+                r.h = base_sizes[i].y;
+            }
+        }
+    }
     grow_port_perimeters(
         scene,
         &requests,
@@ -3545,8 +3663,8 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
         o,
     )?;
     for (i, ms) in min_spans.iter_mut().enumerate() {
-        ms.0 = ms.0.max(rects[i].w);
-        ms.1 = ms.1.max(rects[i].h);
+        ms.0 = base_sizes[i].x.max(rects[i].w);
+        ms.1 = base_sizes[i].y.max(rects[i].h);
     }
 
     let ancestry: Vec<_> = scene
@@ -3578,7 +3696,7 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
             ancestry: &ancestry,
             postorder: &postorder,
         };
-        solve_stage1b(&env, &mut rects, &min_spans, concept_sides.is_some())?;
+        solve_stage1b(&env, &mut rects, &min_spans)?;
     }
 
     if previous.is_none() {
@@ -3589,6 +3707,16 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
             .any(|(a, b)| a.key != b.key || a.side != b.side);
         if side_changed {
             let prev_dims: Vec<(f64, f64)> = rects.iter().map(|r| (r.w, r.h)).collect();
+            for (i, r) in rects.iter_mut().enumerate() {
+                if !scene.nodes[i].container {
+                    if !locks.w_locked[i] {
+                        r.w = base_sizes[i].x;
+                    }
+                    if !locks.h_locked[i] {
+                        r.h = base_sizes[i].y;
+                    }
+                }
+            }
             grow_port_perimeters(
                 scene,
                 &requests2,
@@ -3601,8 +3729,15 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
             for (i, (ow, oh)) in prev_dims.into_iter().enumerate() {
                 if (rects[i].w - ow).abs() > 1e-6 || (rects[i].h - oh).abs() > 1e-6 {
                     grew = true;
-                    min_spans[i].0 = min_spans[i].0.max(rects[i].w);
-                    min_spans[i].1 = min_spans[i].1.max(rects[i].h);
+                    if !scene.nodes[i].container {
+                        min_spans[i] = (
+                            base_sizes[i].x.max(rects[i].w),
+                            base_sizes[i].y.max(rects[i].h),
+                        );
+                    } else {
+                        min_spans[i].0 = min_spans[i].0.max(rects[i].w);
+                        min_spans[i].1 = min_spans[i].1.max(rects[i].h);
+                    }
                 }
             }
             requests = requests2;
@@ -3623,7 +3758,7 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
                     ancestry: &ancestry,
                     postorder: &postorder,
                 };
-                solve_stage1b(&env2, &mut rects, &min_spans, concept_sides.is_some())?;
+                solve_stage1b(&env2, &mut rects, &min_spans)?;
             }
         }
     }
@@ -4573,13 +4708,13 @@ fn grow_port_perimeters(
             }
             let mut length =
                 ports.len().saturating_sub(1) as f64 * o.port_spacing + 2. * eff_corner;
+            let opp = match side {
+                Side::N => Side::S,
+                Side::S => Side::N,
+                Side::E => Side::W,
+                Side::W => Side::E,
+            };
             if !locked && ports.len() >= 2 {
-                let opp = match side {
-                    Side::N => Side::S,
-                    Side::S => Side::N,
-                    Side::E => Side::W,
-                    Side::W => Side::E,
-                };
                 let mut facing_counts: BTreeMap<usize, usize> = BTreeMap::new();
                 for e in &scene.edges {
                     let Some(&(sa_i, sa)) = port_sides.get(port_key(e, true).as_str()) else {
@@ -4647,20 +4782,40 @@ fn grow_port_perimeters(
                             e.target.constraint,
                             PortConstraint::Free | PortConstraint::FixedSide { .. }
                         )
-                });
+                })
+                && (!horiz
+                    || peer_edges.iter().all(|e| {
+                        let Some(&(sa_i, sa)) = port_sides.get(port_key(e, true).as_str()) else {
+                            return false;
+                        };
+                        let Some(&(sb_i, sb)) = port_sides.get(port_key(e, false).as_str()) else {
+                            return false;
+                        };
+                        sa_i != sb_i
+                            && ((sa_i == i && sa == side && sb == opp)
+                                || (sb_i == i && sb == side && sa == opp))
+                    }));
             if unconstrained_bundle {
-                let caption_space = peer_edges
-                    .iter()
-                    .map(|e| {
-                        if horiz {
-                            crate::labels::text_width(&e.label) + 32.
-                        } else {
+                if horiz {
+                    let caption_w = peer_edges
+                        .iter()
+                        .map(|e| {
+                            crate::labels::text_width(&crate::labels::connection_text(scene, e))
+                        })
+                        .fold(0., f64::max);
+                    let gap = (caption_w * 0.65).max(o.port_spacing + 24.);
+                    length = length.max(ports.len() as f64 * gap + 2. * eff_corner);
+                } else {
+                    let caption_space = peer_edges
+                        .iter()
+                        .map(|e| {
                             crate::labels::text_height(&crate::labels::connection_text(scene, e))
-                        }
-                    })
-                    .fold(0., f64::max)
-                    + 12.;
-                length = length.max((ports.len() + 1) as f64 * caption_space.max(o.port_spacing));
+                        })
+                        .fold(0., f64::max)
+                        + 12.;
+                    length =
+                        length.max((ports.len() + 1) as f64 * caption_space.max(o.port_spacing));
+                }
             }
             let unconstrained_ports = ports
                 .iter()
@@ -7015,6 +7170,143 @@ distribute row [kubectl, apiserver, reconciler] [gap: 8g]
         assert!(
             distinct_y.len() > 1,
             "expected a folded multi-row layout to be chosen over the unfolded strip, got y values: {distinct_y:?}"
+        );
+    }
+
+    #[test]
+    fn regression_d1a60001_cycle_compiles_fast_in_debug() {
+        let src = concat!(
+            "n0: \"東京 API 0\" [shape: cache]\n",
+            "n1: \"Event journal 1\" [shape: rect]\n",
+            "n2: \"Regional gateway 2\" [shape: queue]\n",
+            "n3: \"Event journal 3\" [shape: rect]\n",
+            "n4: \"API 4\" [shape: cache]\n",
+            "n5: \"Organization membership service 5\" [shape: queue]\n",
+            "n6: \"Organization membership service 6\" [shape: database]\n",
+            "n7: \"API 7\" [shape: queue]\n",
+            "n8: \"API 8\" [shape: cache]\n",
+            "n9: \"API 9\" [shape: diamond]\n",
+            "n10: \"Event journal 10\" [shape: queue]\n",
+            "n11: \"東京 API 11\" [shape: database]\n",
+            "n12: \"Organization membership service 12\" [shape: rect]\n",
+            "n0 -> n1:\n",
+            "n1 -> n2:\n",
+            "n2 -> n3: validate organization access\n",
+            "n3 -> n4:\n",
+            "n4 -> n5: read through\n",
+            "n5 -> n6: read through\n",
+            "n6 -> n7: send\n",
+            "n7 -> n8:\n",
+            "n8 -> n9: read through\n",
+            "n9 -> n10:\n",
+            "n10 -> n11: validate organization access\n",
+            "n11 -> n12: read through\n",
+            "n12 -> n0: retry\n",
+            "n11 -> n10: validate organization access\n",
+            "n1 -> n12:\n",
+            "n11 -> n2:\n",
+            "n6 -> n4: validate organization access\n",
+        );
+        let opts = LayoutOptions {
+            explore_candidates: true,
+            ..Default::default()
+        };
+        let t0 = std::time::Instant::now();
+        let doc = crate::compile_with(src, &opts, None).expect("d1a60001-cycle should compile");
+        let elapsed_ms = t0.elapsed().as_millis();
+        validate(&doc.scene, &doc.layout, &opts).expect("d1a60001-cycle should validate");
+        assert!(
+            elapsed_ms < 1500,
+            "expected d1a60001-cycle debug compile < 1500ms, got {elapsed_ms}ms"
+        );
+    }
+
+    #[test]
+    fn regression_fuzz_parallel_and_dag_fit_readable_text() {
+        let fuzz_parallel_5 = concat!(
+            "n0: \"Organization membership service 0\" [shape: rect]\n",
+            "n1: \"Organization membership service 1\" [shape: cache]\n",
+            "n2: \"地域ゲートウェイ 2\" [shape: rect]\n",
+            "n3: \"Organization membership service 3\" [shape: diamond]\n",
+            "n4: \"Ledger 4\" [shape: rect]\n",
+            "n5: \"Ledger 5\" [shape: database]\n",
+            "n6: \"Validate request 6\" [shape: queue]\n",
+            "n7: \"API 7\" [shape: database]\n",
+            "n0 -> n1: ack\n",
+            "n1 -> n2: read through\n",
+            "n2 -> n3: send\n",
+            "n3 -> n4: send\n",
+            "n4 -> n5: send\n",
+            "n5 -> n6: send\n",
+            "n6 -> n7: retry\n",
+            "n6 -> n7: send\n",
+            "n2 -> n7: retry\n",
+            "n0 -> n7: read through\n",
+            "n0 -> n7: retry\n",
+        );
+        let fuzz_dag_4 = concat!(
+            "n0: \"API 0\" [shape: cache]\n",
+            "n1: \"Worker 1\" [shape: rect]\n",
+            "n2: \"Event log 2\" [shape: queue]\n",
+            "n3: \"地域ゲートウェイ 3\" [shape: diamond]\n",
+            "n4: \"Cache 4\" [shape: cache]\n",
+            "n5: \"Validate request 5\" [shape: diamond]\n",
+            "n6: \"地域ゲートウェイ 6\" [shape: diamond]\n",
+            "n7: \"地域ゲートウェイ 7\" [shape: rect]\n",
+            "n0 -> n1: send\n",
+            "n1 -> n2: retry\n",
+            "n2 -> n3: retry\n",
+            "n3 -> n4: read through\n",
+            "n4 -> n5: read through\n",
+            "n5 -> n6: ack\n",
+            "n6 -> n7: read through\n",
+            "n1 -> n4: validate organization access\n",
+            "n1 -> n6: validate organization access\n",
+            "n1 -> n7:\n",
+            "n4 -> n7: read through\n",
+            "n5 -> n7: validate organization access\n",
+        );
+        let opts = LayoutOptions {
+            explore_candidates: true,
+            ..Default::default()
+        };
+        for (name, src) in [
+            ("fuzz-parallel-5", fuzz_parallel_5),
+            ("fuzz-dag-4", fuzz_dag_4),
+        ] {
+            let doc = crate::compile_with(src, &opts, None)
+                .unwrap_or_else(|e| panic!("{name} should compile: {e}"));
+            validate(&doc.scene, &doc.layout, &opts)
+                .unwrap_or_else(|e| panic!("{name} should validate: {e}"));
+            let b = crate::render::bounds(&doc.scene, &doc.layout);
+            let min_fit_px = 14.0 * (1200.0 / b.w).min(860.0 / b.h).min(1.0);
+            assert!(
+                min_fit_px >= 8.0,
+                "{name} rendered min_fit_px={min_fit_px:.2} < 8.0 (bounds={b:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn regression_conditional_stages_total_bends_within_budget() {
+        let src = include_str!("../examples/conditional-stages.diagram");
+        let opts = LayoutOptions {
+            explore_candidates: true,
+            ..Default::default()
+        };
+        let doc = crate::compile_with(src, &opts, None)
+            .expect("conditional-stages should compile cleanly");
+        validate(&doc.scene, &doc.layout, &opts)
+            .expect("conditional-stages should validate cleanly");
+        let total_bends: usize = doc
+            .layout
+            .routes
+            .values()
+            .map(|r| crate::routing::coalesced(&r.points).len().saturating_sub(2))
+            .sum();
+        assert!(
+            total_bends <= 8,
+            "expected <= 8 total coalesced bends on conditional-stages, got {total_bends}"
         );
     }
 }
