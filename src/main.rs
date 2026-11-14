@@ -33,17 +33,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     let (mut input, mut output, mut view) = (None, None, None);
     let mut format = "svg".to_string();
+    let mut options = smarter_diagrams::LayoutOptions::default();
     while let Some(a) = args.next() {
         match a.as_str() {
             "-h" | "--help" => {
                 println!(
-                    "smarter-diagrams [INPUT|-] [-o OUTPUT] [--view NAME] [--format svg|json|check|lint|png|pdf]\nsmarter-diagrams mcp\nPNG/PDF require cargo install --features export. Omit INPUT to read stdin."
+                    "smarter-diagrams [INPUT|-] [-o OUTPUT] [--view NAME] [--format svg|json|check|lint|png|pdf] [--no-explore-candidates]\nsmarter-diagrams mcp\nPNG/PDF require cargo install --features export. Omit INPUT to read stdin."
                 );
                 return Ok(());
             }
             "-o" | "--output" => output = Some(args.next().ok_or("missing output path")?),
             "--format" => format = args.next().ok_or("missing format")?,
             "--view" => view = Some(args.next().ok_or("missing view name")?),
+            "--no-explore-candidates" => options.explore_candidates = false,
             _ if a.starts_with('-') && a != "-" => return Err(format!("unknown option {a}").into()),
             _ => {
                 if input.replace(a).is_some() {
@@ -58,10 +60,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         source = std::fs::read_to_string(input.unwrap())?;
     }
-    let mut d = smarter_diagrams::compile(&source)?;
+    let mut d = smarter_diagrams::compile_with(&source, &options, None)?;
     if let Some(name) = view {
         d.scene = smarter_diagrams::views::project(&d.scene, &name)?;
-        d.layout = smarter_diagrams::layout::layout(&d.scene, &Default::default(), None)?;
+        d.layout = smarter_diagrams::layout::layout(&d.scene, &options, None)?;
     }
     let result = match format.as_str() {
         "svg" => d.to_svg().into_bytes(),

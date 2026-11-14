@@ -355,6 +355,22 @@ pub(crate) fn annotations(source: &str, ts: &[Token]) -> Vec<Annotation> {
     }
     out
 }
+fn parse_port_value(key: &str, v: &Value) -> Result<f64, Diagnostic> {
+    let n = number(&v.text).filter(|&n| {
+        n.is_finite()
+            && match key {
+                "order" => n >= 0. && n.fract() == 0. && n <= u32::MAX as f64,
+                "ratio" => n > 0. && n < 1.,
+                "pos" => n >= 0.,
+                _ => false,
+            }
+    });
+    n.ok_or_else(|| Diagnostic {
+        severity: Severity::Error,
+        span: v.span,
+        message: format!("invalid port {key}"),
+    })
+}
 fn port_spec(attrs: &Attributes, side: Option<Side>) -> PortConstraint {
     let side = attrs
         .get("side")
@@ -363,17 +379,26 @@ fn port_spec(attrs: &Attributes, side: Option<Side>) -> PortConstraint {
     match side {
         None => PortConstraint::Free,
         Some(side) => {
-            if let Some(v) = value(attrs, "pos") {
+            if let Some(v) = attrs
+                .get("pos")
+                .and_then(|v| parse_port_value("pos", v).ok())
+            {
                 PortConstraint::FixedPos {
                     side,
                     offset_grid: v,
                 }
-            } else if let Some(v) = value(attrs, "ratio") {
+            } else if let Some(v) = attrs
+                .get("ratio")
+                .and_then(|v| parse_port_value("ratio", v).ok())
+            {
                 PortConstraint::FixedRatio { side, ratio: v }
-            } else if let Some(v) = value(attrs, "order") {
+            } else if let Some(v) = attrs
+                .get("order")
+                .and_then(|v| parse_port_value("order", v).ok())
+            {
                 PortConstraint::FixedOrder {
                     side,
-                    order: v.max(0.) as u32,
+                    order: v as u32,
                 }
             } else {
                 PortConstraint::FixedSide { side }
@@ -524,11 +549,13 @@ pub fn lower(parse: &Parse) -> SceneGraph {
         .collect();
     for (spec, span) in specs {
         match spec {
-            PortConstraint::FixedRatio { ratio, .. } if !(0. ..=1.).contains(&ratio) => {
-                l.error(span, "port ratio must be in [0, 1]".into())
+            PortConstraint::FixedRatio { ratio, .. } if !(ratio > 0. && ratio < 1.) => {
+                l.error(span, "port ratio must be strictly in (0, 1)".into())
             }
-            PortConstraint::FixedPos { offset_grid, .. } if offset_grid < 0. => {
-                l.error(span, "port offset must be non-negative".into())
+            PortConstraint::FixedPos { offset_grid, .. }
+                if !offset_grid.is_finite() || offset_grid < 0. =>
+            {
+                l.error(span, "port offset must be finite and non-negative".into())
             }
             _ => {}
         }
@@ -880,15 +907,10 @@ impl Lower<'_> {
             self.error(v.span, "port side must be N, E, S, or W".into());
         }
         for key in ["order", "ratio", "pos"] {
-            if let Some(v) = attrs.get(key) {
-                let valid = number(&v.text).is_some_and(|n| match key {
-                    "order" => n >= 0. && n.fract() == 0. && n <= u32::MAX as f64,
-                    "ratio" => n > 0. && n < 1.,
-                    _ => n >= 0.,
-                });
-                if !valid {
-                    self.error(v.span, format!("invalid port {key}"));
-                }
+            if let Some(v) = attrs.get(key)
+                && let Err(diag) = parse_port_value(key, v)
+            {
+                self.scene.diagnostics.push(diag);
             }
         }
     }
@@ -973,14 +995,31 @@ impl Lower<'_> {
             .unwrap_or_default();
         let mut port = None;
         if ts.get(i).is_some_and(|t| t.kind == Kind::At) {
-            if let (Some(side), Some(t)) = (side, ts.get(i + 1)) {
-                if let Some(ratio) = number(t.text(self.source)) {
-                    spec = PortConstraint::FixedRatio { side, ratio };
+            if ts.get(i + 1).is_some_and(|t| t.kind == Kind::Minus)
+                && let Some(t) = ts.get(i + 2).filter(|t| t.kind == Kind::Number)
+            {
+                let value_span = Span::new(ts[i + 1].span.start, t.span.end);
+                self.error(value_span, "invalid port ratio".into());
+                i += 3;
+            } else if let Some(t) = ts.get(i + 1) {
+                if let Some(side) = side {
+                    if let Some(ratio) = number(t.text(self.source)) {
+                        if ratio > 0. && ratio < 1. {
+                            spec = PortConstraint::FixedRatio { side, ratio };
+                        } else {
+                            self.error(t.span, "invalid port ratio".into());
+                        }
+                    } else {
+                        self.error(t.span, "expected ratio".into());
+                    }
                 } else {
-                    self.error(t.span, "expected ratio".into());
+                    self.error(t.span, "port ratio requires a side".into());
                 }
+                i += 2;
+            } else {
+                self.error(ts[i].span, "expected ratio".into());
+                i += 1;
             }
-            i += 2;
         }
         if ts.get(i).is_some_and(|t| t.kind == Kind::LParen) {
             let end = matching(ts, i);
@@ -1416,4 +1455,85 @@ pub fn ancestors(scene: &SceneGraph, id: &str) -> BTreeSet<String> {
         at = scene.node(p).and_then(|n| n.parent.as_deref());
     }
     out
+}
+
+/// Resolve a raw node reference within `scope` by walking lexical ancestor scopes
+/// before falling back to root scope.
+pub(crate) fn resolve_scoped_index(
+    scene: &SceneGraph,
+    scope: Option<&str>,
+    raw: &str,
+) -> Option<usize> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    let mut at = scope.filter(|s| !s.is_empty());
+    while let Some(prefix) = at {
+        if let Some(i) = scene.index(&format!("{prefix}.{raw}")) {
+            return Some(i);
+        }
+        at = prefix.rsplit_once('.').map(|(parent, _)| parent);
+    }
+    scene.index(raw)
+}
+
+/// Resolve a raw node reference within `scope` by walking lexical ancestor scopes
+/// before falling back to root scope.
+pub(crate) fn resolve_scoped_node<'a>(
+    scene: &'a SceneGraph,
+    scope: Option<&str>,
+    raw: &str,
+) -> Option<&'a Node> {
+    resolve_scoped_index(scene, scope, raw).map(|i| &scene.nodes[i])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_port_diagnostics_preserve_exact_spans() {
+        let src = "a.E@0 -> b.W@1\na.N@-0.5 -> b.S@0.5\na { port p [side: Z, order: -1, ratio: 0.0, pos: -2] }\n";
+        let scene = lower(&syntax::parse(src));
+        for (msg, expected_slices) in [
+            ("invalid port ratio", vec!["0.0", "0", "1", "-0.5"]),
+            ("port side must be N, E, S, or W", vec!["Z"]),
+            ("invalid port order", vec!["-1"]),
+            ("invalid port pos", vec!["-2"]),
+        ] {
+            let matching: Vec<_> = scene
+                .diagnostics
+                .iter()
+                .filter(|d| d.message == msg)
+                .collect();
+            let actual_slices: Vec<&str> = matching
+                .iter()
+                .map(|d| &src[d.span.start..d.span.end])
+                .collect();
+            assert_eq!(actual_slices, expected_slices, "wrong spans for {msg:?}");
+            for d in matching {
+                assert_ne!(d.span, Span::new(0, 0), "lost span on {d:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn resolve_scoped_node_walks_ancestors_before_root() {
+        let src = "global; db; outer { sibling; inner { db; }; };";
+        let scene = lower(&syntax::parse(src));
+        assert_eq!(
+            resolve_scoped_node(&scene, Some("outer.inner"), "db").map(|n| n.id.as_str()),
+            Some("outer.inner.db")
+        );
+        assert_eq!(
+            resolve_scoped_node(&scene, Some("outer.inner"), "sibling").map(|n| n.id.as_str()),
+            Some("outer.sibling")
+        );
+        assert_eq!(
+            resolve_scoped_node(&scene, Some("outer.inner"), "global").map(|n| n.id.as_str()),
+            Some("global")
+        );
+        assert!(resolve_scoped_node(&scene, Some("outer.inner"), "missing").is_none());
+    }
 }

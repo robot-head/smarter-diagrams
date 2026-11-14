@@ -2,6 +2,31 @@
 use crate::{layout::*, model::*};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Return container node indices sorted by descending ownership depth
+/// (children strictly before parents regardless of declaration order),
+/// breaking ties deterministically by scene index.
+pub(crate) fn containers_postorder(scene: &SceneGraph) -> Vec<usize> {
+    let n = scene.nodes.len();
+    let mut depth = vec![0usize; n];
+    for i in 0..n {
+        let mut d = 0usize;
+        let mut cur = scene.nodes[i].parent.as_deref();
+        let mut steps = 0usize;
+        while let Some(p) = cur {
+            if steps >= n {
+                break;
+            }
+            d += 1;
+            steps += 1;
+            cur = scene.node(p).and_then(|node| node.parent.as_deref());
+        }
+        depth[i] = d;
+    }
+    let mut containers: Vec<usize> = (0..n).filter(|&i| scene.nodes[i].container).collect();
+    containers.sort_by_key(|&i| (std::cmp::Reverse(depth[i]), i));
+    containers
+}
+
 pub(crate) fn pack(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions, spacing: f64) {
     if !scene.layout_rules.is_empty()
         || scene.nodes.iter().any(|n| {
@@ -15,14 +40,8 @@ pub(crate) fn pack(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions, sp
     {
         return;
     }
-    let owners: Vec<_> = scene
-        .nodes
-        .iter()
-        .enumerate()
-        .filter(|(_, n)| n.container)
-        .map(|(i, _)| i)
-        .collect();
-    for &owner in owners.iter().rev() {
+    let owners = containers_postorder(scene);
+    for &owner in &owners {
         let id = &scene.nodes[owner].id;
         let children: Vec<_> = scene
             .nodes
@@ -985,5 +1004,39 @@ fn group(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions, units: &[usi
             rects[i].h = boxes[at].h;
         }
         bottom += bounds.h + (if in_container { 36. } else { 96. }) * spacing;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{Node, SceneGraph, SourceOrigin};
+
+    fn test_node(id: &str, parent: Option<&str>, container: bool) -> Node {
+        Node {
+            id: id.into(),
+            label: id.into(),
+            parent: parent.map(str::to_owned),
+            shape: "rect".into(),
+            container,
+            ports: Default::default(),
+            attrs: Default::default(),
+            annotations: Vec::new(),
+            origin: SourceOrigin::default(),
+            declaration_index: 0,
+            explicit: true,
+        }
+    }
+
+    #[test]
+    fn containers_postorder_puts_children_before_parents_for_any_decl_order() {
+        let mut scene = SceneGraph::default();
+        // Child declared before parent, and deeper grandchild declared first.
+        scene.nodes.push(test_node("p.c.gc", Some("p.c"), true)); // idx 0 (depth 2)
+        scene.nodes.push(test_node("p", None, true)); // idx 1 (depth 0)
+        scene.nodes.push(test_node("p.c", Some("p"), true)); // idx 2 (depth 1)
+        scene.nodes.push(test_node("other", None, true)); // idx 3 (depth 0)
+        scene.nodes.push(test_node("leaf", None, false));
+        assert_eq!(containers_postorder(&scene), vec![0, 2, 1, 3]);
     }
 }

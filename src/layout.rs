@@ -157,7 +157,11 @@ impl Rect {
         }
     }
 }
+fn default_explore_candidates() -> bool {
+    true
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct LayoutOptions {
     pub grid: f64,
     pub margin: f64,
@@ -172,6 +176,8 @@ pub struct LayoutOptions {
     pub shape_budget: usize,
     pub max_layer_width: usize,
     pub target_aspect_ratio: f64,
+    #[serde(default = "default_explore_candidates")]
+    pub explore_candidates: bool,
 }
 impl Default for LayoutOptions {
     fn default() -> Self {
@@ -189,6 +195,7 @@ impl Default for LayoutOptions {
             shape_budget: 2048,
             max_layer_width: 0,
             target_aspect_ratio: 1.6,
+            explore_candidates: true,
         }
     }
 }
@@ -455,9 +462,7 @@ fn layout_pass(
         Default::default()
     };
     let concept_sides = if previous.is_none() {
-        crate::duplex::present(scene, &mut rects, o, true)
-            .or_else(|| crate::records::present(scene, &mut rects, o, true))
-            .or_else(|| crate::topology::readable_concept(scene, &mut rects, o, true))
+        crate::topology::readable_concept(scene, &mut rects, o, true)
     } else {
         None
     };
@@ -470,47 +475,46 @@ fn layout_pass(
     if previous.is_none() {
         crate::ownership::pack(scene, &mut rects, o, spacing);
     }
+    let postorder = crate::ownership::containers_postorder(scene);
     // Size innermost containers before introducing hard containment inequalities.
-    for i in (0..n).rev() {
-        if scene.nodes[i].container {
-            let child_ids: Vec<_> = scene
-                .nodes
-                .iter()
-                .enumerate()
-                .filter(|(_, c)| c.parent.as_deref() == Some(&scene.nodes[i].id))
-                .map(|(j, _)| j)
-                .collect();
-            let mut placed: Vec<usize> = Vec::new();
-            for &j in &child_ids {
-                for &k in &placed {
-                    if with_top_extra(&scene.nodes[j], rects[j])
-                        .inflate(16.)
-                        .intersects(with_top_extra(&scene.nodes[k], rects[k]).inflate(16.))
-                    {
-                        let delta =
-                            rects[k].bottom() + 48. + top_extra(&scene.nodes[j]) - rects[j].top();
-                        let id = scene.nodes[j].id.clone();
-                        for (t, rect) in rects.iter_mut().enumerate() {
-                            if t == j || ancestors(scene, &scene.nodes[t].id).contains(&id) {
-                                rect.y += delta;
-                            }
+    for &i in &postorder {
+        let child_ids: Vec<_> = scene
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.parent.as_deref() == Some(&scene.nodes[i].id))
+            .map(|(j, _)| j)
+            .collect();
+        let mut placed: Vec<usize> = Vec::new();
+        for &j in &child_ids {
+            for &k in &placed {
+                if with_top_extra(&scene.nodes[j], rects[j])
+                    .inflate(16.)
+                    .intersects(with_top_extra(&scene.nodes[k], rects[k]).inflate(16.))
+                {
+                    let delta =
+                        rects[k].bottom() + 48. + top_extra(&scene.nodes[j]) - rects[j].top();
+                    let id = scene.nodes[j].id.clone();
+                    for (t, rect) in rects.iter_mut().enumerate() {
+                        if t == j || ancestors(scene, &scene.nodes[t].id).contains(&id) {
+                            rect.y += delta;
                         }
                     }
                 }
-                placed.push(j);
             }
-            let children: Vec<_> = scene
-                .nodes
-                .iter()
-                .enumerate()
-                .filter(|(_, c)| c.parent.as_deref() == Some(&scene.nodes[i].id))
-                .map(|(j, c)| with_top_extra(c, rects[j]))
-                .collect();
-            if let Some(bounds) = children.into_iter().reduce(Rect::union) {
-                let b = bounds.inflate(o.container_padding);
-                let header = header_height(&scene.nodes[i]);
-                rects[i] = Rect::new(b.x, b.y - header / 2., b.w, b.h + header);
-            }
+            placed.push(j);
+        }
+        let children: Vec<_> = scene
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.parent.as_deref() == Some(&scene.nodes[i].id))
+            .map(|(j, c)| with_top_extra(c, rects[j]))
+            .collect();
+        if let Some(bounds) = children.into_iter().reduce(Rect::union) {
+            let b = bounds.inflate(o.container_padding);
+            let header = header_height(&scene.nodes[i]);
+            rects[i] = Rect::new(b.x, b.y - header / 2., b.w, b.h + header);
         }
     }
     let mut pins = vec![(None, None); n];
@@ -688,8 +692,8 @@ fn layout_pass(
                 }
             }
         }
-        for i in (0..n).rev() {
-            if scene.nodes[i].container && pins[i].0.is_none() && pins[i].1.is_none() {
+        for &i in &postorder {
+            if pins[i].0.is_none() && pins[i].1.is_none() {
                 let children: Vec<_> = scene
                     .nodes
                     .iter()
@@ -708,11 +712,8 @@ fn layout_pass(
             }
         }
     }
-    let concept_sides = concept_sides
-        .or_else(|| crate::duplex::present(scene, &mut rects, o, false))
-        .or_else(|| crate::records::present(scene, &mut rects, o, false))
-        .or_else(|| crate::scope_feedback::hints(scene, &rects, o))
-        .or_else(|| crate::topology::readable_concept(scene, &mut rects, o, false));
+    let concept_sides =
+        concept_sides.or_else(|| crate::topology::readable_concept(scene, &mut rects, o, false));
     let mut requests = port_requests(scene, &rects, o, previous);
     let readable_routes = concept_sides.is_some();
     let readable_fan =
@@ -743,20 +744,6 @@ fn layout_pass(
             }
         }
     }
-    if readable_routes {
-        for edge in &scene.edges {
-            for source in [true, false] {
-                if let Some(request) = requests
-                    .iter_mut()
-                    .find(|p| p.key == port_key(edge, source))
-                    && let Some(target) =
-                        crate::bundles::order(scene, &rects, edge, source, request.side)
-                {
-                    request.target = target;
-                }
-            }
-        }
-    }
     let endpoint_sides: BTreeMap<_, _> = requests.iter().map(|p| (p.key.clone(), p.side)).collect();
     for edge in &scene.edges {
         let sa = endpoint_sides[&port_key(edge, true)];
@@ -765,7 +752,7 @@ fn layout_pass(
             if let Some(request) = requests
                 .iter_mut()
                 .find(|p| p.key == port_key(edge, source))
-                && let Some(target) = crate::sequence_routes::parallel_order(
+                && let Some(target) = parallel_order(
                     scene,
                     edge,
                     source,
@@ -793,10 +780,7 @@ fn layout_pass(
         h_locked[i] = lock.contains("h:") || lock.contains("h :");
     }
     // Absolute child pins can enlarge an auto-sized container; explicit size locks stay hard.
-    for i in (0..n).rev() {
-        if !scene.nodes[i].container {
-            continue;
-        }
+    for &i in &postorder {
         let children: Vec<_> = scene
             .nodes
             .iter()
@@ -1031,13 +1015,9 @@ fn layout_pass(
     };
     let mut sep_cx = Vec::new();
     let mut sep_cy = Vec::new();
-    let preserve_series = readable_routes && crate::series::recognized(scene);
     // Straighten only opposing single-fanout ports, on their tangential coordinate.
     let sides: BTreeMap<_, _> = requests.iter().cloned().map(|p| (p.key, p.side)).collect();
     for e in &scene.edges {
-        if preserve_series {
-            break;
-        }
         let (a, b) = (
             scene.index(&e.source.node).unwrap(),
             scene.index(&e.target.node).unwrap(),
@@ -1137,8 +1117,8 @@ fn layout_pass(
                 {
                     let free =
                         solver::project(&desired_x, &weights, &build_cx(&rects, &sep_cx, false))?;
-                    for i in (0..n).rev() {
-                        if !scene.nodes[i].container || w_locked[i] || referenced_container[i] {
+                    for &i in &postorder {
+                        if w_locked[i] || referenced_container[i] {
                             continue;
                         }
                         if let Some((left, right)) = scene
@@ -1171,8 +1151,8 @@ fn layout_pass(
                 {
                     let free =
                         solver::project(&desired_y, &weights, &build_cy(&rects, &sep_cy, false))?;
-                    for i in (0..n).rev() {
-                        if !scene.nodes[i].container || h_locked[i] || referenced_container[i] {
+                    for &i in &postorder {
+                        if h_locked[i] || referenced_container[i] {
                             continue;
                         }
                         if let Some((top, bottom)) = scene
@@ -1347,10 +1327,9 @@ fn layout_pass(
     // Shrinking stays within the solved box; referenced/pinned containers and
     // incremental reserved frames retain their hard geometry.
     if previous.is_none() {
-        for i in (0..n).rev() {
+        for &i in &postorder {
             let node = &scene.nodes[i];
-            if !node.container
-                || !node.ports.is_empty()
+            if !node.ports.is_empty()
                 || annotations[i].iter().any(|a| a.name == "pin")
                 || scene
                     .edges
@@ -1393,19 +1372,6 @@ fn layout_pass(
     crate::routing::route_all(scene, o, previous, &mut out)?;
     crate::routing::nudge_channels(scene, o, &mut out);
     let coordinated_fan = readable_fan && crate::routing::coordinate_fan(scene, o, &mut out);
-    let coordinated_tree =
-        readable_routes && crate::presentation::coordinate_tree(scene, o, &mut out);
-    let coordinated_mesh =
-        readable_routes && crate::presentation::coordinate_mesh(scene, o, &mut out);
-    let coordinated_backbone =
-        readable_routes && crate::presentation::coordinate_backbone(scene, o, &mut out);
-    let coordinated_series = readable_routes && crate::series::coordinate(scene, o, &mut out);
-    let coordinated_bundles = readable_routes && crate::bundles::coordinate(scene, o, &mut out);
-    let coordinated_duplex = readable_routes && crate::duplex::coordinate(scene, o, &mut out);
-    let coordinated_gather = readable_routes && crate::gather::coordinate(scene, o, &mut out);
-    let coordinated_records = readable_routes && crate::records::coordinate(scene, o, &mut out);
-    let coordinated_scopes =
-        readable_routes && crate::scope_feedback::coordinate(scene, o, &mut out);
     let coordinated_loops =
         readable_routes && crate::routing::coordinate_outer_routes(scene, o, &mut out);
     let has_hard_geometry = annotations
@@ -1429,18 +1395,7 @@ fn layout_pass(
         }
         Err(error) => return Err(error),
     };
-    if !coordinated_fan
-        && !coordinated_loops
-        && !coordinated_tree
-        && !coordinated_mesh
-        && !coordinated_backbone
-        && !coordinated_series
-        && !coordinated_bundles
-        && !coordinated_duplex
-        && !coordinated_gather
-        && !coordinated_records
-        && !coordinated_scopes
-    {
+    if !coordinated_fan && !coordinated_loops {
         crate::labels::polish_channels(scene, o, &mut out);
     }
     for zone in &scene.zones {
@@ -1534,14 +1489,24 @@ fn coordinate(
     } + delta)
 }
 fn coordinate_index(scene: &SceneGraph, id: &str, scope: Option<&str>) -> Option<usize> {
-    let mut at = scope;
-    while let Some(prefix) = at {
-        if let Some(i) = scene.index(&format!("{prefix}.{id}")) {
-            return Some(i);
-        }
-        at = prefix.rsplit_once('.').map(|(parent, _)| parent);
+    crate::model::resolve_scoped_index(scene, scope, id)
+}
+fn pin_anchor_raw(expr: &str) -> Option<String> {
+    let e = expr.replace(' ', "");
+    if number(&e).is_some() {
+        return None;
     }
-    scene.index(id)
+    let split = e
+        .char_indices()
+        .skip(1)
+        .find(|(_, c)| *c == '+' || *c == '-')
+        .map(|(i, _)| i);
+    let base = split.map_or(e.as_str(), |i| &e[..i]);
+    let raw = base
+        .rsplit_once('.')
+        .filter(|(_, a)| matches!(*a, "N" | "E" | "S" | "W" | "x" | "y"))
+        .map_or(base, |(id, _)| id);
+    (!raw.is_empty()).then(|| raw.to_string())
 }
 fn relative_constraint(
     expr: &str,
@@ -1589,18 +1554,15 @@ fn check_pin_cycles(scene: &SceneGraph, anns: &[Vec<Annotation>]) -> Result<(), 
     }
     let mut deps = vec![Vec::new(); scene.nodes.len()];
     for (i, list) in anns.iter().enumerate() {
+        let scope = scene.nodes[i].parent.as_deref();
         for a in list.iter().filter(|a| a.name == "pin") {
             for key in ["x", "y"] {
-                if let Some(v) = a.attrs.get(key) {
-                    let base = v.text.split(['+', '-']).next().unwrap().trim();
-                    let id = base
-                        .rsplit_once('.')
-                        .filter(|(_, a)| matches!(*a, "N" | "E" | "S" | "W" | "x" | "y"))
-                        .map(|(id, _)| id)
-                        .unwrap_or(base);
-                    if let Some(j) = scene.index(id) {
-                        deps[i].push(j);
-                    }
+                if let Some(v) = a.attrs.get(key)
+                    && let Some(raw) = pin_anchor_raw(&v.text)
+                    && let Some(target) = crate::model::resolve_scoped_node(scene, scope, &raw)
+                    && let Some(j) = scene.index(&target.id)
+                {
+                    deps[i].push(j);
                 }
             }
         }
@@ -1835,6 +1797,63 @@ pub fn port_key(edge: &Edge, source: bool) -> String {
         .as_ref()
         .map(|p| format!("{}#{p}", ep.node))
         .unwrap_or_else(|| format!("{}:{}", edge.id, if source { "source" } else { "target" }))
+}
+/// Parallel and antiparallel links sharing attachment sides use consistent
+/// non-crossing port order at both ends, including U-turn bundles.
+pub(crate) fn parallel_order(
+    scene: &SceneGraph,
+    e: &Edge,
+    source: bool,
+    sa: Side,
+    sb: Side,
+    endpoint_sides: &BTreeMap<String, Side>,
+    base: f64,
+) -> Option<f64> {
+    if e.source.node == e.target.node {
+        return None;
+    }
+    let u_id = e.source.node.as_str().min(e.target.node.as_str());
+    let v_id = e.source.node.as_str().max(e.target.node.as_str());
+    let (su, sv) = if e.source.node == u_id {
+        (sa, sb)
+    } else {
+        (sb, sa)
+    };
+    let pairs: Vec<_> = scene
+        .edges
+        .iter()
+        .filter(|other| {
+            let ou = other.source.node.as_str().min(other.target.node.as_str());
+            let ov = other.source.node.as_str().max(other.target.node.as_str());
+            if (ou, ov) != (u_id, v_id) {
+                return false;
+            }
+            let osa = endpoint_sides.get(&port_key(other, true)).copied();
+            let osb = endpoint_sides.get(&port_key(other, false)).copied();
+            let (osu, osv) = if other.source.node == u_id {
+                (osa, osb)
+            } else {
+                (osb, osa)
+            };
+            osu == Some(su) && osv == Some(sv)
+        })
+        .collect();
+    if pairs.len() < 2 {
+        return None;
+    }
+    let ep = if source { &e.source } else { &e.target };
+    if ep.port.is_some()
+        || !matches!(
+            ep.constraint,
+            PortConstraint::Free | PortConstraint::FixedSide { .. }
+        )
+    {
+        return None;
+    }
+    let index = pairs.iter().position(|other| other.id == e.id)?;
+    let on_u = ep.node == u_id;
+    let same_clockwise = matches!(su, Side::N | Side::E) == matches!(sv, Side::N | Side::E);
+    Some(base + index as f64 * 1e-4 * if !on_u && same_clockwise { -1. } else { 1. })
 }
 fn side_index(side: Side) -> usize {
     match side {
@@ -2900,8 +2919,9 @@ fn local_query(
         {
             for axis in ["x", "y"] {
                 if let Some(v) = a.attrs.get(axis)
-                    && number(&v.text).is_none()
-                    && !v.text.trim().starts_with(&root)
+                    && let Some(raw) = pin_anchor_raw(&v.text)
+                    && !crate::model::resolve_scoped_node(scene, n.parent.as_deref(), &raw)
+                        .is_some_and(|target| members.contains(&target.id))
                 {
                     return None;
                 }
@@ -3360,5 +3380,51 @@ fn order_flat_ranks(scene: &SceneGraph, ranks: &[usize], rects: &mut [Rect], o: 
                     hub_r.bottom() + gap + top_extra(&scene.nodes[sat]) + rects[sat].h / 2.;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::lower;
+    use crate::syntax::parse;
+
+    #[test]
+    fn layout_options_serde_defaults_and_cache_config_reflect_explore_candidates() {
+        let off: LayoutOptions = serde_json::from_str(r#"{"explore_candidates":false}"#).unwrap();
+        assert!(!off.explore_candidates);
+        assert_eq!(off.grid, GRID);
+
+        let default_json: LayoutOptions = serde_json::from_str("{}").unwrap();
+        assert!(default_json.explore_candidates);
+
+        let scene = lower(&parse("a -> b;"));
+        let l1 = layout(&scene, &default_json, None).unwrap();
+        let l2 = layout(&scene, &off, None).unwrap();
+        assert_ne!(l1.cache_config, l2.cache_config);
+    }
+
+    #[test]
+    fn scoped_pin_cycles_and_siblings_resolve_lexically() {
+        let valid = lower(&parse("sub {\n b\n a @pin(x: b.E + 4g)\n}\n"));
+        assert!(layout(&valid, &LayoutOptions::default(), None).is_ok());
+
+        let cyclic = lower(&parse("sub {\n a @pin(x: b.E + 4g)\n b @pin(x: a.W - 4g)\n}\n"));
+        let err = layout(&cyclic, &LayoutOptions::default(), None).unwrap_err();
+        assert!(err.to_string().contains("cyclic relative pin anchors"));
+    }
+
+    #[test]
+    fn local_query_detects_external_prefix_pin_dependency() {
+        let opts = LayoutOptions::default();
+        let before = lower(&parse(
+            "sub {\n a @pin(x: sub_ext.E + 4g)\n}\nsub_ext [label: \"Old\"]\n",
+        ));
+        let prior = layout(&before, &opts, None).unwrap();
+        let after = lower(&parse(
+            "sub {\n a @pin(x: sub_ext.E + 4g)\n}\nsub_ext [label: \"Much Longer External Node\"]\n",
+        ));
+        let keys = query_keys(&after, &opts).0;
+        assert!(local_query(&after, &opts, &prior, &keys).is_none());
     }
 }
