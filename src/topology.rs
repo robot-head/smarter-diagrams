@@ -2746,7 +2746,11 @@ mod stage1a {
         }
         let mut fold_row = vec![0usize; n];
         if !unfolded_only {
+            let min_fold_len = if comps.len() > 1 { 7 } else { 5 };
             for comp in &comps {
+                if comp.len() < min_fold_len {
+                    continue;
+                }
                 if let Some(folded) =
                     try_serpentine_fold(scene, comp, &ranks, &bk.order, fas, options)
                 {
@@ -3694,6 +3698,19 @@ mod tests {
         assert!(
             bounds.w < 1150.0 && bounds.h < 650.0,
             "expected compact container bounds, got {bounds:?}"
+        );
+    }
+
+    #[test]
+    fn multi_component_graphs_require_seven_nodes_to_fold() {
+        let src = include_str!("../tests/fixtures/quality/12-independent-systems.diagram");
+        let s = crate::model::lower(&crate::syntax::parse(src));
+        let o = LayoutOptions::default();
+        let sz = vec![Point::new(112.0, 52.0); s.nodes.len()];
+        let c = candidates(&s, &sz, &o);
+        assert!(
+            c[0].fold_row.iter().all(|&r| r == 0),
+            "5-node component in a multi-component graph must stay unfolded"
         );
     }
 }
