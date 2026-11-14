@@ -317,6 +317,21 @@ fn port(ep: &Endpoint, a: Rect, b: Rect, o: &LayoutOptions) -> (Point, Side) {
     (p, side)
 }
 pub fn optimize(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions) -> ShapeStats {
+    optimize_scaled(scene, rects, o, 1.0)
+}
+/// Shape optimization whose grid cells grow with the label-retry `spacing`
+/// factor, so whitespace retries also widen optimized components.
+pub fn optimize_scaled(
+    scene: &SceneGraph,
+    rects: &mut [Rect],
+    o: &LayoutOptions,
+    spacing: f64,
+) -> ShapeStats {
+    let spacing = if spacing.is_finite() {
+        spacing.max(1.0)
+    } else {
+        1.0
+    };
     let mut stats = ShapeStats::default();
     if o.shape_budget == 0 {
         return stats;
@@ -378,9 +393,11 @@ pub fn optimize(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions) -> Sh
             original.iter().map(|p| p.y).sum::<f64>() / n as f64,
         );
         let width =
-            sizes.iter().map(|r| r.w).reduce(f64::max).unwrap() + 2. * o.stub + 4. * o.margin;
+            (sizes.iter().map(|r| r.w).reduce(f64::max).unwrap() + 2. * o.stub + 4. * o.margin)
+                * spacing;
         let height =
-            sizes.iter().map(|r| r.h).reduce(f64::max).unwrap() + 2. * o.stub + 4. * o.margin;
+            (sizes.iter().map(|r| r.h).reduce(f64::max).unwrap() + 2. * o.stub + 4. * o.margin)
+                * spacing;
         let columns = (n as f64).sqrt().ceil() as usize;
         let rows = n.div_ceil(columns);
         let cells: Vec<_> = (0..n)
@@ -410,16 +427,25 @@ pub fn optimize(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions) -> Sh
                 if !mset.contains(&su) && local.contains_key(&sv) {
                     let dx = (rects[su].x - center.x).round() as i32;
                     let dy = (rects[su].y - center.y).round() as i32;
-                    ext_dirs.push((local[&sv], if dx == 0 { -1 } else { dx.signum() }, dy.signum()));
+                    ext_dirs.push((
+                        local[&sv],
+                        if dx == 0 { -1 } else { dx.signum() },
+                        dy.signum(),
+                    ));
                 } else if local.contains_key(&su) && !mset.contains(&sv) {
                     let dx = (rects[sv].x - center.x).round() as i32;
                     let dy = (rects[sv].y - center.y).round() as i32;
-                    ext_dirs.push((local[&su], if dx == 0 { 1 } else { dx.signum() }, dy.signum()));
+                    ext_dirs.push((
+                        local[&su],
+                        if dx == 0 { 1 } else { dx.signum() },
+                        dy.signum(),
+                    ));
                 }
             }
         }
         let rem_budget = o.shape_budget.saturating_sub(stats.searched_states);
-        let (domus_opt, sat_used) = stage1a::domus_solve_component(scene, &members, rem_budget, &ext_dirs);
+        let (domus_opt, sat_used) =
+            stage1a::domus_solve_component(scene, &members, rem_budget, &ext_dirs);
         let mut search = Search {
             scene,
             options: o,
@@ -721,10 +747,10 @@ pub fn coffman_graham(scene: &SceneGraph, width: usize) -> Vec<usize> {
 }
 
 mod stage1a {
-    use super::{components, FlowAxis, SideHints, TopologyPlan};
+    use super::{FlowAxis, SideHints, TopologyPlan, components};
     use crate::formal::satisfy;
     use crate::labels::{connection_text, text_height, text_width};
-    use crate::layout::{effective_annotations, LayoutOptions, Point, Rect};
+    use crate::layout::{LayoutOptions, Point, Rect, effective_annotations};
     use crate::model::{Axis, SceneGraph, Side};
     use std::cmp::Reverse;
     use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
@@ -829,21 +855,22 @@ mod stage1a {
         while rem > 0 {
             let mut peeled = false;
             loop {
-                let best_sink = (0..m)
-                    .filter(|&u| alive[u] && active_out[u] == 0)
-                    .max_by(|&a, &b| {
-                        let ka = (
-                            to_s2[a] + ext_out[a],
-                            Reverse(from_s1[a] + ext_in[a]),
-                            Reverse(scene.nodes[subset[a]].id.as_str()),
-                        );
-                        let kb = (
-                            to_s2[b] + ext_out[b],
-                            Reverse(from_s1[b] + ext_in[b]),
-                            Reverse(scene.nodes[subset[b]].id.as_str()),
-                        );
-                        ka.cmp(&kb)
-                    });
+                let best_sink =
+                    (0..m)
+                        .filter(|&u| alive[u] && active_out[u] == 0)
+                        .max_by(|&a, &b| {
+                            let ka = (
+                                to_s2[a] + ext_out[a],
+                                Reverse(from_s1[a] + ext_in[a]),
+                                Reverse(scene.nodes[subset[a]].id.as_str()),
+                            );
+                            let kb = (
+                                to_s2[b] + ext_out[b],
+                                Reverse(from_s1[b] + ext_in[b]),
+                                Reverse(scene.nodes[subset[b]].id.as_str()),
+                            );
+                            ka.cmp(&kb)
+                        });
                 let Some(u) = best_sink else { break };
                 peeled = true;
                 alive[u] = false;
@@ -857,21 +884,22 @@ mod stage1a {
                 }
             }
             loop {
-                let best_src = (0..m)
-                    .filter(|&u| alive[u] && active_in[u] == 0)
-                    .max_by(|&a, &b| {
-                        let ka = (
-                            from_s1[a] + ext_in[a],
-                            Reverse(to_s2[a] + ext_out[a]),
-                            Reverse(scene.nodes[subset[a]].id.as_str()),
-                        );
-                        let kb = (
-                            from_s1[b] + ext_in[b],
-                            Reverse(to_s2[b] + ext_out[b]),
-                            Reverse(scene.nodes[subset[b]].id.as_str()),
-                        );
-                        ka.cmp(&kb)
-                    });
+                let best_src =
+                    (0..m)
+                        .filter(|&u| alive[u] && active_in[u] == 0)
+                        .max_by(|&a, &b| {
+                            let ka = (
+                                from_s1[a] + ext_in[a],
+                                Reverse(to_s2[a] + ext_out[a]),
+                                Reverse(scene.nodes[subset[a]].id.as_str()),
+                            );
+                            let kb = (
+                                from_s1[b] + ext_in[b],
+                                Reverse(to_s2[b] + ext_out[b]),
+                                Reverse(scene.nodes[subset[b]].id.as_str()),
+                            );
+                            ka.cmp(&kb)
+                        });
                 let Some(u) = best_src else { break };
                 peeled = true;
                 alive[u] = false;
@@ -887,25 +915,23 @@ mod stage1a {
             if peeled || rem == 0 {
                 continue;
             }
-            let best_cycle = (0..m)
-                .filter(|&u| alive[u])
-                .max_by(|&a, &b| {
-                    let da = active_out[a] as isize - active_in[a] as isize;
-                    let db = active_out[b] as isize - active_in[b] as isize;
-                    let ka = (
-                        da,
-                        from_s1[a] + ext_in[a],
-                        Reverse(to_s2[a] + ext_out[a]),
-                        Reverse(scene.nodes[subset[a]].id.as_str()),
-                    );
-                    let kb = (
-                        db,
-                        from_s1[b] + ext_in[b],
-                        Reverse(to_s2[b] + ext_out[b]),
-                        Reverse(scene.nodes[subset[b]].id.as_str()),
-                    );
-                    ka.cmp(&kb)
-                });
+            let best_cycle = (0..m).filter(|&u| alive[u]).max_by(|&a, &b| {
+                let da = active_out[a] as isize - active_in[a] as isize;
+                let db = active_out[b] as isize - active_in[b] as isize;
+                let ka = (
+                    da,
+                    from_s1[a] + ext_in[a],
+                    Reverse(to_s2[a] + ext_out[a]),
+                    Reverse(scene.nodes[subset[a]].id.as_str()),
+                );
+                let kb = (
+                    db,
+                    from_s1[b] + ext_in[b],
+                    Reverse(to_s2[b] + ext_out[b]),
+                    Reverse(scene.nodes[subset[b]].id.as_str()),
+                );
+                ka.cmp(&kb)
+            });
             if let Some(u) = best_cycle {
                 alive[u] = false;
                 rem -= 1;
@@ -1173,25 +1199,23 @@ mod stage1a {
             }
             in_tree_node[0] = true;
             let mut tree_cnt = 1usize;
-            let expand_tight = |in_t: &mut [bool],
-                                t_edge: &mut [bool],
-                                c_rk: &[i32],
-                                t_cnt: &mut usize| {
-                let mut bq: VecDeque<usize> = (0..m).filter(|&i| in_t[i]).collect();
-                while let Some(u) = bq.pop_front() {
-                    for &(v, ei) in &incident[u] {
-                        if !in_t[v] {
-                            let e = &w_edges[ei];
-                            if c_rk[e.v] - c_rk[e.u] == e.min_len {
-                                in_t[v] = true;
-                                t_edge[ei] = true;
-                                *t_cnt += 1;
-                                bq.push_back(v);
+            let expand_tight =
+                |in_t: &mut [bool], t_edge: &mut [bool], c_rk: &[i32], t_cnt: &mut usize| {
+                    let mut bq: VecDeque<usize> = (0..m).filter(|&i| in_t[i]).collect();
+                    while let Some(u) = bq.pop_front() {
+                        for &(v, ei) in &incident[u] {
+                            if !in_t[v] {
+                                let e = &w_edges[ei];
+                                if c_rk[e.v] - c_rk[e.u] == e.min_len {
+                                    in_t[v] = true;
+                                    t_edge[ei] = true;
+                                    *t_cnt += 1;
+                                    bq.push_back(v);
+                                }
                             }
                         }
                     }
-                }
-            };
+                };
             expand_tight(&mut in_tree_node, &mut tree_edge, &c_rank, &mut tree_cnt);
             while tree_cnt < m {
                 let mut best: Option<(i32, usize, bool)> = None;
@@ -1460,9 +1484,8 @@ mod stage1a {
         let shifted: Vec<usize> = ranks.iter().map(|&r| (r - min_r) as usize).collect();
         let max_r = *shifted.iter().max().unwrap_or(&0);
         let mut v_rank: Vec<usize> = shifted.clone();
-        let mut v_key: Vec<(u8, String)> = (0..n)
-            .map(|u| (0u8, scene.nodes[u].id.clone()))
-            .collect();
+        let mut v_key: Vec<(u8, String)> =
+            (0..n).map(|u| (0u8, scene.nodes[u].id.clone())).collect();
         let mut layer_edges: Vec<Vec<(usize, usize)>> = vec![Vec::new(); max_r];
         let mut edge_dummies: Vec<(usize, bool, Vec<usize>)> = Vec::new();
         let mut total_span = 0usize;
@@ -1675,7 +1698,9 @@ mod stage1a {
             return None;
         }
         if members.iter().any(|&u| {
-            scene.nodes[u].container || scene.nodes[u].parent.is_some() || is_node_pinned(scene, u, o)
+            scene.nodes[u].container
+                || scene.nodes[u].parent.is_some()
+                || is_node_pinned(scene, u, o)
         }) {
             return None;
         }
@@ -1738,7 +1763,56 @@ mod stage1a {
             }
         }
 
-        let build_modulo = |cw: usize| -> (Vec<usize>, Vec<usize>, usize, usize) {
+        // Per-boundary row-turn cost. Folding between rank r and r + 1 is free
+        // only at a clean single-node articulation neck (e.g. `join0 -> d1`);
+        // turning inside a branch/join diamond, fan, or parallel bundle stacks
+        // siblings in one fold cell and forces long detours around the turn.
+        let mut cross_edge_count = vec![0usize; span];
+        for e in &scene.edges {
+            let (Some(su), Some(sv)) = (scene.index(&e.source.node), scene.index(&e.target.node))
+            else {
+                continue;
+            };
+            if !mset.contains(&su) || !mset.contains(&sv) || su == sv {
+                continue;
+            }
+            let ru = (ranks[su] - min_r) as usize;
+            let rv = (ranks[sv] - min_r) as usize;
+            for c in &mut cross_edge_count[ru.min(rv)..ru.max(rv)] {
+                *c += 1;
+            }
+        }
+        let turn_cost: Vec<usize> = (0..span.saturating_sub(1))
+            .map(|r| {
+                let mut cost = 0usize;
+                if parallel_adj[r] {
+                    cost += 10;
+                }
+                if rank_groups[r].len() > 1
+                    || rank_groups[r + 1].len() > 1
+                    || cross_edge_count[r] > 1
+                {
+                    cost += 4;
+                }
+                cost
+            })
+            .collect();
+        // (parallel bundle splits, summed turn cost) over all row turns.
+        let tally = |row_of_r: &[usize]| -> (usize, usize) {
+            let mut splits = 0usize;
+            let mut cost = 0usize;
+            for r in 0..span.saturating_sub(1) {
+                if row_of_r[r] != row_of_r[r + 1] {
+                    cost += turn_cost[r];
+                    if parallel_adj[r] {
+                        splits += 1;
+                    }
+                }
+            }
+            (splits, cost)
+        };
+
+        let build_modulo = |cw: usize| -> (Vec<usize>, Vec<usize>, usize) {
             let num_rows = span.div_ceil(cw);
             let mut row_of_r = vec![0usize; span];
             let mut col_of_r = vec![0usize; span];
@@ -1752,13 +1826,10 @@ mod stage1a {
                     cw - 1 - off
                 };
             }
-            let splits = (0..span.saturating_sub(1))
-                .filter(|&r| parallel_adj[r] && row_of_r[r] != row_of_r[r + 1])
-                .count();
-            (row_of_r, col_of_r, num_rows, splits)
+            (row_of_r, col_of_r, num_rows)
         };
 
-        let build_walk = |cw: usize| -> (Vec<usize>, Vec<usize>, usize, usize) {
+        let build_walk = |cw: usize| -> (Vec<usize>, Vec<usize>, usize) {
             let mut row_of_r = vec![0usize; span];
             let mut col_of_r = vec![0usize; span];
             let mut start = 0usize;
@@ -1772,16 +1843,34 @@ mod stage1a {
                     start_col + 1
                 };
                 let mut len = max_slots.min(span - start);
-                if len >= 2 && start + len < span && parallel_adj[start + len - 1] {
-                    let new_len = len - 1;
-                    let new_end_col =
-                        (start_col as isize + dir * (new_len as isize - 1)) as usize;
-                    let next_max = if dir > 0 {
-                        new_end_col + 1
-                    } else {
-                        cw - new_end_col
-                    };
-                    if next_max >= 2 {
+                if len >= 2 && start + len < span && turn_cost[start + len - 1] > 0 {
+                    // Step back to the cleanest earlier cut (articulation neck)
+                    // that still leaves room for the next row.
+                    let cur = turn_cost[start + len - 1];
+                    let mut pick: Option<(usize, usize)> = None;
+                    for new_len in (2..len).rev() {
+                        let c = turn_cost[start + new_len - 1];
+                        if c >= cur {
+                            continue;
+                        }
+                        let new_end_col =
+                            (start_col as isize + dir * (new_len as isize - 1)) as usize;
+                        let next_max = if dir > 0 {
+                            new_end_col + 1
+                        } else {
+                            cw - new_end_col
+                        };
+                        if next_max < 2 {
+                            continue;
+                        }
+                        if pick.is_none_or(|(pc, _)| c < pc) {
+                            pick = Some((c, new_len));
+                        }
+                        if c == 0 {
+                            break;
+                        }
+                    }
+                    if let Some((_, new_len)) = pick {
                         len = new_len;
                     }
                 }
@@ -1795,17 +1884,12 @@ mod stage1a {
                 start += len;
                 row += 1;
             }
-            let num_rows = row.max(1);
-            let splits = (0..span.saturating_sub(1))
-                .filter(|&r| parallel_adj[r] && row_of_r[r] != row_of_r[r + 1])
-                .count();
-            (row_of_r, col_of_r, num_rows, splits)
+            (row_of_r, col_of_r, row.max(1))
         };
 
         struct FoldChoice {
-            best_splits: usize,
-            mod_splits: usize,
-            da: f64,
+            splits: usize,
+            score: f64,
             non_base: bool,
             row_of_r: Vec<usize>,
             col_of_r: Vec<usize>,
@@ -1813,41 +1897,42 @@ mod stage1a {
         }
         let base_w =
             ((members.len() as f64 * o.target_aspect_ratio).sqrt().ceil() as usize).clamp(3, 4);
+        let mut widths = vec![3usize, 4usize];
+        if span >= 10 && rank_groups.iter().any(|g| g.len() > 1) {
+            widths.push(5usize);
+        }
         let mut best_choice: Option<FoldChoice> = None;
-        for cw in [3usize, 4usize] {
-            let (m_row, m_col, m_rows, m_splits) = build_modulo(cw);
-            let (row_of_r, col_of_r, num_rows, best_splits) = if m_splits == 0 {
-                (m_row, m_col, m_rows, m_splits)
-            } else {
-                let (w_row, w_col, w_rows, w_splits) = build_walk(cw);
-                if w_splits < m_splits {
-                    (w_row, w_col, w_rows, w_splits)
-                } else {
-                    (m_row, m_col, m_rows, m_splits)
+        for cw in widths {
+            for (walk, (row_of_r, col_of_r, num_rows)) in
+                [(false, build_modulo(cw)), (true, build_walk(cw))]
+            {
+                let (splits, cost) = tally(&row_of_r);
+                let est_ar = (cw as f64 * 150.0) / (num_rows as f64 * 96.0);
+                let da = (est_ar - o.target_aspect_ratio).abs();
+                // Irregular walks must buy a real reduction in turn cost.
+                let score = cost as f64 + 10. * da + if walk { 2. } else { 0. };
+                let non_base = cw != base_w;
+                let replace = match &best_choice {
+                    None => true,
+                    Some(b) => {
+                        splits < b.splits
+                            || (splits == b.splits
+                                && (score < b.score - 1e-9
+                                    || ((score - b.score).abs() <= 1e-9
+                                        && !non_base
+                                        && b.non_base)))
+                    }
+                };
+                if replace {
+                    best_choice = Some(FoldChoice {
+                        splits,
+                        score,
+                        non_base,
+                        row_of_r,
+                        col_of_r,
+                        num_rows,
+                    });
                 }
-            };
-            let est_ar = (cw as f64 * 150.0) / (num_rows as f64 * 96.0);
-            let da = (est_ar - o.target_aspect_ratio).abs();
-            let non_base = cw != base_w;
-            let replace = match &best_choice {
-                None => true,
-                Some(b) => {
-                    (best_splits, m_splits) < (b.best_splits, b.mod_splits)
-                        || ((best_splits, m_splits) == (b.best_splits, b.mod_splits)
-                            && (da.total_cmp(&b.da).is_lt()
-                                || (da.total_cmp(&b.da).is_eq() && !non_base && b.non_base)))
-                }
-            };
-            if replace {
-                best_choice = Some(FoldChoice {
-                    best_splits,
-                    mod_splits: m_splits,
-                    da,
-                    non_base,
-                    row_of_r,
-                    col_of_r,
-                    num_rows,
-                });
             }
         }
         let FoldChoice {
@@ -1869,6 +1954,7 @@ mod stage1a {
         let mut out_ranks = ranks.to_vec();
         let mut out_order = order.to_vec();
         let mut fold_row = vec![0usize; scene.nodes.len()];
+        let mut slot_of = vec![0usize; scene.nodes.len()];
         for (r, g) in rank_groups.iter().enumerate() {
             let row = row_of_r[r];
             let col = col_of_r[r];
@@ -1876,8 +1962,16 @@ mod stage1a {
                 out_ranks[u] = col as i32;
                 out_order[u] = (row_base[row] + slot) as i32;
                 fold_row[u] = row;
+                slot_of[u] = slot;
             }
         }
+        // A vertical S -> N turn hint is only clean when it leaves the bottom-most
+        // node of its fold cell and enters the top-most node of the next row's
+        // cell; otherwise it would pass straight through a stacked sibling.
+        let clean_turn = |su: usize, sv: usize| -> bool {
+            let ru = (ranks[su] - min_r) as usize;
+            slot_of[su] + 1 == rank_groups[ru].len() && slot_of[sv] == 0
+        };
         let mut side_hints = vec![None; scene.edges.len()];
         for (ei, e) in scene.edges.iter().enumerate() {
             let (Some(su), Some(sv)) = (scene.index(&e.source.node), scene.index(&e.target.node))
@@ -1893,12 +1987,23 @@ mod stage1a {
             let row_v = fold_row[sv];
             if rv == ru + 1 {
                 if row_u == row_v {
-                    side_hints[ei] = if out_ranks[sv] > out_ranks[su] {
-                        Some((Side::E, Side::W))
+                    let (fwd_src, fwd_dst) = if out_ranks[sv] > out_ranks[su] {
+                        (Side::E, Side::W)
                     } else {
-                        Some((Side::W, Side::E))
+                        (Side::W, Side::E)
                     };
-                } else if row_v == row_u + 1 {
+                    // Branch/join diamonds: the top branch stays a straight
+                    // facing edge; the stacked bottom branch leaves/enters
+                    // through the single node's S vertex as a 1-bend L.
+                    let (gu, gv) = (rank_groups[ru].len(), rank_groups[rv].len());
+                    side_hints[ei] = Some(if gu == 1 && gv == 2 && slot_of[sv] == 1 {
+                        (Side::S, fwd_dst)
+                    } else if gu == 2 && gv == 1 && slot_of[su] == 1 {
+                        (fwd_src, Side::S)
+                    } else {
+                        (fwd_src, fwd_dst)
+                    });
+                } else if row_v == row_u + 1 && clean_turn(su, sv) {
                     side_hints[ei] = Some((Side::S, Side::N));
                 }
             } else if rv > ru + 1 && row_u == row_v {
@@ -1907,7 +2012,11 @@ mod stage1a {
                 } else if row_u + 1 == num_rows {
                     side_hints[ei] = Some((Side::S, Side::S));
                 }
-            } else if rv > ru + 1 && row_v == row_u + 1 && out_ranks[su] == out_ranks[sv] {
+            } else if rv > ru + 1
+                && row_v == row_u + 1
+                && out_ranks[su] == out_ranks[sv]
+                && clean_turn(su, sv)
+            {
                 side_hints[ei] = Some((Side::S, Side::N));
             }
         }
@@ -2174,12 +2283,7 @@ mod stage1a {
             };
             let mut clauses: Vec<Vec<i32>> = Vec::new();
             for ei in 0..ne {
-                clauses.push(vec![
-                    v_dir(ei, 0),
-                    v_dir(ei, 1),
-                    v_dir(ei, 2),
-                    v_dir(ei, 3),
-                ]);
+                clauses.push(vec![v_dir(ei, 0), v_dir(ei, 1), v_dir(ei, 2), v_dir(ei, 3)]);
                 for d1 in 0..4u8 {
                     for d2 in (d1 + 1)..4u8 {
                         clauses.push(vec![-v_dir(ei, d1), -v_dir(ei, d2)]);
@@ -2248,10 +2352,7 @@ mod stage1a {
                                 let (e1, f1) = list[i];
                                 let (e2, f2) = list[j];
                                 for d in 0..4u8 {
-                                    clauses.push(vec![
-                                        -step_dir(e1, f1, d),
-                                        -step_dir(e2, f2, d),
-                                    ]);
+                                    clauses.push(vec![-step_dir(e1, f1, d), -step_dir(e2, f2, d)]);
                                 }
                             }
                         }
@@ -2314,8 +2415,7 @@ mod stage1a {
                 break;
             }
             searched += 1;
-            if let Some(dirs) =
-                build_and_solve(&base_edges, &basis_cycles, m, req4, port_m, hints)
+            if let Some(dirs) = build_and_solve(&base_edges, &basis_cycles, m, req4, port_m, hints)
             {
                 solved = Some((dirs, base_edges.clone(), m));
                 break;
@@ -2479,14 +2579,7 @@ mod stage1a {
                 edge_hints.push((ei, ss, ts));
             }
         }
-        (
-            Some(DomusResult {
-                gx,
-                gy,
-                edge_hints,
-            }),
-            searched,
-        )
+        (Some(DomusResult { gx, gy, edge_hints }), searched)
     }
 
     pub(super) fn rects_non_overlapping(
@@ -2592,7 +2685,11 @@ mod stage1a {
         let mut ranks = vec![0i32; n];
         let mut cursor = 0i32;
         for (_, mut units) in by_mr {
-            units.sort_by(|&a, &b| scene.nodes[macro_roots[a]].id.cmp(&scene.nodes[macro_roots[b]].id));
+            units.sort_by(|&a, &b| {
+                scene.nodes[macro_roots[a]]
+                    .id
+                    .cmp(&scene.nodes[macro_roots[b]].id)
+            });
             let mut any_leaf = false;
             for &mi in &units {
                 let r = macro_roots[mi];
@@ -2715,12 +2812,8 @@ mod stage1a {
                                 }
                             }
                         }
-                        let (domus_opt, used) = domus_solve_component(
-                            scene,
-                            scc,
-                            options.shape_budget.min(64),
-                            &ext,
-                        );
+                        let (domus_opt, used) =
+                            domus_solve_component(scene, scc, options.shape_budget.min(64), &ext);
                         states += used;
                         if let Some(res) = domus_opt
                             && res.gy.iter().any(|&y| y > 0)
@@ -2818,8 +2911,7 @@ mod stage1a {
         let max_r = *ranks.iter().max().unwrap_or(&0);
         let depth = (max_r - min_r) as usize;
         let branching = out_deg.iter().filter(|&&d| d >= 2).count();
-        let is_multilevel_tree =
-            in_deg.iter().all(|&d| d <= 1) && depth >= 2 && branching >= 2;
+        let is_multilevel_tree = in_deg.iter().all(|&d| d <= 1) && depth >= 2 && branching >= 2;
         if is_multilevel_tree {
             return true;
         }
@@ -2881,7 +2973,16 @@ mod stage1a {
         let mut v_nodes: Vec<usize> = (0..n).filter(|&i| ranks[i] == max_r).collect();
         let dense = (u_nodes.len() >= 2 && v_nodes.len() >= 3)
             || (u_nodes.len() >= 3 && v_nodes.len() >= 2);
-        if !dense {
+        // Large or nested bipartite meshes force long quadrant detours and
+        // bypass container packing; keep the cross only for small flat graphs.
+        if !dense
+            || u_nodes.len() > 4
+            || v_nodes.len() > 4
+            || scene
+                .nodes
+                .iter()
+                .any(|nd| nd.container || nd.parent.is_some())
+        {
             return None;
         }
         let mut deg = vec![0usize; n];
@@ -2972,7 +3073,10 @@ mod stage1a {
         let n = scene.nodes.len();
         if n < 4
             || canonical.fold_row.iter().any(|&r| r > 0)
-            || scene.nodes.iter().any(|nd| nd.container || nd.parent.is_some())
+            || scene
+                .nodes
+                .iter()
+                .any(|nd| nd.container || nd.parent.is_some())
         {
             return None;
         }
@@ -3003,7 +3107,11 @@ mod stage1a {
             if let (Some(su), Some(sv)) = (scene.index(&e.source.node), scene.index(&e.target.node))
                 && (su == hub || sv == hub)
                 && su != sv
-                && pair_mult.get(&(su.min(sv), su.max(sv))).copied().unwrap_or(0) <= 1
+                && pair_mult
+                    .get(&(su.min(sv), su.max(sv)))
+                    .copied()
+                    .unwrap_or(0)
+                    <= 1
             {
                 let rank_gap = (canonical.ranks[sv] - canonical.ranks[su]).abs();
                 if rank_gap >= 2 {
@@ -3050,7 +3158,10 @@ mod stage1a {
             return out;
         }
         let folded = plan0.fold_row.iter().any(|&r| r > 0);
-        if !folded && should_emit_top_to_bottom(scene, sizes, &raw_ranks) {
+        // Flat raw-rank candidates bypass owner-grouped ranks and container
+        // packing, so containers only explore owner-aware LeftToRight plans.
+        let has_containers = scene.nodes.iter().any(|nd| nd.container);
+        if !has_containers && !folded && should_emit_top_to_bottom(scene, sizes, &raw_ranks) {
             out.push(TopologyPlan {
                 axis: FlowAxis::TopToBottom,
                 ranks: raw_ranks.clone(),
@@ -3061,7 +3172,8 @@ mod stage1a {
                 search_states: plan0.search_states,
             });
         }
-        if let Some(qc) = try_quadrant_cross(scene, &raw_ranks, raw_bk.crossings) {
+        if !has_containers && let Some(qc) = try_quadrant_cross(scene, &raw_ranks, raw_bk.crossings)
+        {
             out.push(qc);
         }
         if folded {
@@ -3409,9 +3521,7 @@ mod tests {
 
     #[test]
     fn fas_and_gansner_respect_source_pull_forward_and_decl_order() {
-        let s_fwd = scene_of(
-            "s0 -> s1 -> s2 -> s3 -> s4 -> s5 -> s6 -> s7\ns0 -> s3\ns2 -> s6\n",
-        );
+        let s_fwd = scene_of("s0 -> s1 -> s2 -> s3 -> s4 -> s5 -> s6 -> s7\ns0 -> s3\ns2 -> s6\n");
         let s_rev = scene_of(
             "s7\ns2\ns5\ns0\ns3\ns1\ns6\ns4\ns0 -> s1 -> s2 -> s3 -> s4 -> s5 -> s6 -> s7\ns0 -> s3\ns2 -> s6\n",
         );
@@ -3425,8 +3535,14 @@ mod tests {
         for id in ["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7"] {
             let uf = s_fwd.index(id).unwrap();
             let ur = s_rev.index(id).unwrap();
-            assert_eq!(c_fwd[0].ranks[uf], c_rev[0].ranks[ur], "rank mismatch on {id}");
-            assert_eq!(c_fwd[0].order[uf], c_rev[0].order[ur], "order mismatch on {id}");
+            assert_eq!(
+                c_fwd[0].ranks[uf], c_rev[0].ranks[ur],
+                "rank mismatch on {id}"
+            );
+            assert_eq!(
+                c_fwd[0].order[uf], c_rev[0].order[ur],
+                "order mismatch on {id}"
+            );
             assert_eq!(
                 c_fwd[0].fold_row[uf], c_rev[0].fold_row[ur],
                 "fold_row mismatch on {id}"
@@ -3477,7 +3593,10 @@ mod tests {
             .iter()
             .find(|e| e.source.node == "a" && e.target.node == "d")
             .unwrap();
-        let guides = c[0].edge_guides.get(&skip.id).expect("expected edge_guides on skip");
+        let guides = c[0]
+            .edge_guides
+            .get(&skip.id)
+            .expect("expected edge_guides on skip");
         assert_eq!(guides.len(), 2);
     }
 
@@ -3520,7 +3639,10 @@ mod tests {
         let rb = tq.index("ring_b").unwrap();
         let rc = tq.index("ring_c").unwrap();
         let rd = tq.index("ring_d").unwrap();
-        let orders: BTreeSet<i32> = [ra, rb, rc, rd].into_iter().map(|i| cp[0].order[i]).collect();
+        let orders: BTreeSet<i32> = [ra, rb, rc, rd]
+            .into_iter()
+            .map(|i| cp[0].order[i])
+            .collect();
         assert!(orders.len() >= 2, "ring should span 2 rows: {orders:?}");
     }
 
@@ -3537,20 +3659,36 @@ mod tests {
 
         // Multi-level tree emits TopToBottom; 1-hop star does NOT
         let tree = scene_of("r -> a\nr -> b\na -> a1\na -> a2\nb -> b1\nb -> b2\n");
-        let c_tree = candidates(&tree, &vec![Point::new(112.0, 52.0); tree.nodes.len()], &o_explore);
+        let c_tree = candidates(
+            &tree,
+            &vec![Point::new(112.0, 52.0); tree.nodes.len()],
+            &o_explore,
+        );
         assert!(c_tree.iter().any(|p| p.axis == FlowAxis::TopToBottom));
-        let c_tree_no = candidates(&tree, &vec![Point::new(112.0, 52.0); tree.nodes.len()], &o_no);
+        let c_tree_no = candidates(
+            &tree,
+            &vec![Point::new(112.0, 52.0); tree.nodes.len()],
+            &o_no,
+        );
         assert_eq!(c_tree_no.len(), 1);
 
         let star = scene_of("hub -> l0\nhub -> l1\nhub -> l2\nhub -> l3\nhub -> l4\n");
-        let c_star = candidates(&star, &vec![Point::new(112.0, 52.0); star.nodes.len()], &o_explore);
+        let c_star = candidates(
+            &star,
+            &vec![Point::new(112.0, 52.0); star.nodes.len()],
+            &o_explore,
+        );
         assert!(!c_star.iter().any(|p| p.axis == FlowAxis::TopToBottom));
 
         // K3,3 emits QuadrantCross with centered axes and L-corridor side_hints
         let k33 = scene_of(
             "u0 -> v0\nu0 -> v1\nu0 -> v2\nu1 -> v0\nu1 -> v1\nu1 -> v2\nu2 -> v0\nu2 -> v1\nu2 -> v2\n",
         );
-        let c_k33 = candidates(&k33, &vec![Point::new(112.0, 52.0); k33.nodes.len()], &o_explore);
+        let c_k33 = candidates(
+            &k33,
+            &vec![Point::new(112.0, 52.0); k33.nodes.len()],
+            &o_explore,
+        );
         let qc = c_k33
             .iter()
             .find(|p| p.axis == FlowAxis::QuadrantCross)
@@ -3567,16 +3705,45 @@ mod tests {
         let o = LayoutOptions::default();
         let mut rects = vec![Rect::new(0.0, 0.0, 112.0, 52.0); s.nodes.len()];
         let hints = readable_concept(&s, &mut rects, &o, true);
-        assert!(hints.is_some(), "expected readable_concept Some for 8-node chain");
+        assert!(
+            hints.is_some(),
+            "expected readable_concept Some for 8-node chain"
+        );
         let min_x = rects.iter().map(|r| r.left()).fold(f64::INFINITY, f64::min);
-        let max_x = rects.iter().map(|r| r.right()).fold(f64::NEG_INFINITY, f64::max);
+        let max_x = rects
+            .iter()
+            .map(|r| r.right())
+            .fold(f64::NEG_INFINITY, f64::max);
         let min_y = rects.iter().map(|r| r.top()).fold(f64::INFINITY, f64::min);
-        let max_y = rects.iter().map(|r| r.bottom()).fold(f64::NEG_INFINITY, f64::max);
+        let max_y = rects
+            .iter()
+            .map(|r| r.bottom())
+            .fold(f64::NEG_INFINITY, f64::max);
         let doc = crate::compile(src).unwrap();
-        let lx0 = doc.layout.nodes.values().map(|r| r.left()).fold(f64::INFINITY, f64::min);
-        let lx1 = doc.layout.nodes.values().map(|r| r.right()).fold(f64::NEG_INFINITY, f64::max);
-        let ly0 = doc.layout.nodes.values().map(|r| r.top()).fold(f64::INFINITY, f64::min);
-        let ly1 = doc.layout.nodes.values().map(|r| r.bottom()).fold(f64::NEG_INFINITY, f64::max);
+        let lx0 = doc
+            .layout
+            .nodes
+            .values()
+            .map(|r| r.left())
+            .fold(f64::INFINITY, f64::min);
+        let lx1 = doc
+            .layout
+            .nodes
+            .values()
+            .map(|r| r.right())
+            .fold(f64::NEG_INFINITY, f64::max);
+        let ly0 = doc
+            .layout
+            .nodes
+            .values()
+            .map(|r| r.top())
+            .fold(f64::INFINITY, f64::min);
+        let ly1 = doc
+            .layout
+            .nodes
+            .values()
+            .map(|r| r.bottom())
+            .fold(f64::NEG_INFINITY, f64::max);
         assert!(max_x > min_x && max_y > min_y);
         assert!(
             (lx1 - lx0) / (ly1 - ly0).max(1.0) < 2.5,
@@ -3587,7 +3754,8 @@ mod tests {
 
     #[test]
     fn serpentine_folds_five_stage_bypass_and_keeps_parallel_bundles_on_same_row() {
-        let bypass_src = "n0 -> n1 -> n2 -> n3 -> n4\nn2 -> n4: a\nn2 -> n4: b\nn3 -> n4: c\nn1 -> n4: ack\n";
+        let bypass_src =
+            "n0 -> n1 -> n2 -> n3 -> n4\nn2 -> n4: a\nn2 -> n4: b\nn3 -> n4: c\nn1 -> n4: ack\n";
         let s_bypass = crate::model::lower(&crate::syntax::parse(bypass_src));
         let o = LayoutOptions::default();
         let sz_bypass = vec![Point::new(112.0, 52.0); s_bypass.nodes.len()];
@@ -3624,7 +3792,8 @@ mod tests {
         );
         assert_ne!(c_par[0].ranks[n8], c_par[0].ranks[n9]);
 
-        let dual_split_src = "n0 -> n1 -> n2 -> n3 -> n4 -> n5 -> n6 -> n7 -> n8 -> n9\nn2 -> n3: b\nn7 -> n8: c\n";
+        let dual_split_src =
+            "n0 -> n1 -> n2 -> n3 -> n4 -> n5 -> n6 -> n7 -> n8 -> n9\nn2 -> n3: b\nn7 -> n8: c\n";
         let s_dual = crate::model::lower(&crate::syntax::parse(dual_split_src));
         let sz_dual = vec![Point::new(112.0, 52.0); s_dual.nodes.len()];
         let c_dual = candidates(&s_dual, &sz_dual, &o);
