@@ -18,6 +18,7 @@ pub mod edit;
 #[cfg(feature = "export")]
 pub mod export;
 pub mod formal;
+pub mod highlight;
 pub mod labels;
 pub mod layout;
 pub mod lint;
@@ -31,6 +32,7 @@ pub mod simulation;
 pub mod solver;
 pub mod spatial;
 pub mod syntax;
+pub mod themes;
 pub mod topology;
 pub mod views;
 #[cfg(feature = "wasm")]
@@ -102,6 +104,10 @@ impl Diagram {
     /// Render the existing scene and geometry as escaped, accessible SVG.
     pub fn to_svg(&self) -> String {
         render::svg(&self.scene, &self.layout)
+    }
+    /// Render the existing scene and geometry with an explicit [`themes::ThemePalette`].
+    pub fn to_svg_with_theme(&self, theme: &themes::ThemePalette) -> String {
+        render::svg_with_theme(&self.scene, &self.layout, Some(theme))
     }
 }
 /// Compile UTF-8 source with default options and no prior geometry.

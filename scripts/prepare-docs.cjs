@@ -8,7 +8,11 @@ const publicDir = path.join(root, 'site/public');
 const palette = fs.readFileSync(path.join(root,'web/diagram-palette.css'),'utf8');
 const lightPalette = palette.match(/:root\{([^}]+)\}/)[1];
 const darkPalette = lightPalette + ';' + palette.match(/:root\[data-theme=dark\]\{([^}]+)\}/)[1];
-const themed = (svg,dark=false) => svg.replace('<svg ',`<svg style="${dark?darkPalette:lightPalette}" `).replace(/width="[^"]+" height="[^"]+" role="img"/, 'width="100%" height="auto" role="img"');
+const themed = (svg, dark = false) =>
+  (svg.includes('data-explicit-theme=')
+    ? svg
+    : svg.replace('<svg ', `<svg style="${dark ? darkPalette : lightPalette}" `))
+    .replace(/width="[^"]+" height="[^"]+" role="img"/, 'width="100%" height="auto" role="img"');
 const release = process.argv.includes('--release');
 const copy = (from, to) => { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.cpSync(from, to, { recursive: true }); };
 const required = ['web/pkg/smarter_diagrams_bg.wasm', 'web/pkg-runtime/smarter_diagrams_bg.wasm', 'target/doc/smarter_diagrams/index.html'];
@@ -35,11 +39,11 @@ for (const file of ['architecture', 'performance', 'verification']) {
 }
 const languageSamples = new Map();
 const comparisons = [];
-const samplePages=['site/index.md','site/examples.md',...['language','guide'].flatMap(dir=>fs.readdirSync(path.join(root,'site',dir)).filter(f=>f.endsWith('.md')).map(f=>`site/${dir}/${f}`))];
+const samplePages=['site/index.md','site/examples.md',...['language','guide','runtime'].flatMap(dir=>fs.readdirSync(path.join(root,'site',dir)).filter(f=>f.endsWith('.md')).map(f=>`site/${dir}/${f}`))];
 for (const file of samplePages) {
   const text = fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n/g, '\n');
-  for (const match of text.matchAll(/^```(diagram[^\n]*)\n([\s\S]*?)^```/gm)) {
-    const group=samples(match[2],match[1]);
+  for (const match of text.matchAll(/^(`{3,})(diagram[^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm)) {
+    const group=samples(match[3],match[2]);
     for (const sample of group) languageSamples.set(key(sample), { ...sample, label: `${file}: ${sample.label}` });
     if(group.length>1)comparisons.push(group.map(key));
   }
@@ -70,6 +74,10 @@ for(const group of comparisons){
   for(const id of group){const result=results.get(id);result.viewBox=[left,top,right-left,bottom-top];result.svg=result.svg.replace(/viewBox="[^"]+" width="[^"]+" height="[^"]+"/,`viewBox="${result.viewBox.join(' ')}" width="${right-left}" height="${bottom-top}"`);}
 }
 const destination = path.join(publicDir, 'generated/language'); fs.mkdirSync(destination, { recursive: true });
+const cliBin = path.join(root, 'target/debug/smarter-diagrams');
+const themeDump = spawnSync(cliBin, ['--dump-themes'], { encoding: 'utf8' });
+if (themeDump.status !== 0) throw Error(`Cannot dump built-in themes: ${themeDump.stderr || themeDump.error}`);
+fs.writeFileSync(path.join(publicDir, 'generated/themes.json'), themeDump.stdout);
 for (let i = 0; i < requests.length; i++) {
   const result=images[i];
   if(result.diagnostic){manifest[key(requests[i])]=result;continue;}

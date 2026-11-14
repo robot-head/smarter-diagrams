@@ -1,15 +1,22 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, useId } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useId, watch } from 'vue'
 import { withBase, useData } from 'vitepress'
 import {touchGestures} from '../../../web/touch-gestures.js'
 
 type NodeRow = { id: string; label: string; shape: string; parent: string | null; bounds: { x:number; y:number; w:number; h:number }; ports: { id:string; label:string; constraint:unknown }[] }
 type Example = { file:string; darkFile:string; label:string; description:string; viewBox:number[]; grid:number; nodes:NodeRow[]; edges:{ id:string; source:string; target:string; label:string; kind:string }[]; zones:{label:string;members:string[]}[]; flows:{label:string;steps:string[]}[] }
+type ThemeEntry = { id:string; label:string; dark:boolean; bg:string; css:string }
 const props = defineProps<{ examples:Example[]; title:string; guides?:boolean }>()
 const { isDark } = useData()
 const fitted = ref(true), readable = ref(true), coarse = ref(false)
 const active = ref(0), zoom = ref(1), showGrid = ref(false), viewport = ref<HTMLElement>(), viewportWidth = ref(640)
+const selectedTheme = ref('auto')
+const themedBlobUrl = ref<string | null>(null)
+let themeCache: ThemeEntry[] | null = null
+const svgCache = new Map<string, string>()
 const id = useId(), current = computed(() => props.examples[active.value])
+const baseSvgUrl = computed(() => withBase(`/generated/language/${isDark.value ? current.value.darkFile : current.value.file}`))
+const activeSvgUrl = computed(() => (selectedTheme.value !== 'auto' && themedBlobUrl.value) ? themedBlobUrl.value : baseSvgUrl.value)
 const bounds = computed(() => current.value.viewBox)
 const imageStyle = computed(() => ({ width:`${bounds.value[2]*zoom.value}px`, height:`${bounds.value[3]*zoom.value}px` }))
 const fitScale = computed(() => Math.max(readable.value ? coarse.value ? .55 : .7 : .05, Math.min(1, viewportWidth.value / bounds.value[2], 520 / bounds.value[3])))
@@ -21,9 +28,41 @@ const gridLines = computed(() => {
   for(let n=Math.ceil(y/grid)*grid;n<=y+h;n+=grid) ys.push(n)
   return {xs,ys}
 })
+async function applyThemeUrl() {
+  if (selectedTheme.value === 'auto') {
+    if (themedBlobUrl.value) { URL.revokeObjectURL(themedBlobUrl.value); themedBlobUrl.value = null }
+    return
+  }
+  if (!themeCache) {
+    const res = await fetch(withBase('/generated/themes.json'))
+    if (!res.ok) return
+    themeCache = await res.json()
+  }
+  const palette = themeCache?.find(t => t.id === selectedTheme.value)
+  if (!palette) return
+  const srcUrl = baseSvgUrl.value
+  let raw = svgCache.get(srcUrl)
+  if (!raw) {
+    const res = await fetch(srcUrl)
+    if (!res.ok) return
+    raw = await res.text()
+    svgCache.set(srcUrl, raw)
+  }
+  let styled = raw.replace(/\sstyle="[^"]*"/, ` style="${palette.css};background:${palette.bg}"`)
+  if (!styled.includes('data-theme-bg="true"')) {
+    const [vx, vy, vw, vh] = bounds.value
+    styled = styled.replace('</style>', `</style><rect data-theme-bg="true" x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="${palette.bg}"/>`)
+  } else {
+    styled = styled.replace(/<rect data-theme-bg="true"[^>]*\/>/, `<rect data-theme-bg="true" x="${bounds.value[0]}" y="${bounds.value[1]}" width="${bounds.value[2]}" height="${bounds.value[3]}" fill="${palette.bg}"/>`)
+  }
+  const nextUrl = URL.createObjectURL(new Blob([styled], { type: 'image/svg+xml' }))
+  if (themedBlobUrl.value) URL.revokeObjectURL(themedBlobUrl.value)
+  themedBlobUrl.value = nextUrl
+}
+watch([selectedTheme, active, isDark], () => { void applyThemeUrl() })
 let observer:ResizeObserver | undefined
 onMounted(() => { if(viewport.value){coarse.value=matchMedia('(pointer: coarse)').matches;viewportWidth.value=viewport.value.clientWidth;zoom.value=fitScale.value;touchGestures(viewport.value,{getZoom:()=>zoom.value,setZoom});observer=new ResizeObserver(entries=>{viewportWidth.value=entries[0].contentRect.width;if(fitted.value)zoom.value=fitScale.value});observer.observe(viewport.value)} })
-onUnmounted(() => observer?.disconnect())
+onUnmounted(() => { observer?.disconnect(); if (themedBlobUrl.value) URL.revokeObjectURL(themedBlobUrl.value) })
 function setZoom(value:number){ fitted.value=false;zoom.value=Math.max(0.05,Math.min(4,value)) }
 function fit(){readable.value=false;fitted.value=true;zoom.value=fitScale.value}
 function wheel(event:WheelEvent){if(!event.ctrlKey&&!event.metaKey)return;event.preventDefault();setZoom(zoom.value*Math.exp(-Math.max(-100,Math.min(100,event.deltaY))*.005))}
@@ -48,13 +87,38 @@ const units = (value:number) => Number((value/current.value.grid).toFixed(2))
         <button aria-label="Actual size (100%)" @click="setZoom(1)"><output aria-live="polite" aria-label="Diagram scale">{{ percent }}</output></button>
         <button aria-label="Zoom in" @click="setZoom(zoom*1.25)">+</button>
         <button @click="fit">Fit</button>
+        <label class="diagram-theme-picker">Theme
+          <select v-model="selectedTheme" class="diagram-theme-select" :aria-label="`${title} color theme`">
+            <option value="auto">Auto (Site)</option>
+            <optgroup label="Catppuccin">
+              <option value="catppuccin-latte">Catppuccin Latte</option>
+              <option value="catppuccin-frappe">Catppuccin Frappe</option>
+              <option value="catppuccin-macchiato">Catppuccin Macchiato</option>
+              <option value="catppuccin-mocha">Catppuccin Mocha</option>
+            </optgroup>
+            <optgroup label="Solarized">
+              <option value="solarized-light">Solarized Light</option>
+              <option value="solarized-dark">Solarized Dark</option>
+            </optgroup>
+            <optgroup label="Base16">
+              <option value="base16-nord">Base16 Nord</option>
+              <option value="base16-ocean">Base16 Ocean</option>
+              <option value="base16-eighties">Base16 Eighties</option>
+              <option value="base16-gruvbox-dark">Base16 Gruvbox Dark</option>
+              <option value="base16-onedark">Base16 OneDark</option>
+              <option value="base16-dracula">Base16 Dracula</option>
+              <option value="base16-tokyo-night">Base16 Tokyo Night</option>
+              <option value="base16-github">Base16 GitHub</option>
+            </optgroup>
+          </select>
+        </label>
         <label v-if="guides"><input v-model="showGrid" type="checkbox"> Show grid</label>
         <span class="diagram-pan-hint">{{ coarse ? 'Pinch to zoom · drag to pan' : 'Ctrl/⌘ + scroll to zoom · swipe to pan' }}</span>
         <span v-if="bounds[2]*zoom > viewportWidth+2" class="diagram-overflow-hint">Pan for more · Fit shows all</span>
       </div>
       <div ref="viewport" class="diagram-viewport" @wheel="wheel" tabindex="0" :aria-label="`${title} diagram. Ctrl or Command plus scroll to zoom; swipe or use arrow keys to pan.`">
         <div class="diagram-stage" :style="imageStyle">
-          <img :src="withBase(`/generated/language/${isDark ? current.darkFile : current.file}`)" loading="lazy" :alt="`${title} — ${current.label}. ${current.nodes.length} nodes and ${current.edges.length} connections. Details follow in Diagram description.`" :aria-describedby="`${id}-description`">
+          <img :src="activeSvgUrl" loading="lazy" :alt="`${title} — ${current.label}. ${current.nodes.length} nodes and ${current.edges.length} connections. Details follow in Diagram description.`" :aria-describedby="`${id}-description`">
           <svg v-if="showGrid" class="diagram-grid" :viewBox="bounds.join(' ')" aria-hidden="true">
             <g stroke="#147467" stroke-opacity=".2" stroke-width=".6">
               <line v-for="x in gridLines.xs" :key="`x${x}`" :x1="x" :x2="x" :y1="bounds[1]" :y2="bounds[1]+bounds[3]"/>
@@ -64,7 +128,7 @@ const units = (value:number) => Number((value/current.value.grid).toFixed(2))
           </svg>
         </div>
       </div>
-      <figcaption>{{ current.label }} · <a :href="withBase(`/generated/language/${isDark ? current.darkFile : current.file}`)" target="_blank" rel="noopener" :aria-label="`Open SVG: ${title} — ${current.label}`">Open SVG ↗</a><span v-if="examples.length>1"> · Comparisons keep the same scale and frame.</span></figcaption>
+      <figcaption>{{ current.label }} · <a :href="activeSvgUrl" target="_blank" rel="noopener" :aria-label="`Open SVG: ${title} — ${current.label}`">Open SVG ↗</a><span v-if="examples.length>1"> · Comparisons keep the same scale and frame.</span></figcaption>
       <details :id="`${id}-description`" class="diagram-description">
         <summary>Diagram description · {{ current.nodes.length }} nodes, {{ current.edges.length }} connections</summary>
         <pre class="diagram-description-pre">{{ current.description }}</pre>

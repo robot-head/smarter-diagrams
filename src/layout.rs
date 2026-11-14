@@ -140,6 +140,9 @@ pub(crate) fn with_top_extra(node: &Node, r: Rect) -> Rect {
     Rect::new(r.x, r.y - extra / 2., r.w, r.h + extra)
 }
 pub(crate) fn title_width(node: &Node) -> f64 {
+    if let Some(code) = crate::highlight::measure(&node.label, &node.shape) {
+        return code.total_w;
+    }
     crate::labels::text_width(&crate::labels::node_title(node)) * 16. / 15.
         + 32.
         + crate::shapes::title_gutter(&node.shape)
@@ -484,7 +487,9 @@ fn compute_base_sizes(
                 .get("stereotype")
                 .map(|v| crate::model::unquote(v.text.trim()))
                 .filter(|s| !s.trim().is_empty())
-                .map_or(0., |s| crate::labels::text_width(&format!("«{}»", s.trim())) * 12. / 15. + 28.)
+                .map_or(0., |s| {
+                    crate::labels::text_width(&format!("«{}»", s.trim())) * 12. / 15. + 28.
+                })
         } else {
             0.
         };
@@ -506,7 +511,11 @@ fn compute_base_sizes(
             .map(|row| record_row_width(row))
             .reduce(f64::max)
             .unwrap_or(0.);
-        let mut w = title_width(node).max(112.).max(stereo_w).max(port_w).max(extra_w);
+        let mut w = title_width(node)
+            .max(112.)
+            .max(stereo_w)
+            .max(port_w)
+            .max(extra_w);
         let has_fixed_rows = is_record_shape(&node.shape)
             && node
                 .ports
@@ -522,7 +531,11 @@ fn compute_base_sizes(
             (node.ports.len() as f64 + 2.) * o.grid
         };
         let title = crate::labels::node_title(node);
-        h = h.max(title.split('\n').count() as f64 * 20. + 28.);
+        if let Some(code) = crate::highlight::measure(&node.label, &node.shape) {
+            h = h.max(code.total_h);
+        } else if !title.is_empty() {
+            h = h.max(title.split('\n').count() as f64 * 20. + 28.);
+        }
         if is_class_shape(&node.shape) {
             h = h.max(class_header_height(node));
         }
@@ -628,9 +641,7 @@ fn compute_base_sizes(
             }
             for e in &scene.edges {
                 for ep in [&e.source, &e.target] {
-                    if ep.port.is_none()
-                        && ep.node == node.id
-                        && ep.constraint.side() == Some(side)
+                    if ep.port.is_none() && ep.node == node.id && ep.constraint.side() == Some(side)
                     {
                         fixed_count += 1;
                         match ep.constraint {
@@ -4578,10 +4589,9 @@ fn choose_attachment_pair(
             _ => r.x,
         };
         let ty = match *c {
-            PortConstraint::FixedPos { side, offset_grid } if side == s => {
-                (r.top() + record_slot_offset(node, offset_grid, o.grid))
-                    .clamp(r.top() + cy, r.bottom() - cy)
-            }
+            PortConstraint::FixedPos { side, offset_grid } if side == s => (r.top()
+                + record_slot_offset(node, offset_grid, o.grid))
+            .clamp(r.top() + cy, r.bottom() - cy),
             PortConstraint::FixedRatio { side, ratio } if side == s => {
                 (r.top() + ratio * r.h).clamp(r.top() + cy, r.bottom() - cy)
             }
@@ -4974,7 +4984,14 @@ fn choose_port_sides(
             let b = rects[j];
             let side = if source { pair.0 } else { pair.1 };
             let other_side = if source { pair.1 } else { pair.0 };
-            let base = port_target(&scene.nodes[j], b, &other.constraint, side, other_side, o.grid);
+            let base = port_target(
+                &scene.nodes[j],
+                b,
+                &other.constraint,
+                side,
+                other_side,
+                o.grid,
+            );
             let target = parallel_order(scene, e, source, pair.0, pair.1, &endpoint_sides, base)
                 .unwrap_or(base);
 
@@ -5150,9 +5167,8 @@ fn grow_port_perimeters(
                 }
                 for (_peer_idx, count) in facing_counts {
                     if count >= 2 {
-                        length = length.max(
-                            count.saturating_sub(1) as f64 * o.port_spacing + 2. * o.corner,
-                        );
+                        length = length
+                            .max(count.saturating_sub(1) as f64 * o.port_spacing + 2. * o.corner);
                     }
                 }
             }
@@ -6303,9 +6319,13 @@ pub fn validate(scene: &SceneGraph, l: &Layout, o: &LayoutOptions) -> Result<(),
             return Err(Error::Layout("non-finite or empty node geometry".into()));
         }
         let title = crate::labels::node_title(a);
-        let title_height = (title.lines().count().saturating_sub(1)) as f64 * 20.
-            + 18.
-            + if a.shape == "database" { 16. } else { 0. };
+        let title_height = if let Some(code) = crate::highlight::measure(&a.label, &a.shape) {
+            code.total_h - 8.
+        } else {
+            (title.lines().count().saturating_sub(1)) as f64 * 20.
+                + 18.
+                + if a.shape == "database" { 16. } else { 0. }
+        };
         if !a.container
             && !is_record_shape(&a.shape)
             && !matches!(a.shape.as_str(), "diamond" | "decision")

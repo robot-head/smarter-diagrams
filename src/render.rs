@@ -596,7 +596,24 @@ pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
 }
 
 pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
-    svg_with_decorations(scene, l, |_| true, |_, _| String::new())
+    svg_with_theme(scene, l, None)
+}
+
+/// Render SVG using an explicit theme override (falling back to `scene.theme` if `None`).
+pub fn svg_with_theme(
+    scene: &SceneGraph,
+    l: &Layout,
+    theme: Option<&crate::themes::ThemePalette>,
+) -> String {
+    let owned;
+    let resolved = match theme {
+        Some(t) => Some(t),
+        None => {
+            owned = scene.theme.as_deref().and_then(crate::themes::by_name);
+            owned.as_ref()
+        }
+    };
+    svg_themed_with_decorations(scene, l, resolved, |_| true, |_, _| String::new())
 }
 
 // Decorations belong inside the node's opacity group and below its text.
@@ -606,12 +623,71 @@ pub(crate) fn svg_with_decorations(
     edge_visible: impl Fn(&str) -> bool,
     decorate: impl Fn(&Node, Rect) -> String,
 ) -> String {
+    let owned = scene.theme.as_deref().and_then(crate::themes::by_name);
+    svg_themed_with_decorations(scene, l, owned.as_ref(), edge_visible, decorate)
+}
+
+fn edge_stroke_style(e: &Edge) -> (&'static str, &'static str) {
+    let style_val = e
+        .attrs
+        .get("style")
+        .map(|v| crate::model::unquote(v.text.trim()))
+        .unwrap_or_default();
+    let animate = e
+        .attrs
+        .get("animate")
+        .is_some_and(|v| crate::model::unquote(v.text.trim()) == "true");
+    if animate
+        || matches!(
+            style_val.as_str(),
+            "marching-ants" | "marching_ants" | "animated"
+        )
+    {
+        (" marching-ants", " stroke-dasharray=\"6 4\"")
+    } else if style_val == "dashed" {
+        ("", " stroke-dasharray=\"6 4\"")
+    } else if style_val == "dotted" {
+        ("", " stroke-dasharray=\"2 4\" stroke-linecap=\"round\"")
+    } else {
+        ("", "")
+    }
+}
+
+pub(crate) fn svg_themed_with_decorations(
+    scene: &SceneGraph,
+    l: &Layout,
+    theme: Option<&crate::themes::ThemePalette>,
+    edge_visible: impl Fn(&str) -> bool,
+    decorate: impl Fn(&Node, Rect) -> String,
+) -> String {
     let ellipses = all_zone_ellipses(scene, l);
     let titles = zone_titles_from_ellipses(scene, l, &ellipses);
     let bounds = bounds_with(scene, l, &ellipses, &titles);
     let masks = edge_masks(scene, l, &edge_visible);
+    let theme_attrs = theme
+        .map(|t| {
+            format!(
+                " data-explicit-theme=\"{}\" style=\"{};background:var(--sd-bg,{})\"",
+                escape(&t.id),
+                t.css_vars(),
+                escape(&t.bg)
+            )
+        })
+        .unwrap_or_default();
+    let theme_bg_rect = theme
+        .map(|t| {
+            format!(
+                "<rect data-theme-bg=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"var(--sd-bg,{})\"/>",
+                bounds.left(),
+                bounds.top(),
+                bounds.w,
+                bounds.h,
+                escape(&t.bg)
+            )
+        })
+        .unwrap_or_default();
     let mut s = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:var(--sd-fg,#233347)}}.node-title{{font-weight:600;font-size:16px}}.port-label{{font-size:13px}}.edge{{fill:none;stroke:var(--sd-edge,#53657a);stroke-width:1.85;stroke-linejoin:round}}.flow{{fill:none;stroke:var(--sd-flow,#356bd9);stroke-width:3.2;stroke-linejoin:round}}.class-hdr{{fill:var(--sd-node,#e5eef6)}}.class-sub{{font:500 11.5px/1.2 var(--sd-font,Inter,ui-sans-serif,system-ui,sans-serif);fill:var(--sd-edge,#53657a)}}.port-type{{font:500 12px/1.35 ui-monospace,'SFMono-Regular',Consolas,monospace;fill:var(--sd-edge,#53657a)}}.class-rule{{stroke:var(--sd-border,#6b8198);stroke-opacity:.36}}.row-rule{{stroke:var(--sd-border,#6b8198);stroke-opacity:.22}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:var(--sd-edge,#53657a)}}</style>",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\"{theme_attrs} role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:var(--sd-fg,#233347)}}.node-title{{font-weight:600;font-size:16px}}.port-label{{font-size:13px}}.edge{{fill:none;stroke:var(--sd-edge,#53657a);stroke-width:1.85;stroke-linejoin:round}}.flow{{fill:none;stroke:var(--sd-flow,#356bd9);stroke-width:3.2;stroke-linejoin:round}}.class-hdr{{fill:var(--sd-node,#e5eef6)}}.class-sub{{font:500 11.5px/1.2 var(--sd-font,Inter,ui-sans-serif,system-ui,sans-serif);fill:var(--sd-edge,#53657a)}}.port-type{{font:500 12px/1.35 ui-monospace,'SFMono-Regular',Consolas,monospace;fill:var(--sd-edge,#53657a)}}.class-rule{{stroke:var(--sd-border,#6b8198);stroke-opacity:.36}}.row-rule{{stroke:var(--sd-border,#6b8198);stroke-opacity:.22}}.code-box{{fill:var(--sd-code-bg,#f1f5fa);stroke:var(--sd-code-border,#c2d0e0);stroke-width:1}}.code-hdr{{fill:var(--sd-code-header,#e4ecf5)}}.code-lang{{font:600 10.5px/1 ui-monospace,'SFMono-Regular',Consolas,monospace;fill:var(--sd-edge,#53657a)}}.code-line{{font:500 12.5px/1.35 ui-monospace,'SFMono-Regular',Consolas,monospace;fill:var(--sd-fg,#233347)}}.syn-kw{{fill:var(--sd-syn-kw,#6d28d9);font-weight:600}}.syn-str{{fill:var(--sd-syn-str,#047857)}}.syn-num{{fill:var(--sd-syn-num,#b45309)}}.syn-cmt{{fill:var(--sd-syn-cmt,#526378);font-style:italic}}.syn-type{{fill:var(--sd-syn-type,#0f766e)}}.syn-fn{{fill:var(--sd-syn-fn,#1d4ed8)}}@keyframes sd-marching-ants{{from{{stroke-dashoffset:20}}to{{stroke-dashoffset:0}}}}.marching-ants{{stroke-dasharray:6 4;animation:sd-marching-ants .85s linear infinite}}@media(prefers-reduced-motion:reduce){{.marching-ants{{animation:none}}}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:var(--sd-edge,#53657a)}}</style>{theme_bg_rect}",
         bounds.left(),
         bounds.top(),
         bounds.w,
@@ -696,11 +772,10 @@ pub(crate) fn svg_with_decorations(
         .collect();
     for e in &scene.edges {
         let r = &l.routes[&e.id];
-        let dashed = e.attrs.get("style").is_some_and(|v| v.text == "dashed");
-        let dash = if dashed && !e.attrs.contains_key("phantom") {
-            " stroke-dasharray=\"6 4\""
+        let (extra_class, dash) = if !e.attrs.contains_key("phantom") {
+            edge_stroke_style(e)
         } else {
-            ""
+            ("", "")
         };
         let phantom = if e.attrs.contains_key("phantom") {
             " stroke=\"#c345ac\" stroke-dasharray=\"5 4\""
@@ -732,7 +807,7 @@ pub(crate) fn svg_with_decorations(
         let mask = gap_mask(&e.id, &masks);
         let _ = write!(
             s,
-            "<path data-edge=\"{}\" class=\"edge\" style=\"stroke:{color};stroke-width:{width}\" d=\"{}\"{mask}{dash}{phantom}><title>{}</title></path>",
+            "<path data-edge=\"{}\" class=\"edge{extra_class}\" style=\"stroke:{color};stroke-width:{width}\" d=\"{}\"{mask}{dash}{phantom}><title>{}</title></path>",
             escape(&e.id),
             rounded_path(&shaft),
             escape(&format!(
@@ -994,9 +1069,7 @@ pub(crate) fn svg_with_decorations(
                         emit_row(&mut s, r.top() + extra_y + 12., row);
                         extra_y += 18.;
                     }
-                    if !extra_methods.is_empty()
-                        && (slot_bottom > 0. || !extra_fields.is_empty())
-                    {
+                    if !extra_methods.is_empty() && (slot_bottom > 0. || !extra_fields.is_empty()) {
                         let dy = r.top() + extra_y + 2.;
                         let _ = write!(
                             s,
@@ -1020,6 +1093,68 @@ pub(crate) fn svg_with_decorations(
                         extra_y += 18.;
                     }
                 }
+            }
+        } else if let Some(code) = crate::highlight::measure(&n.label, &n.shape) {
+            let gutter = crate::shapes::title_gutter(&n.shape);
+            let center_x = r.x + gutter / 2.;
+            let db_top = if n.shape == "database" {
+                crate::shapes::CYLINDER_RY.min(r.h / 2.) * 2. + 4.
+            } else {
+                0.
+            };
+            let mut cy = r.top() + code.outer_y + db_top;
+            if !code.title.is_empty() {
+                let _ = write!(
+                    s,
+                    "<text class=\"node-title\" text-anchor=\"middle\" dominant-baseline=\"central\" x=\"{:.2}\" y=\"{:.2}\">{}</text>",
+                    center_x,
+                    cy + code.title_h / 2.,
+                    text_content(&code.title, center_x, 20.)
+                );
+                cy += code.title_h + code.gap_title;
+            }
+            for (bi, block) in code.blocks.iter().enumerate() {
+                if bi > 0 {
+                    cy += code.gap_blocks;
+                }
+                let bx = center_x - block.w / 2.;
+                let _ = write!(
+                    s,
+                    "<rect class=\"code-box\" x=\"{bx:.2}\" y=\"{cy:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"5\"/>",
+                    block.w, block.h
+                );
+                if block.header_h > 0. {
+                    let _ = write!(
+                        s,
+                        "<rect class=\"code-hdr\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"4\"/><text class=\"code-lang\" x=\"{:.2}\" y=\"{:.2}\">{}</text>",
+                        bx + 1.,
+                        cy + 1.,
+                        block.w - 2.,
+                        block.header_h - 1.,
+                        bx + 10.,
+                        cy + 13.,
+                        escape(&block.lang.to_ascii_uppercase())
+                    );
+                }
+                let mut ly = cy + 9. + block.header_h + 12.;
+                for line_tokens in &block.lines {
+                    let _ = write!(
+                        s,
+                        "<text class=\"code-line\" xml:space=\"preserve\" x=\"{:.2}\" y=\"{ly:.2}\">",
+                        bx + 12.
+                    );
+                    for tok in line_tokens {
+                        if let Some(cls) = tok.kind.css_class() {
+                            let _ =
+                                write!(s, "<tspan class=\"{cls}\">{}</tspan>", escape(&tok.text));
+                        } else {
+                            s.push_str(&escape(&tok.text));
+                        }
+                    }
+                    s.push_str("</text>");
+                    ly += 17.;
+                }
+                cy += block.h;
             }
         } else {
             let _ = write!(
@@ -1110,9 +1245,10 @@ pub(crate) fn svg_with_decorations(
                 } else {
                     String::new()
                 };
+                let (extra_class, dash) = edge_stroke_style(edge);
                 let _ = write!(
                     s,
-                    "<g aria-label=\"{} step {}\"><path data-edge=\"{}\" class=\"flow\"{width_attr} d=\"{}\"{mask}/></g>",
+                    "<g aria-label=\"{} step {}\"><path data-edge=\"{}\" class=\"flow{extra_class}\"{width_attr}{dash} d=\"{}\"{mask}/></g>",
                     escape(&flow.label),
                     step + 1,
                     escape(id),

@@ -342,3 +342,11 @@ West and East remain separate owners. Their feedback uses an inner channel and a
 [Open in the editor](/demo/?example=peer-feedback) · [Download source](/examples/peer-feedback.diagram)
 
 <<< ../examples/peer-feedback.diagram
+
+### Syntax-highlighted code blocks, marching ants, and themes
+
+Nodes can embed fenced `sql`, `rust`, `go`, `ts`, `python`, `json`, or `yaml` blocks inside triple-quoted labels, edges can animate with `[style: marching-ants]`, and any example can be viewed in Catppuccin, Solarized, or Base16 palettes from the toolbar above.
+
+[Open in the editor](/demo/?example=themes-and-code) · [Download source](/examples/themes-and-code.diagram)
+
+<<< ../examples/themes-and-code.diagram

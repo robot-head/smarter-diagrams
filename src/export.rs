@@ -1,17 +1,56 @@
 //! Native PNG/PDF export, optional so font/raster dependencies stay out of the core Wasm bundle.
 use crate::Error;
 
-fn color_fallbacks(value: &str) -> String {
+use std::collections::BTreeMap;
+
+fn parse_root_vars(svg: &str) -> BTreeMap<String, String> {
+    let mut vars = BTreeMap::new();
+    let Some(svg_start) = svg.find("<svg") else {
+        return vars;
+    };
+    let Some(svg_end) = svg[svg_start..].find('>').map(|n| svg_start + n) else {
+        return vars;
+    };
+    let tag = &svg[svg_start..svg_end];
+    let Some(style_start) = tag.find(" style=\"").map(|n| n + 8) else {
+        return vars;
+    };
+    let Some(style_end) = tag[style_start..].find('"').map(|n| style_start + n) else {
+        return vars;
+    };
+    for decl in tag[style_start..style_end].split(';') {
+        if let Some((k, v)) = decl.split_once(':') {
+            let key = k.trim();
+            let val = v.trim();
+            if key.starts_with("--sd-") && !val.is_empty() {
+                vars.insert(key.to_owned(), val.to_owned());
+            }
+        }
+    }
+    vars
+}
+
+fn color_fallbacks(value: &str, overrides: &BTreeMap<String, String>) -> String {
     let mut value = value.to_owned();
-    while let Some(start) = value.find("var(--sd-") {
+    let mut pos = 0;
+    while let Some(start) = value[pos..].find("var(--sd-").map(|n| pos + n) {
         let Some(end) = value[start..].find(')').map(|n| start + n) else {
             break;
         };
-        let Some((_, fallback)) = value[start..end].split_once(',') else {
-            break;
+        let inner = &value[start + 4..end];
+        let replacement = if let Some((name, fallback)) = inner.split_once(',') {
+            overrides
+                .get(name.trim())
+                .cloned()
+                .unwrap_or_else(|| fallback.trim().to_owned())
+        } else if let Some(val) = overrides.get(inner.trim()) {
+            val.clone()
+        } else {
+            pos = end + 1;
+            continue;
         };
-        let fallback = fallback.trim().to_owned();
-        value.replace_range(start..=end, &fallback);
+        value.replace_range(start..=end, &replacement);
+        pos = start + replacement.len();
     }
     value
 }
@@ -19,6 +58,7 @@ fn color_fallbacks(value: &str) -> String {
 // Resolve only paint attributes and style declarations. A diagram caption can
 // itself contain CSS syntax, which must remain literal text in native exports.
 fn native_svg(svg: &str) -> String {
+    let overrides = parse_root_vars(svg);
     let mut output = String::with_capacity(svg.len());
     let mut cursor = 0;
     while let Some(open) = svg[cursor..].find('<').map(|n| cursor + n) {
@@ -37,7 +77,7 @@ fn native_svg(svg: &str) -> String {
                 let Some(end) = tag[start..].find('"').map(|n| start + n) else {
                     break;
                 };
-                let fallback = color_fallbacks(&tag[start..end]);
+                let fallback = color_fallbacks(&tag[start..end], &overrides);
                 tag.replace_range(start..end, &fallback);
                 offset = start + fallback.len() + 1;
             }
@@ -47,7 +87,7 @@ fn native_svg(svg: &str) -> String {
         if tag.starts_with("<style")
             && let Some(end) = svg[cursor..].find("</style>").map(|n| cursor + n)
         {
-            output.push_str(&color_fallbacks(&svg[cursor..end]));
+            output.push_str(&color_fallbacks(&svg[cursor..end], &overrides));
             cursor = end;
         }
     }
@@ -141,5 +181,25 @@ mod tests {
         assert!(native.contains("font-size:15px;fill:#233347"));
         assert!(!native.contains("fill=\"var("));
         assert!(!native.contains("fill:var("));
+    }
+
+    #[test]
+    fn themed_code_and_marching_ants_render_to_png() {
+        let src = r#"
+theme: catppuccin-mocha
+api: "API\n```rust\npub fn handle() -> bool { true }\n```"
+db: "Store\n```sql\nSELECT id FROM jobs;\n```"
+api -> db: "query" [style: marching-ants]
+"#;
+        let svg = crate::compile(src).unwrap().to_svg();
+        assert!(svg.contains("data-explicit-theme=\"catppuccin-mocha\""));
+        assert!(svg.contains("marching-ants"));
+        let native = super::native_svg(&svg);
+        let mocha = crate::themes::by_name("catppuccin-mocha").unwrap();
+        assert!(native.contains(&*mocha.bg));
+        assert!(native.contains(&*mocha.syn_kw));
+        let bytes =
+            super::png(&svg, 1.0).expect("resvg must render themed SVG with animations & code");
+        assert!(bytes.starts_with(b"\x89PNG"));
     }
 }

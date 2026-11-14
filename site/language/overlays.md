@@ -60,3 +60,70 @@ metrics -> archive
 The story marks a static path for saliency. `views::causal_cone` and `views::attention` calculate k-hop focus from incoming, outgoing or both directions. The browser uses `focus_svg(node, hops)` for hover emphasis while retaining context.
 
 The **Full context** tab shows the whole story. **Focus: api** applies one-hop focus to `api`: `archive` remains in place with faded shape ink because it is two hops away. Its label keeps enough contrast to remain readable.
+
+## Animated dashed edges (marching ants)
+
+```diagram
+producer: Event Producer
+stream: Kafka Partition [shape: queue]
+consumer: Stream Processor
+sink: Analytics Warehouse [shape: database]
+
+producer -> stream: "publish" [style: marching-ants]
+stream -> consumer: "consume" [style: marching-ants]
+consumer -> sink: "flush" [style: dashed]
+
+align row [producer, stream, consumer, sink]
+```
+
+Set `[style: marching-ants]` (or `[style: animated]` / `[animate: true]`) on any edge or flow segment to animate dashed flow along the connection direction. `[style: dotted]` draws dotted strokes, and `[style: dashed]` draws static dashes. Animations automatically honor `@media (prefers-reduced-motion: reduce)`.
+
+## Syntax-highlighted code inside nodes
+
+````diagram
+api: """
+Worker Handler
+```ts
+export async function handle(id: string): Promise<number> {
+  const count = await claimRows(id, 64);
+  return count;
+}
+```
+"""
+
+db: """
+Queue Store
+```sql
+SELECT id, payload
+FROM outbox
+WHERE sent_at IS NULL -- pending rows
+LIMIT 64;
+```
+""" [shape: database]
+
+api -> db: "claim batch" [style: marching-ants]
+````
+
+Triple-quoted `"""..."""` node labels preserve line breaks and common-indent dedenting cleanly. Fenced blocks (`sql`, `rust`, `go`, `ts`/`js`, `python`, `json`/`yaml`, `sh`) render inside a recessed code container sized during layout so connectors never cross text.
+
+## Color themes (Catppuccin, Solarized, Base16)
+
+```diagram
+theme: catppuccin-mocha
+
+ingress: "Edge Router" [shape: actor]
+worker: "Worker Pool"
+cache: "Hot Cache" [shape: cache]
+store: "Primary DB" [shape: database]
+
+ingress -> worker: "dispatch" [style: marching-ants]
+worker -> cache: "lookup"
+worker -> store: "commit"
+align row [ingress, worker, cache]
+```
+
+Every diagram viewer includes a live **Theme** switcher, and authors or CI exports can pin any palette directly:
+
+- **Built-in palettes**: `light`, `dark`, Catppuccin (`catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `catppuccin-mocha`), Solarized (`solarized-light`, `solarized-dark`), and Base16 presets (`base16-nord`, `base16-ocean`, `base16-eighties`, `base16-gruvbox-dark`, `base16-onedark`, `base16-dracula`, `base16-tokyo-night`, `base16-github`).
+- **Source directive**: add `theme: <name>` or `@theme(<name>)` at top level so SVGs and PNG/PDF exports bake in that theme.
+- **Custom Base16 scheme families**: load any standard `base00`–`base0F` YAML or JSON scheme with `--theme-file path/to/scheme.yaml`, `ThemePalette::from_base16_str(...)`, `ThemePalette::from_base16_dir(...)`, or **Import Base16** in the browser playground. All derived shape fills, borders, and syntax token colors are checked to satisfy WCAG contrast (`>= 4.5:1` text, `>= 3:1` outlines).

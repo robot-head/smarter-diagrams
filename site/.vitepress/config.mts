@@ -52,7 +52,7 @@ export default defineConfig({
       md.renderer.rules.fence = (tokens, index, options, env, renderer) => {
         const code = fence(tokens, index, options, env, renderer)
         const token = tokens[index]
-        if (!(env.relativePath?.startsWith('language/') || env.relativePath?.startsWith('guide/') || env.relativePath === 'index.md' || env.relativePath === 'examples.md') || !/^diagram(?:\s|$)/.test(token.info)) return code
+        if (!(env.relativePath?.startsWith('language/') || env.relativePath?.startsWith('guide/') || env.relativePath?.startsWith('runtime/') || env.relativePath === 'index.md' || env.relativePath === 'examples.md') || !/^diagram(?:\s|$)/.test(token.info)) return code
         const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
         let heading = 'Language example'
         for (let i = index - 1; i >= 0; i--) {

@@ -50,6 +50,7 @@ pub enum Kind {
     Endpoint,
     PortAnchor,
     KeyVal,
+    ThemeDecl,
     Error,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -102,6 +103,7 @@ impl Language for DiagramLanguage {
             Kind::Endpoint,
             Kind::PortAnchor,
             Kind::KeyVal,
+            Kind::ThemeDecl,
             Kind::Error,
         ];
         KINDS[raw.0 as usize]
@@ -248,6 +250,17 @@ pub fn lex(source: &str) -> Vec<Token> {
                     .is_some_and(char::is_whitespace))
         {
             (Kind::Comment, rest.find(['\r', '\n']).unwrap_or(rest.len()))
+        } else if rest.starts_with("\"\"\"") {
+            let mut n = 3;
+            while n < rest.len() {
+                if rest[n..].starts_with("\"\"\"") {
+                    n += 3;
+                    break;
+                }
+                let ch = rest[n..].chars().next().unwrap();
+                n += ch.len_utf8();
+            }
+            (Kind::String, n)
         } else if c == '"' {
             let mut n = c.len_utf8();
             let mut escape = false;
@@ -314,6 +327,13 @@ pub fn significant(tokens: &[Token]) -> impl Iterator<Item = &Token> {
         .iter()
         .filter(|t| !matches!(t.kind, Kind::Whitespace | Kind::Newline | Kind::Comment))
 }
+fn is_valid_string_token(raw: &str) -> bool {
+    if let Some(inner) = raw.strip_prefix("\"\"\"") {
+        raw.len() >= 6 && inner.ends_with("\"\"\"")
+    } else {
+        serde_json::from_str::<String>(raw).is_ok()
+    }
+}
 pub fn parse(source: &str) -> Parse {
     let tokens = lex(source);
     let mut p = Parser {
@@ -323,9 +343,7 @@ pub fn parse(source: &str) -> Parse {
         b: GreenNodeBuilder::new(),
         errors: tokens
             .iter()
-            .filter(|t| {
-                t.kind == Kind::String && serde_json::from_str::<String>(t.text(source)).is_err()
-            })
+            .filter(|t| t.kind == Kind::String && !is_valid_string_token(t.text(source)))
             .map(|t| (t.span, "invalid or unterminated quoted string".into()))
             .collect(),
     };
@@ -351,6 +369,32 @@ struct Parser<'a> {
     errors: Vec<(Span, String)>,
 }
 impl Parser<'_> {
+    fn is_theme_directive(&self, line_end: usize) -> bool {
+        let rest: Vec<_> = significant(&self.tokens[self.i + 1..line_end]).collect();
+        if rest.is_empty()
+            || rest.iter().any(|t| {
+                matches!(t.kind, Kind::LBrace | Kind::LBracket | Kind::At) || is_edge(t.kind)
+            })
+        {
+            return false;
+        }
+        if rest[0].kind == Kind::Colon {
+            let val: String = rest[1..]
+                .iter()
+                .map(|t| {
+                    let s = t.text(self.source);
+                    if t.kind == Kind::String {
+                        s.trim_matches('"').to_string()
+                    } else {
+                        s.to_string()
+                    }
+                })
+                .collect();
+            crate::themes::by_name(&val).is_some()
+        } else {
+            true
+        }
+    }
     fn token(&mut self) {
         let t = &self.tokens[self.i];
         self.b.token(t.kind.into(), t.text(self.source));
@@ -411,6 +455,14 @@ impl Parser<'_> {
             {
                 Kind::StoryDecl
             }
+            "@" if self
+                .tokens
+                .get(self.i + 1)
+                .is_some_and(|t| t.text(self.source) == "theme") =>
+            {
+                Kind::ThemeDecl
+            }
+            "theme" if self.is_theme_directive(line_end) => Kind::ThemeDecl,
             "@" if self
                 .tokens
                 .get(self.i + 1)
@@ -644,4 +696,5 @@ pub mod ast {
     view!(Endpoint, Endpoint);
     view!(PortAnchor, PortAnchor);
     view!(KeyVal, KeyVal);
+    view!(ThemeDecl, ThemeDecl);
 }

@@ -206,6 +206,8 @@ pub struct SceneGraph {
     pub views: Vec<View>,
     pub strata: Vec<String>,
     pub story: Vec<NodeId>,
+    #[serde(default)]
+    pub theme: Option<String>,
 }
 impl SceneGraph {
     pub fn index(&self, id: &str) -> Option<usize> {
@@ -244,6 +246,32 @@ pub fn value(attrs: &Attributes, k: &str) -> Option<f64> {
     attrs.get(k).and_then(|v| number(&v.text))
 }
 pub(crate) fn unquote(s: &str) -> String {
+    if let Some(inner) = s
+        .strip_prefix("\"\"\"")
+        .and_then(|rest| rest.strip_suffix("\"\"\""))
+    {
+        let norm = inner.replace("\r\n", "\n");
+        let trimmed_start = norm.strip_prefix('\n').unwrap_or(&norm);
+        let trimmed_end = trimmed_start.trim_end_matches([' ', '\t']);
+        let trimmed_end = trimmed_end.strip_suffix('\n').unwrap_or(trimmed_end);
+        let indent = trimmed_end
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| l.len() - l.trim_start_matches([' ', '\t']).len())
+            .min()
+            .unwrap_or(0);
+        return trimmed_end
+            .lines()
+            .map(|l| {
+                if l.trim().is_empty() {
+                    ""
+                } else {
+                    &l[indent.min(l.len())..]
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
     serde_json::from_str::<String>(s).unwrap_or_else(|_| s.to_owned())
 }
 fn tokens(source: &str, span: Span) -> Vec<Token> {
@@ -452,6 +480,7 @@ pub fn lower(parse: &Parse) -> SceneGraph {
             Kind::ViewDecl => l.view(stmt, scope),
             Kind::StrataDecl => l.strata(stmt),
             Kind::StoryDecl => l.story(stmt, scope),
+            Kind::ThemeDecl => l.theme_decl(stmt),
             _ => {}
         }
     }
@@ -815,7 +844,8 @@ impl Lower<'_> {
                 | Kind::LayoutBlock
                 | Kind::ViewDecl
                 | Kind::StrataDecl
-                | Kind::StoryDecl => self.pending.push((stmt, scope.into())),
+                | Kind::StoryDecl
+                | Kind::ThemeDecl => self.pending.push((stmt, scope.into())),
                 _ => {}
             }
         }
@@ -1331,6 +1361,37 @@ impl Lower<'_> {
             .filter(|t| t.kind == Kind::Ident)
             .map(|t| t.text(self.source).to_string())
             .collect();
+    }
+    fn theme_decl(&mut self, stmt: &SyntaxNode) {
+        let ts = self.header(stmt);
+        let tokens: Vec<_> = ts
+            .iter()
+            .filter(|t| !matches!(t.kind, Kind::At | Kind::Colon | Kind::LParen | Kind::RParen))
+            .collect();
+        let name: String = tokens
+            .iter()
+            .skip(1)
+            .map(|t| {
+                let text = t.text(self.source);
+                if t.kind == Kind::String {
+                    unquote(text)
+                } else {
+                    text.to_string()
+                }
+            })
+            .collect();
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        if crate::themes::by_name(trimmed).is_some() {
+            self.scene.theme = Some(trimmed.to_string());
+        } else {
+            self.error(
+                Span::from(stmt.text_range()),
+                format!("unknown theme {trimmed}"),
+            );
+        }
     }
     fn story(&mut self, stmt: &SyntaxNode, scope: &str) {
         let ts = self.header(stmt);

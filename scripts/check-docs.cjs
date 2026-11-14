@@ -21,11 +21,11 @@ fs.rmSync(output, { recursive: true, force: true });
 fs.mkdirSync(binDir, { recursive: true });
 const rustSnippets = [];
 for (const file of files(path.join(root, 'site')).filter(file => file.endsWith('.md'))) {
-  const text = fs.readFileSync(file, 'utf8');
-  for (const match of text.matchAll(/^```(diagram|rust|toml|json)([^\n]*)\n([\s\S]*?)^```/gm)) {
-    const source = match[3], label = `${path.relative(root, file)}:${text.slice(0, match.index).split('\n').length}`;
-    if (match[1] === 'diagram') { checkDiagram(source, label, /\bexpect-error\b/.test(match[2])); continue; }
-    if (match[1] === 'toml') {
+  const text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+  for (const match of text.matchAll(/^(`{3,})(diagram|rust|toml|json)([^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm)) {
+    const source = match[4], label = `${path.relative(root, file)}:${text.slice(0, match.index).split('\n').length}`;
+    if (match[2] === 'diagram') { checkDiagram(source, label, /\bexpect-error\b/.test(match[3])); continue; }
+    if (match[2] === 'toml') {
       const args = ['-c', 'import sys,tomllib; tomllib.loads(sys.stdin.read())'];
       const opts = { input: source, encoding: 'utf8' };
       let result = spawnSync('python3', args, opts);
@@ -36,7 +36,7 @@ for (const file of files(path.join(root, 'site')).filter(file => file.endsWith('
       if (result.error || result.status !== 0) throw Error(`${label}: ${result.stderr || result.error}`);
       configurations++; continue;
     }
-    if (match[1] === 'json') {
+    if (match[2] === 'json') {
       try { JSON.parse(source); } catch {
         try { for (const line of source.trim().split('\n')) JSON.parse(line); }
         catch (error) { throw Error(`${label}: ${error.message}`); }

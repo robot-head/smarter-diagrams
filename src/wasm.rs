@@ -13,6 +13,36 @@ pub fn render_svg(source: &str) -> Result<String, JsValue> {
         .map_err(|e| JsValue::from_str(&e.with_source(source)))
 }
 #[wasm_bindgen]
+pub fn available_themes_json() -> Result<String, JsValue> {
+    let items: Vec<_> = crate::themes::all_builtin()
+        .into_iter()
+        .map(|t| serde_json::json!({ "id": t.id, "label": t.label, "dark": t.dark }))
+        .collect();
+    serde_json::to_string(&items).map_err(js_error)
+}
+#[wasm_bindgen]
+pub fn parse_base16_theme_json(spec: &str) -> Result<String, JsValue> {
+    let palette = crate::themes::ThemePalette::from_base16_str(spec).map_err(js_error)?;
+    serde_json::to_string(&palette).map_err(js_error)
+}
+#[wasm_bindgen]
+pub fn render_svg_themed(source: &str, theme_or_base16: &str) -> Result<String, JsValue> {
+    let diagram = crate::compile(source).map_err(|e| JsValue::from_str(&e.with_source(source)))?;
+    if theme_or_base16.trim().is_empty() || theme_or_base16 == "auto" {
+        return Ok(diagram.to_svg());
+    }
+    let palette = if let Some(preset) = crate::themes::by_name(theme_or_base16) {
+        preset
+    } else if theme_or_base16.trim_start().starts_with('{') || theme_or_base16.contains("base00") {
+        crate::themes::ThemePalette::from_base16_str(theme_or_base16).map_err(js_error)?
+    } else {
+        return Err(JsValue::from_str(&format!(
+            "unknown theme {theme_or_base16}"
+        )));
+    };
+    Ok(diagram.to_svg_with_theme(&palette))
+}
+#[wasm_bindgen]
 pub fn render_svg_with_options(source: &str, options_json: &str) -> Result<String, JsValue> {
     let options = parse_options(options_json)?;
     crate::compile_with(source, &options, None)
@@ -234,6 +264,24 @@ impl WasmDocument {
 }
 #[wasm_bindgen]
 impl WasmDocument {
+    pub fn svg_themed(&self, theme_or_base16: &str) -> Result<String, JsValue> {
+        let d = self.inner.snapshot();
+        if theme_or_base16.trim().is_empty() || theme_or_base16 == "auto" {
+            return Ok(d.to_svg());
+        }
+        let palette = if let Some(preset) = crate::themes::by_name(theme_or_base16) {
+            preset
+        } else if theme_or_base16.trim_start().starts_with('{')
+            || theme_or_base16.contains("base00")
+        {
+            crate::themes::ThemePalette::from_base16_str(theme_or_base16).map_err(js_error)?
+        } else {
+            return Err(JsValue::from_str(&format!(
+                "unknown theme {theme_or_base16}"
+            )));
+        };
+        Ok(d.to_svg_with_theme(&palette))
+    }
     pub fn flows_json(&self) -> Result<String, JsValue> {
         serde_json::to_string(&self.inner.snapshot().scene.flows).map_err(js_error)
     }

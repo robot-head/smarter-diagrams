@@ -1,0 +1,35 @@
+client: "API Gateway" [shape: actor]
+broker: "Job Broker" [shape: queue]
+
+worker: """
+Job Worker
+```rust
+pub async fn run(q: &Queue) -> Result<(), Err> {
+    while let Some(job) = q.pop().await {
+        process(job, 250).await?;
+    }
+    Ok(())
+}
+```
+"""
+
+ledger: """
+PostgreSQL Outbox
+```sql
+SELECT id, payload, attempts
+FROM job_queue
+WHERE state = 'queued' -- active partition
+ORDER BY run_at ASC
+LIMIT 64;
+```
+""" [shape: database]
+
+client -> broker: "enqueue"
+broker -> worker: "stream" [style: marching-ants]
+worker -> ledger: "claim batch" [style: marching-ants]
+
+align row [client, broker, worker, ledger]
+
+flow claim "Streaming claim loop" {
+  client -> broker -> worker -> ledger
+}

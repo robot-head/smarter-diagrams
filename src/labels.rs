@@ -75,6 +75,17 @@ pub(crate) fn split_record_row(raw: &str) -> (&str, Option<&str>) {
 }
 /// Approximate painted title box of a leaf node (centred in its silhouette).
 fn node_title_rect(node: &Node, r: Rect) -> Rect {
+    if let Some(code) = crate::highlight::measure(&node.label, &node.shape) {
+        if code.title.is_empty() {
+            return Rect::new(r.x, r.top() + code.outer_y, 0., 0.);
+        }
+        return Rect::new(
+            r.x + crate::shapes::title_gutter(&node.shape) / 2.,
+            r.top() + code.outer_y + code.title_h / 2.,
+            (text_width(&code.title) * 16. / 15.).min(r.w),
+            code.title_h.min(r.h),
+        );
+    }
     let title = node_title(node);
     if crate::layout::is_class_shape(&node.shape) {
         let header_h = crate::layout::class_header_height(node);
@@ -2455,7 +2466,9 @@ fn valid_with_port_box(
                     || scene
                         .edge(&f.id)
                         .is_some_and(|e| crate::render::flow_caption(scene, e).is_some()));
-            if !opaque_inline_pill && r.intersects(hit.bounds) && !hit.bounds.inflate(-6.).encloses(r)
+            if !opaque_inline_pill
+                && r.intersects(hit.bounds)
+                && !hit.bounds.inflate(-6.).encloses(r)
             {
                 return false;
             }
@@ -2685,6 +2698,9 @@ pub(crate) fn wrap_text(text: &str, width: f64) -> String {
         .join("\n")
 }
 pub(crate) fn node_title(node: &Node) -> String {
+    if crate::highlight::has_code_blocks(&node.label) {
+        return crate::highlight::extract_title(&node.label);
+    }
     if node.container {
         node.label.clone()
     } else {

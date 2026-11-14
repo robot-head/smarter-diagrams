@@ -271,7 +271,8 @@
 }
 
 .diagram-controls button,
-.diagram-tabs button {
+.diagram-tabs button,
+.diagram-controls select {
   border: 1px solid var(--vp-c-divider);
   background: var(--vp-c-bg-soft);
   color: var(--vp-c-text-1);
@@ -285,14 +286,16 @@
 }
 
 .diagram-controls button:hover,
-.diagram-tabs button:hover {
+.diagram-tabs button:hover,
+.diagram-controls select:hover {
   border-color: var(--vp-c-brand-1);
 }
 
 .diagram-controls button:focus-visible,
 .diagram-tabs button:focus-visible,
 .diagram-viewport:focus-visible,
-.diagram-controls input:focus-visible {
+.diagram-controls input:focus-visible,
+.diagram-controls select:focus-visible {
   outline: 3px solid var(--vp-c-brand-1);
   outline-offset: 2px;
 }
