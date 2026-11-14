@@ -24,7 +24,6 @@ pub(crate) fn container_header_rect(node: &Node, r: Rect) -> Option<Rect> {
         28. + h - 24.,
     ))
 }
-#[allow(dead_code)]
 pub(crate) fn container_header_rect_with_ports(
     node: &Node,
     r: Rect,

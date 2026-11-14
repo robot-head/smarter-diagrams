@@ -178,7 +178,7 @@ pub(crate) fn placements_clear(scene: &SceneGraph, layout: &Layout) -> bool {
             let rect = layout.nodes[&node.id];
             if ignore.contains(&node.id) {
                 node.id != label.feature
-                    && crate::layout::container_header_rect(node, rect)
+                    && crate::layout::container_header_rect_with_ports(node, rect, &layout.ports)
                         .is_some_and(|h| bounds.intersects(h))
             } else if crossed.contains(&node.id) {
                 let opaque_flow_pill = !label.callout
@@ -188,8 +188,9 @@ pub(crate) fn placements_clear(scene: &SceneGraph, layout: &Layout) -> bool {
                 let clear_border = opaque_flow_pill
                     || !bounds.intersects(rect)
                     || rect.inflate(-6.).encloses(bounds);
-                let hits_header = crate::layout::container_header_rect(node, rect)
-                    .is_some_and(|h| bounds.intersects(h));
+                let hits_header =
+                    crate::layout::container_header_rect_with_ports(node, rect, &layout.ports)
+                        .is_some_and(|h| bounds.intersects(h));
                 !clear_border || hits_header
             } else {
                 bounds.intersects(rect)
@@ -1406,7 +1407,8 @@ fn valid(
         let n = &scene.nodes[hit.id];
         if f.ignore.contains(&n.id) {
             if n.id != f.id
-                && let Some(header) = crate::layout::container_header_rect(n, hit.bounds)
+                && let Some(header) =
+                    crate::layout::container_header_rect_with_ports(n, hit.bounds, &l.ports)
                 && (r.intersects(header)
                     || leader_path(label)
                         .windows(2)
@@ -1423,7 +1425,8 @@ fn valid(
             {
                 return false;
             }
-            if let Some(header) = crate::layout::container_header_rect(n, hit.bounds)
+            if let Some(header) =
+                crate::layout::container_header_rect_with_ports(n, hit.bounds, &l.ports)
                 && (r.intersects(header)
                     || leader_path(label)
                         .windows(2)

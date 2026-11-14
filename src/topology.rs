@@ -2881,7 +2881,6 @@ mod stage1a {
 
 pub(crate) type SideHints = Vec<Option<(Side, Side)>>;
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FlowAxis {
     LeftToRight,
@@ -2889,7 +2888,6 @@ pub(crate) enum FlowAxis {
     QuadrantCross,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct TopologyPlan {
     pub axis: FlowAxis,
@@ -2901,7 +2899,6 @@ pub(crate) struct TopologyPlan {
     pub search_states: usize,
 }
 
-#[allow(dead_code)]
 pub(crate) fn candidates(
     scene: &SceneGraph,
     sizes: &[Point],
