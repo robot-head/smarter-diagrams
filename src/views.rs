@@ -118,9 +118,69 @@ pub fn filter(scene: &SceneGraph, keep: &BTreeSet<String>) -> SceneGraph {
     out.reindex();
     out
 }
+fn is_coord_literal(expr: &str) -> bool {
+    let trimmed = expr.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let body = trimmed
+        .strip_suffix("px")
+        .or_else(|| trimmed.strip_suffix('g'))
+        .unwrap_or(trimmed);
+    body.parse::<f64>().is_ok_and(f64::is_finite)
+}
+
+fn pin_anchor_raw(expr: &str) -> Option<String> {
+    let e = expr.replace(' ', "");
+    if is_coord_literal(&e) {
+        return None;
+    }
+    let split = e
+        .char_indices()
+        .skip(1)
+        .find(|(_, c)| *c == '+' || *c == '-')
+        .map(|(i, _)| i);
+    let base = split.map_or(e.as_str(), |i| &e[..i]);
+    let raw = base
+        .rsplit_once('.')
+        .filter(|(_, a)| matches!(*a, "N" | "E" | "S" | "W" | "x" | "y"))
+        .map_or(base, |(id, _)| id);
+    (!raw.is_empty()).then(|| raw.to_string())
+}
+
+fn sanitize_pin_annotations(
+    anns: &mut Vec<Annotation>,
+    scope: Option<&str>,
+    scene: &SceneGraph,
+    keep: &BTreeSet<String>,
+) {
+    anns.retain_mut(|ann| {
+        if ann.name != "pin" {
+            return true;
+        }
+        if let Some(from) = ann.attrs.get("from")
+            && resolve_scoped_node(scene, scope, &from.text).is_none_or(|n| !keep.contains(&n.id))
+        {
+            ann.attrs.remove("from");
+        }
+        for axis in ["x", "y"] {
+            if let Some(val) = ann.attrs.get(axis)
+                && let Some(raw) = pin_anchor_raw(&val.text)
+                && resolve_scoped_node(scene, scope, &raw).is_none_or(|n| !keep.contains(&n.id))
+            {
+                ann.attrs.remove(axis);
+            }
+        }
+        !ann.attrs.is_empty()
+    });
+}
+
 pub(crate) fn filter_exact(scene: &SceneGraph, keep: &BTreeSet<String>) -> SceneGraph {
     let mut out = scene.clone();
     out.nodes.retain(|n| keep.contains(&n.id));
+    for n in &mut out.nodes {
+        sanitize_pin_annotations(&mut n.annotations, n.parent.as_deref(), scene, keep);
+    }
     out.edges
         .retain(|e| keep.contains(&e.source.node) && keep.contains(&e.target.node));
     for z in &mut out.zones {
@@ -137,6 +197,13 @@ pub(crate) fn filter_exact(scene: &SceneGraph, keep: &BTreeSet<String>) -> Scene
     }
     out.layout_rules
         .retain(|r| keep.contains(&r.target) || out.edges.iter().any(|e| e.id == r.target));
+    for rule in &mut out.layout_rules {
+        let scope = scene
+            .node(&rule.target)
+            .and_then(|n| n.parent.as_deref());
+        sanitize_pin_annotations(&mut rule.annotations, scope, scene, keep);
+    }
+    out.layout_rules.retain(|r| !r.annotations.is_empty());
     out.story.retain(|id| keep.contains(id));
     out.reindex();
     out
@@ -256,7 +323,10 @@ pub fn fisheye(
             let dy = r.y - lens.center.y;
             let d = dx.hypot(dy);
             if d > 0. && d < lens.radius {
-                let scale = 1. + lens.strength * (1. - d / lens.radius).powi(2);
+                // Keep f(d) = d * (1 + k * (1 - d/R)^2) strictly monotonic on [0, R]:
+                // min derivative occurs at d = 2R/3 with slope 1 - k/3, so cap k < 3.
+                let strength = lens.strength.min(2.95);
+                let scale = 1. + strength * (1. - d / lens.radius).powi(2);
                 r.x = lens.center.x + dx * scale;
                 r.y = lens.center.y + dy * scale;
             }
@@ -324,4 +394,82 @@ pub fn attention(scene: &SceneGraph, focus: Option<&str>, hops: usize) -> BTreeM
             )
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn project_strips_excluded_pin_anchors_and_from_refs() {
+        let mut scene = crate::model::lower(&crate::syntax::parse(
+            "a @pin(grid: 0, 0)\nb @pin(x: a.E + 4g, y: 0)\nc @pin(x: b.E + 4g, y: 0)\na -> b -> c\nview v { include a }\n",
+        ));
+        // Also simulate an explicit `@pin(from: c)` annotation on `a` to verify `from` stripping.
+        scene.nodes[0].annotations.push(Annotation {
+            name: "pin".into(),
+            attrs: BTreeMap::from([(
+                "from".into(),
+                Value {
+                    text: "c".into(),
+                    ..Default::default()
+                },
+            )]),
+            span: crate::syntax::Span::default(),
+        });
+        let mut kept_only = BTreeSet::from(["b".to_string()]);
+        let projected = filter_exact(&scene, &kept_only);
+        assert!(
+            projected.node("b").unwrap().annotations.iter().all(|a| a.name != "pin" || !a.attrs.contains_key("x")),
+            "expected pin referencing excluded node `a` to be stripped"
+        );
+        assert!(crate::layout::layout(&projected, &LayoutOptions::default(), None).is_ok());
+
+        // Verify `from` referencing excluded node `c` is stripped while `a` stays valid.
+        kept_only.insert("a".to_string());
+        kept_only.remove("b");
+        let projected_a = filter_exact(&scene, &kept_only);
+        assert!(
+            !projected_a
+                .node("a")
+                .unwrap()
+                .annotations
+                .iter()
+                .any(|a| a.name == "pin" && a.attrs.contains_key("from"))
+        );
+        assert!(crate::layout::layout(&projected_a, &LayoutOptions::default(), None).is_ok());
+    }
+
+    #[test]
+    fn fisheye_clamps_radial_distortion_to_stay_monotonic() {
+        let diag = crate::compile(
+            "focus @pin(grid: 0, 0)\ninner\nmid\nouter\nrim\nfocus -> inner -> mid -> outer -> rim\n",
+        )
+        .unwrap();
+        let center = diag.layout.nodes["focus"].center();
+        let high = fisheye(
+            &diag.scene,
+            &diag.layout,
+            &[Lens {
+                center,
+                radius: 400.,
+                strength: 10.0,
+                kind: LensKind::Members(BTreeSet::new()),
+            }],
+            &LayoutOptions::default(),
+        )
+        .unwrap();
+        // Verify pre-VPSC monotonic radial distortion directly on synthetic radii inside [0, R].
+        let mut r: f64 = 20.;
+        let mut prev = 0.;
+        while r < 400. {
+            let strength = 10.0_f64.min(2.95);
+            let mapped = r * (1. + strength * (1. - r / 400.).powi(2));
+            assert!(mapped > prev, "radial distortion must remain strictly monotonic: {mapped} <= {prev}");
+            assert!(mapped < 400., "interior node must stay inside lens radius: {mapped}");
+            prev = mapped;
+            r += 5.;
+        }
+        assert!(crate::layout::validate(&diag.scene, &high, &LayoutOptions::default()).is_ok());
+    }
 }

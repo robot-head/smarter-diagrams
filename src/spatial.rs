@@ -22,6 +22,36 @@ pub struct Stack {
     pub vias: Vec<Via>,
     pub theta: f64,
 }
+fn stratum_y_extent(layout: &Layout) -> (f64, f64) {
+    let mut min_y = f64::INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for r in layout.nodes.values() {
+        min_y = min_y.min(r.top());
+        max_y = max_y.max(r.bottom());
+    }
+    for route in layout.routes.values() {
+        for p in &route.points {
+            min_y = min_y.min(p.y);
+            max_y = max_y.max(p.y);
+        }
+    }
+    for label in &layout.labels {
+        min_y = min_y.min(label.bounds.top());
+        max_y = max_y.max(label.bounds.bottom());
+    }
+    for pts in layout.zones.values() {
+        for p in pts {
+            min_y = min_y.min(p.y);
+            max_y = max_y.max(p.y);
+        }
+    }
+    if !min_y.is_finite() || !max_y.is_finite() {
+        (-40., 40.)
+    } else {
+        (min_y, max_y)
+    }
+}
+
 fn layer(node: &Node, default: &str) -> String {
     node.attrs
         .get("stratum")
@@ -45,7 +75,8 @@ pub fn strata(scene: &SceneGraph, options: &LayoutOptions, theta: f64) -> Result
         }
         ownership.insert(node.id.clone(), name);
     }
-    let mut planes = Vec::new();
+    let mut plane_graphs = Vec::with_capacity(names.len());
+    let mut planes = Vec::with_capacity(names.len());
     for (i, name) in names.iter().enumerate() {
         let keep = ownership
             .iter()
@@ -63,21 +94,96 @@ pub fn strata(scene: &SceneGraph, options: &LayoutOptions, theta: f64) -> Result
             }
         }
         let layout = crate::layout::layout(&graph, options, None)?;
+        plane_graphs.push(graph);
         planes.push(Stratum {
             id: name.clone(),
             layout,
             index: i,
         });
     }
-    let spacing = planes
-        .iter()
-        .flat_map(|p| p.layout.nodes.values().map(|r| r.h))
-        .reduce(f64::max)
-        .unwrap_or(80.)
-        + 160.;
-    for plane in &mut planes {
-        let dx = plane.index as f64 * spacing * theta.sin();
-        let dy = plane.index as f64 * spacing;
+    // Gently couple cross-stratum `via` X endpoints so aligned inter-plane links pull
+    // unpinned endpoints closer without violating intra-plane constraints.
+    let mut cross_partners: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for e in &scene.edges {
+        if ownership[&e.source.node] != ownership[&e.target.node] {
+            cross_partners
+                .entry(e.source.node.clone())
+                .or_default()
+                .push(e.target.node.clone());
+            cross_partners
+                .entry(e.target.node.clone())
+                .or_default()
+                .push(e.source.node.clone());
+        }
+    }
+    if !cross_partners.is_empty() && planes.len() >= 2 {
+        let mut plane_by_node = BTreeMap::new();
+        for (pi, graph) in plane_graphs.iter().enumerate() {
+            for node in &graph.nodes {
+                plane_by_node.insert(node.id.as_str(), pi);
+            }
+        }
+        for _ in 0..2 {
+            for pi in 0..planes.len() {
+                let mut changed = false;
+                let mut prior = planes[pi].layout.clone();
+                for node in &plane_graphs[pi].nodes {
+                    if node.annotations.iter().any(|a| a.name == "pin") {
+                        continue;
+                    }
+                    let Some(partners) = cross_partners.get(&node.id) else {
+                        continue;
+                    };
+                    let mut sum_x = 0.;
+                    let mut count = 0usize;
+                    for partner in partners {
+                        if let Some(&pj) = plane_by_node.get(partner.as_str())
+                            && let Some(pr) = planes[pj].layout.nodes.get(partner)
+                        {
+                            sum_x += pr.x;
+                            count += 1;
+                        }
+                    }
+                    if count > 0
+                        && let Some(r) = prior.nodes.get_mut(&node.id)
+                    {
+                        let target_x = sum_x / count as f64;
+                        if (target_x - r.x).abs() > 1e-3 {
+                            r.x += 0.35 * (target_x - r.x);
+                            changed = true;
+                        }
+                    }
+                }
+                if changed {
+                    prior.cache_key.clear();
+                    prior.cache_config.clear();
+                    prior.entity_keys.clear();
+                    if let Ok(updated) = crate::layout::layout(&plane_graphs[pi], options, Some(&prior))
+                    {
+                        planes[pi].layout = updated;
+                    }
+                }
+            }
+        }
+    }
+    let gap = 160.;
+    let mut prev_cursor_y = 0.;
+    let mut prev_h = 0.;
+    for (idx, plane) in planes.iter_mut().enumerate() {
+        let (min_y, max_y) = stratum_y_extent(&plane.layout);
+        let cur_h = (max_y - min_y).max(0.);
+        let cur_mid = 0.5 * (min_y + max_y);
+        let dy = if idx == 0 {
+            prev_cursor_y = cur_mid;
+            prev_h = cur_h;
+            0.
+        } else {
+            let cursor_y = prev_cursor_y + prev_h * 0.5 + gap + cur_h * 0.5;
+            prev_cursor_y = cursor_y;
+            prev_h = cur_h;
+            cursor_y - cur_mid
+        };
+        let dx = dy * theta.sin();
         for r in plane.layout.nodes.values_mut() {
             r.x += dx;
             r.y += dy;
@@ -480,35 +586,155 @@ pub fn compare(
     for e in &proposal.edges {
         edge_changes.entry(e.id.clone()).or_insert(Change::Added);
     }
-    // Lock unchanged infrastructure to the base coordinate system in the joint union solve.
-    for n in &mut union.nodes {
-        if changes[&n.id] == Change::Unchanged
-            && let Some(r) = base_layout.nodes.get(&n.id)
-        {
-            n.annotations.retain(|a| a.name != "pin");
-            n.annotations.push(Annotation {
-                name: "pin".into(),
-                attrs: BTreeMap::from([
-                    (
-                        "x".into(),
-                        Value {
-                            text: format!("{}g", r.x / options.grid),
-                            ..Default::default()
-                        },
-                    ),
-                    (
-                        "y".into(),
-                        Value {
-                            text: format!("{}g", r.y / options.grid),
-                            ..Default::default()
-                        },
-                    ),
-                ]),
-                ..Default::default()
-            });
+    // Lock unobstructed unchanged nodes to base_layout, while softening colliding or
+    // structurally coupled unpinned nodes so added neighbors push cleanly without infeasibility.
+    let mut defer_pin = BTreeSet::new();
+    let changed_ancestors: BTreeSet<String> = union
+        .nodes
+        .iter()
+        .filter(|n| changes.get(&n.id) != Some(&Change::Unchanged))
+        .flat_map(|n| ancestors(&union, &n.id))
+        .chain(
+            base.nodes
+                .iter()
+                .filter(|n| changes.get(&n.id) != Some(&Change::Unchanged))
+                .flat_map(|n| ancestors(base, &n.id)),
+        )
+        .collect();
+    defer_pin.extend(changed_ancestors.iter().cloned());
+
+    // Any node referenced by a relation that changed between base and proposal cannot stay rigidly pinned.
+    let base_rels: BTreeSet<(usize, Vec<String>, bool, Option<u64>)> = base
+        .relations
+        .iter()
+        .map(|r| {
+            (
+                r.axis as usize,
+                r.members.clone(),
+                r.distribute,
+                r.gap_grid.map(f64::to_bits),
+            )
+        })
+        .collect();
+    for r in &proposal.relations {
+        let sig = (
+            r.axis as usize,
+            r.members.clone(),
+            r.distribute,
+            r.gap_grid.map(f64::to_bits),
+        );
+        if !base_rels.contains(&sig) {
+            defer_pin.extend(r.members.iter().cloned());
         }
     }
-    let layout = crate::layout::layout(&union, options, Some(base_layout))?;
+
+    // Check explicit pinned additions/modifications and estimated node sizes overlapping base rects.
+    let mut obstacle_boxes: Vec<(String, Rect)> = Vec::new();
+    for n in &union.nodes {
+        let ch = changes[&n.id];
+        if ch == Change::Unchanged {
+            continue;
+        }
+        if let Some(pin_pt) = explicit_numeric_pin(n, options.grid) {
+            let approx = base_layout
+                .nodes
+                .get(&n.id)
+                .copied()
+                .unwrap_or(Rect::new(pin_pt.x, pin_pt.y, 120., 60.));
+            obstacle_boxes.push((
+                n.id.clone(),
+                Rect::new(pin_pt.x, pin_pt.y, approx.w, approx.h),
+            ));
+        } else if ch == Change::Modified
+            && let Some(r) = base_layout.nodes.get(&n.id)
+        {
+            obstacle_boxes.push((n.id.clone(), r.inflate(options.margin)));
+        }
+    }
+    for n in &union.nodes {
+        if changes[&n.id] == Change::Unchanged
+            && !has_pin_annotation(n)
+            && let Some(r) = base_layout.nodes.get(&n.id)
+        {
+            let padded = r.inflate(options.margin);
+            if obstacle_boxes
+                .iter()
+                .any(|(other, box_r)| *other != n.id && rects_overlap(padded, *box_r))
+            {
+                defer_pin.insert(n.id.clone());
+            }
+        }
+    }
+
+    // Tier 1: pin all safe unchanged unpinned nodes; Tier 2: also relax 1-hop neighbors of changes;
+    // Tier 3: relax all synthetic pins on unpinned unchanged nodes (keeping explicit pins intact).
+    let mut one_hop_neighbors = defer_pin.clone();
+    for e in &union.edges {
+        if changes.get(&e.source.node) != Some(&Change::Unchanged) {
+            one_hop_neighbors.insert(e.target.node.clone());
+        }
+        if changes.get(&e.target.node) != Some(&Change::Unchanged) {
+            one_hop_neighbors.insert(e.source.node.clone());
+        }
+    }
+    for n in &union.nodes {
+        if let Some(p) = &n.parent
+            && (changed_ancestors.contains(p) || changes.get(p) != Some(&Change::Unchanged))
+        {
+            one_hop_neighbors.insert(n.id.clone());
+        }
+    }
+    let all_unpinned_unchanged: BTreeSet<String> = union
+        .nodes
+        .iter()
+        .filter(|n| changes[&n.id] == Change::Unchanged && !has_pin_annotation(n))
+        .map(|n| n.id.clone())
+        .collect();
+
+    let mut chosen = None;
+    let mut last_err = None;
+    for relaxed in [&defer_pin, &one_hop_neighbors, &all_unpinned_unchanged] {
+        let mut attempt = union.clone();
+        for n in &mut attempt.nodes {
+            if changes[&n.id] == Change::Unchanged
+                && !has_pin_annotation(n)
+                && !relaxed.contains(&n.id)
+                && let Some(r) = base_layout.nodes.get(&n.id)
+            {
+                n.annotations.push(Annotation {
+                    name: "pin".into(),
+                    attrs: BTreeMap::from([
+                        (
+                            "x".into(),
+                            Value {
+                                text: format!("{}g", r.x / options.grid),
+                                ..Default::default()
+                            },
+                        ),
+                        (
+                            "y".into(),
+                            Value {
+                                text: format!("{}g", r.y / options.grid),
+                                ..Default::default()
+                            },
+                        ),
+                    ]),
+                    ..Default::default()
+                });
+            }
+        }
+        match crate::layout::layout(&attempt, options, Some(base_layout)) {
+            Ok(layout) => {
+                chosen = Some((attempt, layout));
+                break;
+            }
+            Err(err) => last_err = Some(err),
+        }
+    }
+    let (union, layout) = match chosen {
+        Some(pair) => pair,
+        None => return Err(last_err.expect("at least one attempt ran")),
+    };
     Ok(SpatialDiff {
         base_scene: base.clone(),
         base_layout: base_layout.clone(),
@@ -517,6 +743,38 @@ pub fn compare(
         changes,
         edge_changes,
     })
+}
+
+fn has_pin_annotation(node: &Node) -> bool {
+    node.annotations.iter().any(|a| a.name == "pin")
+}
+
+fn explicit_numeric_pin(node: &Node, grid: f64) -> Option<Point> {
+    let pin = node.annotations.iter().find(|a| a.name == "pin")?;
+    if let Some(v) = pin.attrs.get("grid") {
+        let mut parts = v.text.split(',').filter_map(|s| parse_pin_scalar(s, grid));
+        if let (Some(x), Some(y)) = (parts.next(), parts.next()) {
+            return Some(Point::new(x, y));
+        }
+    }
+    let x = pin.attrs.get("x").and_then(|v| parse_pin_scalar(&v.text, grid))?;
+    let y = pin.attrs.get("y").and_then(|v| parse_pin_scalar(&v.text, grid))?;
+    Some(Point::new(x, y))
+}
+
+fn parse_pin_scalar(raw: &str, grid: f64) -> Option<f64> {
+    let t = raw.trim();
+    if let Some(px) = t.strip_suffix("px") {
+        px.trim().parse::<f64>().ok()
+    } else if let Some(g) = t.strip_suffix('g') {
+        g.trim().parse::<f64>().ok().map(|v| v * grid)
+    } else {
+        t.parse::<f64>().ok().map(|v| v * grid)
+    }
+}
+
+fn rects_overlap(a: Rect, b: Rect) -> bool {
+    a.left() < b.right() && b.left() < a.right() && a.top() < b.bottom() && b.top() < a.bottom()
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MorphFrame {
@@ -897,6 +1155,59 @@ fn annotations_equal(a: &[Annotation], b: &[Annotation]) -> bool {
         && a.iter()
             .zip(b)
             .all(|(a, b)| a.name == b.name && attrs_equal(&a.attrs, &b.attrs))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strata_stacks_by_actual_plane_heights_and_couples_via_x() {
+        let source = "\
+strata [app, hardware]
+stack [stratum: app] {
+  top @pin(grid: 0, 0)
+  mid @pin(grid: 0, 12)
+  bot @pin(grid: 0, 24)
+  top -> mid -> bot
+}
+bridge [stratum: app] @pin(grid: 24, 0)
+host [stratum: hardware]
+bridge -> host [relation: runs_on]
+";
+        let diag = crate::compile(source).unwrap();
+        let stack = strata(&diag.scene, &LayoutOptions::default(), 0.).unwrap();
+        assert_eq!(stack.planes.len(), 2);
+        let (_, p0_max) = stratum_y_extent(&stack.planes[0].layout);
+        let (p1_min, _) = stratum_y_extent(&stack.planes[1].layout);
+        assert!(
+            p1_min >= p0_max + 159.9,
+            "tall plane 0 (bottom={p0_max}) must not overlap plane 1 (top={p1_min})"
+        );
+        // `bridge` sits at x = 14g = 224 in plane 0; coupled `host` should move toward positive x.
+        assert!(
+            stack.planes[1].layout.nodes["host"].x > 50.,
+            "cross-stratum via X endpoint coupling should pull unpinned host toward bridge: got {}",
+            stack.planes[1].layout.nodes["host"].x
+        );
+    }
+
+    #[test]
+    fn compare_relaxes_colliding_unchanged_node_without_infeasibility() {
+        let options = LayoutOptions::default();
+        let base = crate::compile("a -> b\nfar @pin(grid: 40, 0)\n").unwrap();
+        let a_pos = base.layout.nodes["a"];
+        let gx = (a_pos.x / options.grid).round() as i64;
+        let gy = (a_pos.y / options.grid).round() as i64;
+        // `proposal` explicitly pins a new node `added` directly over `a`'s old position.
+        let prop_src = format!("a -> b\nfar @pin(grid: 40, 0)\nadded @pin(grid: {gx}, {gy})\na -> added\n");
+        let proposal = crate::model::lower(&crate::syntax::parse(&prop_src));
+        let diff = compare(&base.scene, &proposal, &base.layout, &options).unwrap();
+        assert!(crate::layout::validate(&diff.union, &diff.layout, &options).is_ok());
+        // Distant unobstructed node keeps exact coordinate while colliding `a` yields cleanly.
+        assert_eq!(diff.layout.nodes["far"].x, base.layout.nodes["far"].x);
+        assert!(!rects_overlap(diff.layout.nodes["a"], diff.layout.nodes["added"]));
+    }
 }
 
 #[cfg(all(test, feature = "wasm-runtime"))]

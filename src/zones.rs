@@ -38,15 +38,18 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
         }
     }
     let mut member_rects = Vec::new();
+    let mut member_parents: Vec<Option<String>> = Vec::new();
     let mut includes = Vec::new();
     let mut owner_envelopes: BTreeMap<Option<String>, Rect> = BTreeMap::new();
     for id in &members {
         let r = layout.nodes[id].inflate(padding);
         if r.w > 0. && r.h > 0. {
+            let parent = scene.node(id).unwrap().parent.clone();
             owner_envelopes
-                .entry(scene.node(id).unwrap().parent.clone())
+                .entry(parent.clone())
                 .and_modify(|old| *old = old.union(r))
                 .or_insert(r);
+            member_parents.push(parent);
             member_rects.push(r);
             includes.push(r);
         }
@@ -56,14 +59,77 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
             includes.push(env);
         }
     }
-    // Connect nearby member halos along aligned spans whenever clear of exclusions.
+    // Connect member halos along aligned spans whenever clear of exclusions.
+    // Same-owner members have no arbitrary distance cutoff so scoped zones stay contiguous.
     let m_len = member_rects.len();
+    let mut add_aligned_bridge = |ra: Rect, rb: Rect| {
+        let (ox0, ox1) = (ra.left().max(rb.left()), ra.right().min(rb.right()));
+        if ox1 - ox0 >= 24. {
+            let (gy0, gy1) = (ra.bottom().min(rb.bottom()), ra.top().max(rb.top()));
+            let bridge = if gy1 > gy0 {
+                Rect::new((ox0 + ox1) / 2., (gy0 + gy1) / 2., ox1 - ox0, gy1 - gy0)
+            } else {
+                let (ty, by) = (ra.top().min(rb.top()), ra.bottom().max(rb.bottom()));
+                Rect::new((ox0 + ox1) / 2., (ty + by) / 2., ox1 - ox0, by - ty)
+            };
+            if !exclusions.iter().any(|ex| ex.intersects(bridge)) {
+                includes.push(bridge);
+            }
+        }
+        let (oy0, oy1) = (ra.top().max(rb.top()), ra.bottom().min(rb.bottom()));
+        if oy1 - oy0 >= 24. {
+            let (gx0, gx1) = (ra.right().min(rb.right()), ra.left().max(rb.left()));
+            let bridge = if gx1 > gx0 {
+                Rect::new((gx0 + gx1) / 2., (oy0 + oy1) / 2., gx1 - gx0, oy1 - oy0)
+            } else {
+                let (lx, rx) = (ra.left().min(rb.left()), ra.right().max(rb.right()));
+                Rect::new((lx + rx) / 2., (oy0 + oy1) / 2., rx - lx, oy1 - oy0)
+            };
+            if !exclusions.iter().any(|ex| ex.intersects(bridge)) {
+                includes.push(bridge);
+            }
+        }
+    };
+    let rect_dist = |a: Rect, b: Rect| {
+        let dx = (b.left() - a.right()).max(a.left() - b.right()).max(0.);
+        let dy = (b.top() - a.bottom()).max(a.top() - b.bottom()).max(0.);
+        dx + dy
+    };
+    let mut by_owner: BTreeMap<Option<String>, Vec<usize>> = BTreeMap::new();
+    for (i, parent) in member_parents.iter().enumerate() {
+        by_owner.entry(parent.clone()).or_default().push(i);
+    }
+    for indices in by_owner.into_values() {
+        if indices.len() < 2 {
+            continue;
+        }
+        let mut in_tree = vec![false; indices.len()];
+        in_tree[0] = true;
+        for _ in 1..indices.len() {
+            let mut best = (f64::INFINITY, 0usize, 0usize);
+            for (u_pos, &u) in indices.iter().enumerate() {
+                if !in_tree[u_pos] {
+                    continue;
+                }
+                for (v_pos, &v) in indices.iter().enumerate() {
+                    if in_tree[v_pos] {
+                        continue;
+                    }
+                    let d = rect_dist(member_rects[u], member_rects[v]);
+                    if d < best.0 {
+                        best = (d, u, v);
+                    }
+                }
+            }
+            if !best.0.is_finite() {
+                break;
+            }
+            let pos = indices.iter().position(|&idx| idx == best.2).unwrap();
+            in_tree[pos] = true;
+            add_aligned_bridge(member_rects[best.1], member_rects[best.2]);
+        }
+    }
     if m_len >= 2 {
-        let rect_dist = |a: Rect, b: Rect| {
-            let dx = (b.left() - a.right()).max(a.left() - b.right()).max(0.);
-            let dy = (b.top() - a.bottom()).max(a.top() - b.bottom()).max(0.);
-            dx + dy
-        };
         let mut in_tree = vec![false; m_len];
         in_tree[0] = true;
         for _ in 1..m_len {
@@ -86,36 +152,10 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
                 break;
             }
             in_tree[best.2] = true;
-            if best.0 > 640. {
+            if member_parents[best.1] != member_parents[best.2] && best.0 > 640. {
                 continue;
             }
-            let (ra, rb) = (member_rects[best.1], member_rects[best.2]);
-            let (ox0, ox1) = (ra.left().max(rb.left()), ra.right().min(rb.right()));
-            if ox1 - ox0 >= 24. {
-                let (gy0, gy1) = (ra.bottom().min(rb.bottom()), ra.top().max(rb.top()));
-                let bridge = if gy1 > gy0 {
-                    Rect::new((ox0 + ox1) / 2., (gy0 + gy1) / 2., ox1 - ox0, gy1 - gy0)
-                } else {
-                    let (ty, by) = (ra.top().min(rb.top()), ra.bottom().max(rb.bottom()));
-                    Rect::new((ox0 + ox1) / 2., (ty + by) / 2., ox1 - ox0, by - ty)
-                };
-                if !exclusions.iter().any(|ex| ex.intersects(bridge)) {
-                    includes.push(bridge);
-                }
-            }
-            let (oy0, oy1) = (ra.top().max(rb.top()), ra.bottom().min(rb.bottom()));
-            if oy1 - oy0 >= 24. {
-                let (gx0, gx1) = (ra.right().min(rb.right()), ra.left().max(rb.left()));
-                let bridge = if gx1 > gx0 {
-                    Rect::new((gx0 + gx1) / 2., (oy0 + oy1) / 2., gx1 - gx0, oy1 - oy0)
-                } else {
-                    let (lx, rx) = (ra.left().min(rb.left()), ra.right().max(rb.right()));
-                    Rect::new((lx + rx) / 2., (oy0 + oy1) / 2., rx - lx, oy1 - oy0)
-                };
-                if !exclusions.iter().any(|ex| ex.intersects(bridge)) {
-                    includes.push(bridge);
-                }
-            }
+            add_aligned_bridge(member_rects[best.1], member_rects[best.2]);
         }
     }
     // Bridge remaining nearby member components around exclusions via rectilinear corridors.
@@ -183,6 +223,19 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
         if num_comp <= 1 {
             break;
         }
+        let mut comp_owners: Vec<BTreeSet<Option<String>>> = vec![BTreeSet::new(); num_comp];
+        for (idx, &cid) in comp.iter().enumerate() {
+            if cid == usize::MAX {
+                continue;
+            }
+            let (cx, cy) = (idx % w, idx / w);
+            let p = Point::new((xs[cx] + xs[cx + 1]) / 2., (ys[cy] + ys[cy + 1]) / 2.);
+            for (mi, mr) in member_rects.iter().enumerate() {
+                if mr.contains(p) {
+                    comp_owners[cid].insert(member_parents[mi].clone());
+                }
+            }
+        }
         let open_span = |cx: usize, cy: usize, horizontal_move: bool| -> f64 {
             if horizontal_move {
                 let mut y0 = cy;
@@ -219,7 +272,8 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
                     heap.push((std::cmp::Reverse(0f64.to_bits()), s));
                 }
             }
-            let mut reached = None;
+            let mut accepted: Option<(f64, Vec<Point>)> = None;
+            let mut visited_dst = vec![false; num_comp];
             while let Some((std::cmp::Reverse(bits), s)) = heap.pop() {
                 let d = f64::from_bits(bits);
                 if d > dist[s] + 1e-9 {
@@ -229,9 +283,57 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
                     break;
                 }
                 let (cell_idx, dir) = (s / 5, s % 5);
-                if comp[cell_idx] != usize::MAX && comp[cell_idx] != src_cid {
-                    reached = Some((d, s));
-                    break;
+                let dst_cid = comp[cell_idx];
+                if dst_cid != usize::MAX && dst_cid != src_cid {
+                    if !visited_dst[dst_cid] {
+                        visited_dst[dst_cid] = true;
+                        let mut cells = Vec::new();
+                        let mut pts = Vec::new();
+                        let mut cur = s;
+                        while cur != usize::MAX {
+                            let ci = cur / 5;
+                            let (cx, cy) = (ci % w, ci / w);
+                            if cells.last() != Some(&(cx, cy)) {
+                                cells.push((cx, cy));
+                                pts.push(Point::new(
+                                    (xs[cx] + xs[cx + 1]) / 2.,
+                                    (ys[cy] + ys[cy + 1]) / 2.,
+                                ));
+                            }
+                            cur = prev[cur];
+                        }
+                        let boundary_pt = |a: (usize, usize), b: (usize, usize)| {
+                            if a.0 != b.0 {
+                                let bx = xs[a.0.max(b.0)];
+                                Point::new(bx, (ys[a.1] + ys[a.1 + 1]) / 2.)
+                            } else {
+                                let by = ys[a.1.max(b.1)];
+                                Point::new((xs[a.0] + xs[a.0 + 1]) / 2., by)
+                            }
+                        };
+                        let empty_len = if pts.len() >= 2 {
+                            let p_start = boundary_pt(cells[0], cells[1]);
+                            let p_end = boundary_pt(cells[cells.len() - 2], cells[cells.len() - 1]);
+                            if pts.len() == 2 {
+                                p_start.manhattan_distance(p_end)
+                            } else {
+                                p_start.manhattan_distance(pts[1])
+                                    + pts[1..pts.len() - 1]
+                                        .windows(2)
+                                        .map(|p| p[0].manhattan_distance(p[1]))
+                                        .sum::<f64>()
+                                    + pts[pts.len() - 2].manhattan_distance(p_end)
+                            }
+                        } else {
+                            0.
+                        };
+                        let share_owner = !comp_owners[src_cid].is_disjoint(&comp_owners[dst_cid]);
+                        if share_owner || empty_len <= 680. {
+                            accepted = Some((d, pts));
+                            break;
+                        }
+                    }
+                    continue;
                 }
                 let (cx, cy) = (cell_idx % w, cell_idx / w);
                 let mx = (xs[cx] + xs[cx + 1]) / 2.;
@@ -267,49 +369,10 @@ pub(crate) fn contours(scene: &SceneGraph, layout: &Layout, zone: &Zone) -> Vec<
                     }
                 }
             }
-            if let Some((cost, mut cur)) = reached {
-                let mut cells = Vec::new();
-                let mut pts = Vec::new();
-                while cur != usize::MAX {
-                    let cell_idx = cur / 5;
-                    let (cx, cy) = (cell_idx % w, cell_idx / w);
-                    if cells.last() != Some(&(cx, cy)) {
-                        cells.push((cx, cy));
-                        pts.push(Point::new(
-                            (xs[cx] + xs[cx + 1]) / 2.,
-                            (ys[cy] + ys[cy + 1]) / 2.,
-                        ));
-                    }
-                    cur = prev[cur];
-                }
-                let boundary_pt = |a: (usize, usize), b: (usize, usize)| {
-                    if a.0 != b.0 {
-                        let bx = xs[a.0.max(b.0)];
-                        Point::new(bx, (ys[a.1] + ys[a.1 + 1]) / 2.)
-                    } else {
-                        let by = ys[a.1.max(b.1)];
-                        Point::new((xs[a.0] + xs[a.0 + 1]) / 2., by)
-                    }
-                };
-                let empty_len = if pts.len() >= 2 {
-                    let p_start = boundary_pt(cells[0], cells[1]);
-                    let p_end = boundary_pt(cells[cells.len() - 2], cells[cells.len() - 1]);
-                    if pts.len() == 2 {
-                        p_start.manhattan_distance(p_end)
-                    } else {
-                        p_start.manhattan_distance(pts[1])
-                            + pts[1..pts.len() - 1]
-                                .windows(2)
-                                .map(|p| p[0].manhattan_distance(p[1]))
-                                .sum::<f64>()
-                            + pts[pts.len() - 2].manhattan_distance(p_end)
-                    }
-                } else {
-                    0.
-                };
-                if empty_len <= 680. && best_pts.as_ref().is_none_or(|(bcost, _)| cost < *bcost) {
-                    best_pts = Some((cost, pts));
-                }
+            if let Some((cost, pts)) = accepted
+                && best_pts.as_ref().is_none_or(|(bcost, _)| cost < *bcost)
+            {
+                best_pts = Some((cost, pts));
             }
         }
         let Some((_, pts)) = best_pts else {
@@ -447,5 +510,30 @@ mod tests {
             0,
             "the excluded node must be outside even-odd contour fill"
         );
+    }
+
+    #[test]
+    fn wide_same_owner_members_stay_one_contiguous_hull_around_exclusions() {
+        // Separated by 72g = 1152px (> 640px) with non-member `blocker` in between.
+        let d = crate::compile(
+            "a @pin(grid: 0, 0)\nblocker @pin(grid: 36, 0)\nb @pin(grid: 72, 0)\nzone wide around [a, b] { padding: 20 }\n",
+        )
+        .unwrap();
+        let polygons = contours(&d.scene, &d.layout, &d.scene.zones[0]);
+        assert_eq!(
+            polygons.len(),
+            1,
+            "same-owner zone members >640px apart should bridge around exclusions into 1 ring, got {}",
+            polygons.len()
+        );
+        let p = d.layout.nodes["blocker"].center();
+        let crossings = polygons[0]
+            .iter()
+            .zip(polygons[0].iter().cycle().skip(1))
+            .filter(|(a, b)| {
+                (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x
+            })
+            .count();
+        assert_eq!(crossings % 2, 0, "blocker must remain excluded outside hull");
     }
 }
