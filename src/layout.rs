@@ -629,34 +629,40 @@ fn has_named_multiport(scene: &SceneGraph, node_idx: usize) -> bool {
     false
 }
 
+fn effective_ep_side(scene: &SceneGraph, ep: &Endpoint, node_idx: usize) -> Option<Side> {
+    ep.constraint.side().or_else(|| {
+        ep.port
+            .as_deref()
+            .and_then(|p| scene.nodes[node_idx].ports.get(p))
+            .and_then(|p| p.constraint.side())
+    })
+}
+
+fn is_wrong_way_side(self_r: Rect, peer_r: Rect, side: Side) -> bool {
+    match side {
+        Side::E => peer_r.right() < self_r.left() - 8.0,
+        Side::W => peer_r.left() > self_r.right() + 8.0,
+        Side::S => peer_r.bottom() < self_r.top() - 8.0,
+        Side::N => peer_r.top() > self_r.bottom() + 8.0,
+    }
+}
+
 fn named_port_corridor_width(
     scene: &SceneGraph,
     edge: &Edge,
-    a: usize,
-    b: usize,
+    _a: usize,
+    _b: usize,
     lanes: usize,
     o: &LayoutOptions,
 ) -> f64 {
-    let port_w = [
-        (a, edge.source.port.as_deref()),
-        (b, edge.target.port.as_deref()),
-    ]
-    .into_iter()
-    .filter_map(|(idx, p)| {
-        (scene.nodes[idx].shape != "sql_table")
-            .then_some(p)
-            .flatten()
-    })
-    .map(|name| crate::labels::text_width(name) + 16.)
-    .fold(0., f64::max);
     let text = crate::labels::connection_text(scene, edge);
     let edge_w = if text.trim().is_empty() {
         0.
     } else {
         crate::labels::text_width(&text) + 16.
     };
-    let lanes_w = lanes.max(1) as f64 * o.port_spacing;
-    (port_w + edge_w + lanes_w + 2. * o.stub + 2. * o.margin).min(280.)
+    let lanes_w = (lanes + 1) as f64 * o.lane_spacing.max(12.);
+    (lanes_w + edge_w + 2. * o.stub + 2. * o.margin).min(220.)
 }
 
 fn has_labeled_parallel_bundle(scene: &SceneGraph) -> bool {
@@ -752,11 +758,6 @@ fn parallel_bundle_corridor_width(
     if a == b {
         return None;
     }
-    let off_axis = |side: Option<Side>| match side {
-        Some(Side::N | Side::S) => horizontal,
-        Some(Side::E | Side::W) => !horizontal,
-        None => false,
-    };
     let mut pair_count = 0usize;
     let mut widths = Vec::new();
     for e in &scene.edges {
@@ -767,8 +768,35 @@ fn parallel_bundle_corridor_width(
         if !((sa == a && sb == b) || (sa == b && sb == a)) {
             continue;
         }
-        if off_axis(e.source.constraint.side()) || off_axis(e.target.constraint.side()) {
-            continue;
+        let (ep_a, ep_b) = if sa == a {
+            (&e.source, &e.target)
+        } else {
+            (&e.target, &e.source)
+        };
+        let side_a = effective_ep_side(scene, ep_a, a);
+        let side_b = effective_ep_side(scene, ep_b, b);
+        if horizontal {
+            let (side_left, side_right) = if left_is_a {
+                (side_a, side_b)
+            } else {
+                (side_b, side_a)
+            };
+            if matches!(side_left, Some(Side::N | Side::S | Side::W))
+                || matches!(side_right, Some(Side::N | Side::S | Side::E))
+            {
+                continue;
+            }
+        } else {
+            let (side_top, side_bot) = if ra.y <= rb.y {
+                (side_a, side_b)
+            } else {
+                (side_b, side_a)
+            };
+            if matches!(side_top, Some(Side::E | Side::W | Side::N))
+                || matches!(side_bot, Some(Side::E | Side::W | Side::S))
+            {
+                continue;
+            }
         }
         pair_count += 1;
         let text = crate::labels::connection_text(scene, e);
@@ -966,12 +994,35 @@ fn build_plan_rects(
             };
             let named_port_corridors = (0..n).any(|i| has_named_multiport(scene, i));
             let has_labeled_parallel = has_labeled_parallel_bundle(scene);
+            let mut corridor_edge_counts = vec![0usize; cols.len().saturating_sub(1)];
+            let mut adj_hop_counts = vec![0usize; cols.len().saturating_sub(1)];
+            for e in &scene.edges {
+                let (Some(a), Some(b)) = (scene.index(&e.source.node), scene.index(&e.target.node))
+                else {
+                    continue;
+                };
+                if plan.fold_row[a] != plan.fold_row[b] || col_idx[a] == col_idx[b] {
+                    continue;
+                }
+                let ca = cols.binary_search(&col_idx[a]).unwrap();
+                let cb = cols.binary_search(&col_idx[b]).unwrap();
+                let (lo, hi) = (ca.min(cb), ca.max(cb));
+                for c in lo..hi {
+                    corridor_edge_counts[c] += 1;
+                }
+                if hi == lo + 1 {
+                    adj_hop_counts[lo] += 1;
+                }
+            }
+            let has_dense_corridor = adj_hop_counts.iter().any(|&c| c >= 6)
+                || corridor_edge_counts.iter().any(|&c| c >= 6);
             let is_default_lr = single_fold
                 && plan.search_states == 0
                 && plan.side_hints.is_empty()
                 && plan.edge_guides.is_empty()
                 && !named_port_corridors
-                && !has_labeled_parallel;
+                && !has_labeled_parallel
+                && !has_dense_corridor;
             if is_default_lr {
                 let mut rows = BTreeMap::new();
                 for i in 0..n {
@@ -983,22 +1034,19 @@ fn build_plan_rects(
                 return rects;
             }
             let mut gap_after = vec![min_gap.max(72. * spacing); cols.len().saturating_sub(1)];
-            if !single_fold || spacing > 1. || named_port_corridors || has_labeled_parallel {
-                let mut corridor_edge_counts = vec![0usize; cols.len().saturating_sub(1)];
-                for e in &scene.edges {
-                    let (Some(a), Some(b)) =
-                        (scene.index(&e.source.node), scene.index(&e.target.node))
-                    else {
-                        continue;
-                    };
-                    if plan.fold_row[a] != plan.fold_row[b] || col_idx[a] == col_idx[b] {
-                        continue;
-                    }
-                    let ca = cols.binary_search(&col_idx[a]).unwrap();
-                    let cb = cols.binary_search(&col_idx[b]).unwrap();
-                    let (lo, hi) = (ca.min(cb), ca.max(cb));
-                    for c in lo..hi {
-                        corridor_edge_counts[c] += 1;
+            if !single_fold
+                || spacing > 1.
+                || named_port_corridors
+                || has_labeled_parallel
+                || has_dense_corridor
+            {
+                for (c, g) in gap_after.iter_mut().enumerate() {
+                    if corridor_edge_counts[c] >= 6 {
+                        *g = g.max(
+                            ((corridor_edge_counts[c] + 2) as f64 * o.lane_spacing.max(13.))
+                                .min(240.)
+                                * spacing,
+                        );
                     }
                 }
                 for e in &scene.edges {
@@ -2229,10 +2277,28 @@ fn solve_stage1b(
                 endpoint_axis_expr(env, b, sb, &e.target.constraint, y_vars[b], rects, false);
 
             match (sa, sb) {
-                (Side::E, Side::W) | (Side::W, Side::E) if !(pin_fixed_y[a] && pin_fixed_y[b]) => {
+                (Side::E, Side::W)
+                    if !(pin_fixed_y[a] && pin_fixed_y[b])
+                        && rects[b].left() >= rects[a].right() + 2. * env.o.stub - 1e-6 =>
+                {
                     push_diff(&mut l1_y, &ay, ay_c, &by, by_c, 0., ortho_w);
                 }
-                (Side::N, Side::S) | (Side::S, Side::N) if !(pin_fixed_x[a] && pin_fixed_x[b]) => {
+                (Side::W, Side::E)
+                    if !(pin_fixed_y[a] && pin_fixed_y[b])
+                        && rects[a].left() >= rects[b].right() + 2. * env.o.stub - 1e-6 =>
+                {
+                    push_diff(&mut l1_y, &ay, ay_c, &by, by_c, 0., ortho_w);
+                }
+                (Side::S, Side::N)
+                    if !(pin_fixed_x[a] && pin_fixed_x[b])
+                        && rects[b].top() >= rects[a].bottom() + 2. * env.o.stub - 1e-6 =>
+                {
+                    push_diff(&mut l1_x, &ax, ax_c, &bx, bx_c, 0., ortho_w);
+                }
+                (Side::N, Side::S)
+                    if !(pin_fixed_x[a] && pin_fixed_x[b])
+                        && rects[a].top() >= rects[b].bottom() + 2. * env.o.stub - 1e-6 =>
+                {
                     push_diff(&mut l1_x, &ax, ax_c, &bx, bx_c, 0., ortho_w);
                 }
                 _ => {}
@@ -3143,18 +3209,47 @@ fn widen_column_corridors(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOpti
         let cur_gap = rects[right_idx].left() - rects[left_idx].right();
         let mut req_gap = 0f64;
         if named_pair {
-            let face_edges = scene
-                .edges
-                .iter()
-                .filter(|x| {
-                    (scene.index(&x.source.node) == Some(a)
-                        || scene.index(&x.target.node) == Some(a))
-                        || (scene.index(&x.source.node) == Some(b)
-                            || scene.index(&x.target.node) == Some(b))
-                })
-                .count();
-            req_gap =
-                req_gap.max(named_port_corridor_width(scene, e, a, b, face_edges, o) * spacing);
+            let (ep_left, ep_right) = if left_idx == a {
+                (&e.source, &e.target)
+            } else {
+                (&e.target, &e.source)
+            };
+            let side_left = effective_ep_side(scene, ep_left, left_idx);
+            let side_right = effective_ep_side(scene, ep_right, right_idx);
+            if !matches!(side_left, Some(Side::N | Side::S | Side::W))
+                && !matches!(side_right, Some(Side::N | Side::S | Side::E))
+            {
+                let face_edges = scene
+                    .edges
+                    .iter()
+                    .filter(|x| {
+                        let (Some(xa), Some(xb)) =
+                            (scene.index(&x.source.node), scene.index(&x.target.node))
+                        else {
+                            return false;
+                        };
+                        let c_xa = col_of(rects[xa].x);
+                        let c_xb = col_of(rects[xb].x);
+                        if c_xa.min(c_xb) != lo_c || c_xa.max(c_xb) != hi_c {
+                            return false;
+                        }
+                        let (x_left_idx, x_ep_left, x_right_idx, x_ep_right) = if c_xa < c_xb {
+                            (xa, &x.source, xb, &x.target)
+                        } else {
+                            (xb, &x.target, xa, &x.source)
+                        };
+                        !matches!(
+                            effective_ep_side(scene, x_ep_left, x_left_idx),
+                            Some(Side::N | Side::S | Side::W)
+                        ) && !matches!(
+                            effective_ep_side(scene, x_ep_right, x_right_idx),
+                            Some(Side::N | Side::S | Side::E)
+                        )
+                    })
+                    .count();
+                req_gap =
+                    req_gap.max(named_port_corridor_width(scene, e, a, b, face_edges, o) * spacing);
+            }
         }
         if has_parallel
             && let Some(par_w) =
@@ -4200,6 +4295,112 @@ fn check_pin_cycles(scene: &SceneGraph, anns: &[Vec<Annotation>]) -> Result<(), 
     }
     Ok(())
 }
+fn fixed_port_y(
+    scene: &SceneGraph,
+    rects: &[Rect],
+    ep: &Endpoint,
+    node_idx: usize,
+    expected_side: Side,
+    o: &LayoutOptions,
+) -> Option<f64> {
+    let named = ep
+        .port
+        .as_deref()
+        .and_then(|p| scene.nodes[node_idx].ports.get(p))
+        .map(|p| &p.constraint);
+    let r = rects[node_idx];
+    [Some(&ep.constraint), named]
+        .into_iter()
+        .flatten()
+        .find_map(|c| match *c {
+            PortConstraint::FixedPos { side, offset_grid } if side == expected_side => {
+                Some(r.top() + offset_grid * o.grid)
+            }
+            PortConstraint::FixedRatio { side, ratio } if side == expected_side => {
+                Some(r.top() + ratio * r.h)
+            }
+            _ => None,
+        })
+}
+
+fn corridor_straddle_bias(
+    scene: &SceneGraph,
+    rects: &[Rect],
+    u: usize,
+    ep_u: &Endpoint,
+    v: usize,
+    ep_v: &Endpoint,
+    o: &LayoutOptions,
+) -> [f64; 4] {
+    let mut bias = [0f64; 4];
+    if effective_ep_side(scene, ep_u, u).is_some() {
+        return bias;
+    }
+    let ru = rects[u];
+    let rv = rects[v];
+    let (v_side, inner_side) = if ru.right() + 2. * o.stub <= rv.left() {
+        (Side::W, Side::E)
+    } else if rv.right() + 2. * o.stub <= ru.left() {
+        (Side::E, Side::W)
+    } else {
+        return bias;
+    };
+    if effective_ep_side(scene, ep_v, v) != Some(v_side) {
+        return bias;
+    }
+    let Some(y_pe) = fixed_port_y(scene, rects, ep_v, v, v_side, o) else {
+        return bias;
+    };
+    let mut u_others = Vec::new();
+    let mut sibling_ys = Vec::new();
+    for other in &scene.edges {
+        let (Some(oa), Some(ob)) = (
+            scene.index(&other.source.node),
+            scene.index(&other.target.node),
+        ) else {
+            continue;
+        };
+        let (peer, peer_ep_v) = if oa == v && ob != v {
+            (ob, &other.source)
+        } else if ob == v && oa != v {
+            (oa, &other.target)
+        } else {
+            continue;
+        };
+        let Some(y_p) = fixed_port_y(scene, rects, peer_ep_v, v, v_side, o) else {
+            continue;
+        };
+        if peer == u {
+            if (y_p - y_pe).abs() > 1e-6 {
+                u_others.push(y_p);
+            }
+        } else if (rects[peer].x - ru.x).abs() < ru.w.max(rects[peer].w) {
+            sibling_ys.push((peer, y_p));
+        }
+    }
+    let bypass_below = !is_wrong_way_side(ru, rv, Side::S)
+        && u_others.iter().any(|&y_other| {
+            sibling_ys
+                .iter()
+                .any(|&(w, y_pw)| rects[w].y > ru.y && y_other < y_pw && y_pw < y_pe)
+        });
+    let bypass_above = !is_wrong_way_side(ru, rv, Side::N)
+        && u_others.iter().any(|&y_other| {
+            sibling_ys
+                .iter()
+                .any(|&(w, y_pw)| rects[w].y < ru.y && y_pe < y_pw && y_pw < y_other)
+        });
+    if bypass_below {
+        bias[side_index(Side::S)] -= 4. * o.grid + o.weights.bend;
+        bias[side_index(inner_side)] += 16. * o.grid;
+    }
+    if bypass_above {
+        bias[side_index(Side::N)] -= 4. * o.grid + o.weights.bend;
+        bias[side_index(inner_side)] += 16. * o.grid;
+    }
+    bias
+}
+
 // Select attachment sides purely from geometry, obstacle exposure, face-load
 // balance, and optional candidate topology hints (never conditioned on @pin).
 #[allow(clippy::too_many_arguments)]
@@ -4218,12 +4419,34 @@ fn choose_attachment_pair(
     let mut anc = crate::model::ancestors(scene, &e.source.node);
     anc.extend(crate::model::ancestors(scene, &e.target.node));
     let is_ancestor = |k: usize| anc.contains(&scene.nodes[k].id);
+    let src_side = effective_ep_side(scene, &e.source, ai);
+    let dst_side = effective_ep_side(scene, &e.target, bi);
     if ai == bi {
-        return (
-            e.source.constraint.side().unwrap_or(Side::E),
-            e.target.constraint.side().unwrap_or(Side::N),
-        );
+        return (src_side.unwrap_or(Side::E), dst_side.unwrap_or(Side::N));
     }
+    let resolve_c = |ep: &Endpoint, idx: usize| match ep.constraint {
+        PortConstraint::FixedPos { .. } | PortConstraint::FixedRatio { .. } => {
+            ep.constraint.clone()
+        }
+        _ => ep
+            .port
+            .as_deref()
+            .and_then(|p| scene.nodes[idx].ports.get(p))
+            .filter(|p| {
+                matches!(
+                    p.constraint,
+                    PortConstraint::FixedPos { .. }
+                        | PortConstraint::FixedRatio { .. }
+                        | PortConstraint::FixedSide { .. }
+                )
+            })
+            .map(|p| p.constraint.clone())
+            .unwrap_or_else(|| ep.constraint.clone()),
+    };
+    let src_c = resolve_c(&e.source, ai);
+    let dst_c = resolve_c(&e.target, bi);
+    let bias_a = corridor_straddle_bias(scene, rects, ai, &e.source, bi, &e.target, o);
+    let bias_b = corridor_straddle_bias(scene, rects, bi, &e.target, ai, &e.source, o);
     let point = |r: Rect, s: Side, c: &PortConstraint| {
         let cx = o.corner.min(r.w / 4.);
         let cy = o.corner.min(r.h / 4.);
@@ -4262,13 +4485,11 @@ fn choose_attachment_pair(
     let sides = [Side::E, Side::W, Side::S, Side::N];
     for sa in sides {
         for sb in sides {
-            if e.source.constraint.side().is_some_and(|s| s != sa)
-                || e.target.constraint.side().is_some_and(|s| s != sb)
-            {
+            if src_side.is_some_and(|s| s != sa) || dst_side.is_some_and(|s| s != sb) {
                 continue;
             }
-            let a = point(ra, sa, &e.source.constraint);
-            let b = point(rb, sb, &e.target.constraint);
+            let a = point(ra, sa, &src_c);
+            let b = point(rb, sb, &dst_c);
             let (ax, ay) = sa.normal();
             let (bx, by) = sb.normal();
             let u = a.offset(ax * o.stub, ay * o.stub);
@@ -4384,6 +4605,71 @@ fn choose_attachment_pair(
                         }
                     }
                 }
+            } else {
+                let bx_lo = ra.left().min(rb.left()).min(u.x).min(v.x) - o.stub - o.margin;
+                let bx_hi = ra.right().max(rb.right()).max(u.x).max(v.x) + o.stub + o.margin;
+                let by_lo = ra.top().min(rb.top()).min(u.y).min(v.y) - o.stub - o.margin;
+                let by_hi = ra.bottom().max(rb.bottom()).max(u.y).max(v.y) + o.stub + o.margin;
+                let mut x_lanes = vec![
+                    u.x - o.margin - o.stub,
+                    u.x + o.margin + o.stub,
+                    v.x - o.margin - o.stub,
+                    v.x + o.margin + o.stub,
+                    (u.x + v.x) * 0.5,
+                    bx_lo,
+                    bx_hi,
+                ];
+                let mut y_lanes = vec![
+                    u.y - o.margin - o.stub,
+                    u.y + o.margin + o.stub,
+                    v.y - o.margin - o.stub,
+                    v.y + o.margin + o.stub,
+                    (u.y + v.y) * 0.5,
+                    by_lo,
+                    by_hi,
+                ];
+                for (k, rk) in rects.iter().enumerate() {
+                    if k == ai || k == bi || (scene.nodes[k].container && is_ancestor(k)) {
+                        continue;
+                    }
+                    if rk.right() + o.margin < bx_lo
+                        || rk.left() - o.margin > bx_hi
+                        || rk.bottom() + o.margin < by_lo
+                        || rk.top() - o.margin > by_hi
+                    {
+                        continue;
+                    }
+                    x_lanes.push(rk.left() - o.margin - 4.);
+                    x_lanes.push(rk.right() + o.margin + 4.);
+                    x_lanes.push(rk.left() - o.stub - o.margin);
+                    x_lanes.push(rk.right() + o.stub + o.margin);
+                    y_lanes.push(rk.top() - o.margin - 4.);
+                    y_lanes.push(rk.bottom() + o.margin + 4.);
+                    y_lanes.push(rk.top() - o.stub - o.margin);
+                    y_lanes.push(rk.bottom() + o.stub + o.margin);
+                }
+                x_lanes.sort_by(f64::total_cmp);
+                x_lanes.dedup_by(|x, y| (*x - *y).abs() < 1.);
+                y_lanes.sort_by(f64::total_cmp);
+                y_lanes.dedup_by(|x, y| (*x - *y).abs() < 1.);
+                for lx in x_lanes {
+                    if (lx - u.x).abs() > 1e-3
+                        && (lx - v.x).abs() > 1e-3
+                        && (lx - u.x) * ax >= -1e-6
+                        && (lx - v.x) * bx >= -1e-6
+                    {
+                        candidates.push(vec![a, u, Point::new(lx, u.y), Point::new(lx, v.y), v, b]);
+                    }
+                }
+                for ly in y_lanes {
+                    if (ly - u.y).abs() > 1e-3
+                        && (ly - v.y).abs() > 1e-3
+                        && (ly - u.y) * ay >= -1e-6
+                        && (ly - v.y) * by >= -1e-6
+                    {
+                        candidates.push(vec![a, u, Point::new(u.x, ly), Point::new(v.x, ly), v, b]);
+                    }
+                }
             }
             for path in &candidates {
                 let last_seg = path.len().saturating_sub(2);
@@ -4457,6 +4743,13 @@ fn choose_attachment_pair(
                         }
                     }
                 }
+                if src_side.is_none() && hint != Some((sa, sb)) && is_wrong_way_side(ra, rb, sa) {
+                    cost += 150_000.;
+                }
+                if dst_side.is_none() && hint != Some((sa, sb)) && is_wrong_way_side(rb, ra, sb) {
+                    cost += 150_000.;
+                }
+                cost += bias_a[side_index(sa)] + bias_b[side_index(sb)];
                 if cost < best.0 - 1e-6 {
                     best = (cost, sa, sb);
                 }
@@ -5648,8 +5941,6 @@ fn assign_ports<'a>(
                 .filter(|p| p.node == bi && p.side == pb.side)
                 .count()
                 == 1;
-            let a_eligible = a_sole && is_free_or_side(&ra_req.spec);
-            let b_eligible = b_sole && is_free_or_side(&rb_req.spec);
 
             let (coord_a, coord_b) = if horiz_axis {
                 (pa.point.y, pb.point.y)
@@ -5663,53 +5954,96 @@ fn assign_ports<'a>(
 
             let ra = rects[ai];
             let rb = rects[bi];
-            let (len_a, len_b) = if horiz_axis {
-                (ra.h, rb.h)
-            } else {
-                (ra.w, rb.w)
+            let shape_name = |node_idx: usize| -> &str {
+                let node = &scene.nodes[node_idx];
+                if node.container && node.shape != "sql_table" {
+                    "container"
+                } else {
+                    &node.shape
+                }
             };
-            let eff_corner_a = o.corner.min(len_a / 4.);
-            let eff_corner_b = o.corner.min(len_b / 4.);
-            let (face_min_a, face_max_a) = if horiz_axis {
-                (ra.top(), ra.bottom())
-            } else {
-                (ra.left(), ra.right())
-            };
-            let (face_min_b, face_max_b) = if horiz_axis {
-                (rb.top(), rb.bottom())
-            } else {
-                (rb.left(), rb.right())
+            let can_snap_end = |node_idx: usize,
+                                other_idx: usize,
+                                side: Side,
+                                key: &str,
+                                spec: &PortConstraint,
+                                old_coord: f64,
+                                target_coord: f64,
+                                peer_pt: Point|
+             -> bool {
+                if !is_free_or_side(spec) {
+                    return false;
+                }
+                let r = rects[node_idx];
+                let (face_min, face_max, len) = if horiz_axis {
+                    (r.top(), r.bottom(), r.h)
+                } else {
+                    (r.left(), r.right(), r.w)
+                };
+                let eff_corner = o.corner.min(len / 4.);
+                if target_coord < face_min + eff_corner - 1e-6
+                    || target_coord > face_max - eff_corner + 1e-6
+                {
+                    return false;
+                }
+                let peers_ok = requests
+                    .iter()
+                    .filter(|p| p.node == node_idx && p.side == side && p.key != key)
+                    .filter_map(|p| out.ports.get(&p.key).filter(|other| other.side == side))
+                    .all(|other| {
+                        let other_coord = if horiz_axis {
+                            other.point.y
+                        } else {
+                            other.point.x
+                        };
+                        (target_coord - other_coord).abs() >= o.port_spacing - 1e-4
+                            && (old_coord < other_coord) == (target_coord < other_coord)
+                            && (old_coord > other_coord) == (target_coord > other_coord)
+                    });
+                if !peers_ok {
+                    return false;
+                }
+                let t = target_coord - face_min;
+                let snapped_pt = crate::shapes::attachment(shape_name(node_idx), r, side, t);
+                !(0..scene.nodes.len()).any(|k| {
+                    k != node_idx
+                        && k != other_idx
+                        && !scene.nodes[k].container
+                        && rects[k].inflate(o.margin).blocks(snapped_pt, peer_pt)
+                })
             };
 
-            let a_can_snap = a_eligible
-                && coord_b >= face_min_a + eff_corner_a - 1e-6
-                && coord_b <= face_max_a - eff_corner_a + 1e-6;
-            let b_can_snap = b_eligible
-                && coord_a >= face_min_b + eff_corner_b - 1e-6
-                && coord_a <= face_max_b - eff_corner_b + 1e-6;
+            let a_can_snap = can_snap_end(
+                ai,
+                bi,
+                pa.side,
+                &ka,
+                &ra_req.spec,
+                coord_a,
+                coord_b,
+                pb.point,
+            );
+            let b_can_snap = can_snap_end(
+                bi,
+                ai,
+                pb.side,
+                &kb,
+                &rb_req.spec,
+                coord_b,
+                coord_a,
+                pa.point,
+            );
+            let snap_a = a_can_snap && (!b_can_snap || a_sole || !b_sole);
+            let snap_b = !snap_a && b_can_snap;
 
-            if a_can_snap && (!b_eligible || !b_can_snap) {
+            if snap_a {
                 let t = if horiz_axis {
                     coord_b - ra.top()
                 } else {
                     coord_b - ra.left()
                 };
                 write_port(&scene.nodes[ai], ra, pa.side, t, &ka, out);
-            } else if b_can_snap && (!a_eligible || !a_can_snap) {
-                let t = if horiz_axis {
-                    coord_a - rb.top()
-                } else {
-                    coord_a - rb.left()
-                };
-                write_port(&scene.nodes[bi], rb, pb.side, t, &kb, out);
-            } else if a_can_snap {
-                let t = if horiz_axis {
-                    coord_b - ra.top()
-                } else {
-                    coord_b - ra.left()
-                };
-                write_port(&scene.nodes[ai], ra, pa.side, t, &ka, out);
-            } else if b_can_snap {
+            } else if snap_b {
                 let t = if horiz_axis {
                     coord_a - rb.top()
                 } else {
@@ -6506,11 +6840,34 @@ fn order_flat_ranks(
         .nodes
         .iter()
         .any(|n| n.shape == "sql_table" || !n.ports.is_empty());
-    let corridor = if has_explicit_ports {
+    let rank_list: Vec<usize> = by_rank.keys().copied().collect();
+    let mut hop_cross_counts = vec![0usize; rank_list.len().saturating_sub(1)];
+    for e in &scene.edges {
+        let (Some(a), Some(b)) = (scene.index(&e.source.node), scene.index(&e.target.node)) else {
+            continue;
+        };
+        if is_sat[a] || is_sat[b] || ranks[a] == ranks[b] {
+            continue;
+        }
+        if let (Ok(ia), Ok(ib)) = (
+            rank_list.binary_search(&ranks[a]),
+            rank_list.binary_search(&ranks[b]),
+        ) {
+            let (lo, hi) = (ia.min(ib), ia.max(ib));
+            for count in &mut hop_cross_counts[lo..hi] {
+                *count += 1;
+            }
+        }
+    }
+    let max_cross = hop_cross_counts.into_iter().max().unwrap_or(0);
+    let mut corridor = if has_explicit_ports {
         160.
     } else {
         o.margin.max(48.)
     };
+    if max_cross >= 6 {
+        corridor = corridor.max(((max_cross + 2) as f64 * o.lane_spacing.max(13.)).min(220.));
+    }
     let mut x = 0.;
     let mut prev_r = 0usize;
     let mut prev_w = 0.;
@@ -7308,5 +7665,123 @@ distribute row [kubectl, apiserver, reconciler] [gap: 8g]
             total_bends <= 8,
             "expected <= 8 total coalesced bends on conditional-stages, got {total_bends}"
         );
+    }
+
+    fn proper_crossings_count(layout: &Layout) -> usize {
+        let routes: Vec<Vec<Point>> = layout
+            .routes
+            .values()
+            .map(|r| crate::routing::coalesced(&r.points))
+            .collect();
+        let mut count = 0usize;
+        for i in 0..routes.len() {
+            for j in (i + 1)..routes.len() {
+                for pa in routes[i].windows(2) {
+                    for pb in routes[j].windows(2) {
+                        if crate::routing::proper_crossing(pa[0], pa[1], pb[0], pb[1]) {
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        count
+    }
+
+    fn max_port_detour(layout: &Layout) -> f64 {
+        layout
+            .routes
+            .values()
+            .filter_map(|r| {
+                let pts = crate::routing::coalesced(&r.points);
+                let (first, last) = (pts.first()?, pts.last()?);
+                let direct = (first.x - last.x).abs() + (first.y - last.y).abs();
+                if direct <= 1e-6 {
+                    return None;
+                }
+                let len: f64 = pts.windows(2).map(|w| w[0].distance(w[1])).sum();
+                Some(len / direct)
+            })
+            .fold(0., f64::max)
+    }
+
+    #[test]
+    fn architecture_example_has_zero_crossings_and_low_detour() {
+        let src = include_str!("../examples/architecture.diagram");
+        let opts = LayoutOptions::default();
+        let doc = crate::compile_with(src, &opts, None).expect("architecture should compile");
+        validate(&doc.scene, &doc.layout, &opts).expect("architecture should validate");
+        let crossings = proper_crossings_count(&doc.layout);
+        let detour = max_port_detour(&doc.layout);
+        assert_eq!(crossings, 0, "expected 0 proper crossings, got {crossings}");
+        assert!(
+            detour < 2.5,
+            "expected max port detour < 2.5, got {detour:.3}"
+        );
+    }
+
+    #[test]
+    fn abc12345_dag_has_zero_wrong_way_port_exits() {
+        let src = include_str!("../tests/fixtures/quality/abc12345-dag.diagram");
+        let opts = LayoutOptions::default();
+        let doc = crate::compile_with(src, &opts, None).expect("abc12345-dag should compile");
+        validate(&doc.scene, &doc.layout, &opts).expect("abc12345-dag should validate");
+        for e in &doc.scene.edges {
+            let ai = doc.scene.index(&e.source.node).unwrap();
+            let bi = doc.scene.index(&e.target.node).unwrap();
+            if ai == bi {
+                continue;
+            }
+            let ra = doc.layout.nodes[&e.source.node];
+            let rb = doc.layout.nodes[&e.target.node];
+            let pa = &doc.layout.ports[&port_key(e, true)];
+            let pb = &doc.layout.ports[&port_key(e, false)];
+            if effective_ep_side(&doc.scene, &e.source, ai).is_none() {
+                assert!(
+                    !is_wrong_way_side(ra, rb, pa.side),
+                    "edge {} source exited wrong-way side {:?} (ra={ra:?}, rb={rb:?})",
+                    e.id,
+                    pa.side
+                );
+            }
+            if effective_ep_side(&doc.scene, &e.target, bi).is_none() {
+                assert!(
+                    !is_wrong_way_side(rb, ra, pb.side),
+                    "edge {} target exited wrong-way side {:?} (ra={ra:?}, rb={rb:?})",
+                    e.id,
+                    pb.side
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn multi_slot_records_and_named_ports_have_zero_crossings_and_compact_detour() {
+        let opts = LayoutOptions::default();
+        for (name, src) in [
+            (
+                "multi-slot-records",
+                include_str!("../examples/multi-slot-records.diagram"),
+            ),
+            (
+                "10-many-named-ports",
+                include_str!("../tests/fixtures/quality/10-many-named-ports.diagram"),
+            ),
+        ] {
+            let doc = crate::compile_with(src, &opts, None)
+                .unwrap_or_else(|e| panic!("{name} should compile: {e}"));
+            validate(&doc.scene, &doc.layout, &opts)
+                .unwrap_or_else(|e| panic!("{name} should validate: {e}"));
+            let crossings = proper_crossings_count(&doc.layout);
+            let detour = max_port_detour(&doc.layout);
+            assert_eq!(
+                crossings, 0,
+                "{name}: expected 0 proper crossings, got {crossings}"
+            );
+            assert!(
+                detour < 3.5,
+                "{name}: expected max port detour < 3.5, got {detour:.3}"
+            );
+        }
     }
 }
