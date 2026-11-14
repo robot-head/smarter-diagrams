@@ -1,12 +1,12 @@
 //! Typed, atomic UTF-8 source edits and semantic canvas gesture synthesis.
 use crate::{
     Error,
-    layout::{GRID, Layout, Point},
+    layout::{GRID, Layout, Point, Rect},
     model::*,
     syntax::{self, Kind, Span},
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TextPatch {
     pub delete_range: Span,
@@ -291,59 +291,112 @@ fn patches_for(source: &str, op: &DiagramEditOp, separate: bool) -> Result<Vec<T
             for r in scene
                 .relations
                 .iter()
-                .filter(|r| !r.distribute && r.axis == *axis && r.members.contains(node))
+                .filter(|r| r.axis == *axis && r.members.contains(node))
             {
                 let remaining: Vec<_> =
                     r.members.iter().filter(|id| *id != node).cloned().collect();
-                if remaining.len() < 2 {
+                let min_remaining = if r.distribute && r.gap_grid.is_none() {
+                    3
+                } else {
+                    2
+                };
+                if remaining.len() < min_remaining {
                     patches.push(remove_preserving_comments(
                         source,
                         whole_line(source, r.origin),
                     ));
                 } else {
-                    let ts: Vec<_> = syntax::lex(r.list_span.text(source))
+                    let relative = r.list_span.text(source);
+                    let ts: Vec<_> = syntax::lex(relative)
                         .into_iter()
                         .filter(|t| {
                             !matches!(t.kind, Kind::Whitespace | Kind::Newline | Kind::Comment)
                         })
                         .collect();
-                    let relative = r.list_span.text(source);
+                    struct ListItem {
+                        span: Span,
+                        prev_comma: Option<Span>,
+                        next_comma: Option<Span>,
+                        is_match: bool,
+                    }
+                    let mut items = Vec::new();
                     let mut at = 1;
                     while at + 1 < ts.len() {
-                        let begin = at;
-                        while at < ts.len() && !matches!(ts[at].kind, Kind::Comma | Kind::RBracket)
-                        {
+                        if ts[at].kind == Kind::Comma {
                             at += 1;
+                            continue;
+                        }
+                        let begin = at;
+                        if ts[at].kind == Kind::Ident {
+                            at += 1;
+                            while at + 1 < ts.len()
+                                && ts[at].kind == Kind::Dot
+                                && ts[at + 1].kind == Kind::Ident
+                            {
+                                at += 2;
+                            }
+                        } else {
+                            while at + 1 < ts.len() && ts[at].kind != Kind::Comma {
+                                at += 1;
+                            }
+                            if at == begin {
+                                at += 1;
+                                continue;
+                            }
                         }
                         let span = Span::new(ts[begin].span.start, ts[at - 1].span.end);
-                        if span
-                            .text(relative)
-                            .chars()
-                            .filter(|c| !c.is_whitespace())
-                            .collect::<String>()
-                            == *node
-                        {
-                            let delete = if ts[at].kind == Kind::Comma {
-                                Span::new(span.start, ts[at].span.end)
+                        let prev_comma = (begin > 1 && ts[begin - 1].kind == Kind::Comma)
+                            .then(|| ts[begin - 1].span);
+                        let next_comma =
+                            (at < ts.len() && ts[at].kind == Kind::Comma).then(|| ts[at].span);
+                        let item_idx = items.len();
+                        let is_match = r.members.get(item_idx).is_some_and(|id| id == node);
+                        items.push(ListItem {
+                            span,
+                            prev_comma,
+                            next_comma,
+                            is_match,
+                        });
+                        if at < ts.len() && ts[at].kind == Kind::Comma {
+                            at += 1;
+                        }
+                    }
+                    if items.len() != r.members.len() {
+                        for it in &mut items {
+                            let raw: String = it
+                                .span
+                                .text(relative)
+                                .chars()
+                                .filter(|c| !c.is_whitespace())
+                                .collect();
+                            it.is_match = raw == *node
+                                || node.rsplit_once('.').is_some_and(|(_, leaf)| raw == leaf);
+                        }
+                    }
+                    if let Some(last_kept) = items.iter().rposition(|it| !it.is_match) {
+                        for (idx, it) in items.iter().enumerate() {
+                            if !it.is_match {
+                                continue;
+                            }
+                            let delete = if idx < last_kept {
+                                match it.next_comma {
+                                    Some(comma) => Span::new(it.span.start, comma.end),
+                                    None => it.span,
+                                }
                             } else {
-                                let prev = ts[..begin]
-                                    .iter()
-                                    .rev()
-                                    .find(|t| t.kind == Kind::Comma)
-                                    .unwrap();
-                                Span::new(prev.span.start, span.end)
+                                match it.prev_comma {
+                                    Some(comma) => Span::new(comma.start, it.span.end),
+                                    None => it.span,
+                                }
                             };
-                            patches.push(TextPatch::replace(
+                            patches.push(remove_preserving_comments(
                                 source,
                                 Span::new(
                                     delete.start + r.list_span.start,
                                     delete.end + r.list_span.start,
                                 ),
-                                "",
                             ));
-                            break;
                         }
-                        at += 1;
                     }
                 }
             }
@@ -938,37 +991,126 @@ pub(crate) fn anchor_geometry(
     };
     apply_patches(source, &patches)
 }
+/// Return true if a relation constrains the X coordinate (`false` for Y).
+/// `align` constrains the perpendicular axis; `distribute` constrains its own axis.
+pub(crate) fn relation_constrains_x(r: &Relation) -> bool {
+    if r.distribute {
+        r.axis == Axis::Row
+    } else {
+        r.axis == Axis::Col
+    }
+}
+
+/// Return true if `remaining` members of `r` still satisfy its `distribute` constraints.
+pub(crate) fn distribute_subset_valid(
+    r: &Relation,
+    remaining: &[&str],
+    rects: &BTreeMap<NodeId, Rect>,
+    positions: &BTreeMap<NodeId, Point>,
+    grid: f64,
+) -> bool {
+    if !r.distribute {
+        return true;
+    }
+    let is_x = relation_constrains_x(r);
+    let coord = |id: &str| {
+        positions
+            .get(id)
+            .copied()
+            .or_else(|| rects.get(id).copied().map(Rect::center))
+            .map(|p| if is_x { p.x } else { p.y })
+    };
+    let half = |id: &str| {
+        rects
+            .get(id)
+            .map(|rect| if is_x { rect.w * 0.5 } else { rect.h * 0.5 })
+    };
+    if let Some(gap) = r.gap_grid {
+        let target = gap * grid;
+        remaining.windows(2).all(|w| {
+            let (Some(a), Some(ha), Some(b), Some(hb)) =
+                (coord(w[0]), half(w[0]), coord(w[1]), half(w[1]))
+            else {
+                return false;
+            };
+            (((b - hb) - (a + ha)) - target).abs() <= 1e-4
+        })
+    } else {
+        remaining.windows(3).all(|w| {
+            let (Some(a), Some(b), Some(c)) = (coord(w[0]), coord(w[1]), coord(w[2])) else {
+                return false;
+            };
+            (a - 2. * b + c).abs() <= 1e-4
+        })
+    }
+}
+
+fn has_axis_pin(scene: &SceneGraph, id: &str, is_x: bool) -> bool {
+    let Some(node) = scene.node(id) else {
+        return false;
+    };
+    let key = if is_x { "x" } else { "y" };
+    let has_pin = |anns: &[Annotation]| {
+        anns.iter()
+            .filter(|a| a.name == "pin")
+            .any(|a| a.attrs.contains_key("grid") || a.attrs.contains_key(key))
+    };
+    has_pin(&node.annotations)
+        || scene
+            .layout_rules
+            .iter()
+            .any(|r| r.variant.is_none() && r.target == id && has_pin(&r.annotations))
+}
+
 /// Convert canvas positions into semantic edits. Positions are node centroids in pixels.
 pub fn synthesize_drag(
     scene: &SceneGraph,
     layout: &Layout,
     drags: &[Drag],
 ) -> Result<Vec<DiagramEditOp>, Error> {
-    let mut ops = Vec::new();
+    let mut drag_positions = BTreeMap::new();
     for drag in drags {
         if !drag.position.x.is_finite() || !drag.position.y.is_finite() {
             return Err(Error::Edit("drag coordinates must be finite".into()));
         }
-        let n = scene
+        scene
             .node(&drag.node)
             .ok_or_else(|| Error::Edit(format!("unknown node {}", drag.node)))?;
-        let old = layout
+        layout
             .nodes
             .get(&drag.node)
             .ok_or_else(|| Error::Edit("node is absent from layout".into()))?;
-        for (axis, delta) in [
-            (Axis::Row, (drag.position.y - old.y).abs()),
-            (Axis::Col, (drag.position.x - old.x).abs()),
-        ] {
-            if delta >= 24.
-                && scene
-                    .relations
-                    .iter()
-                    .any(|r| !r.distribute && r.axis == axis && r.members.contains(&n.id))
+        drag_positions.insert(drag.node.clone(), drag.position);
+    }
+
+    let mut broken_relations: BTreeSet<(NodeId, bool)> = BTreeSet::new();
+    let mut ops = Vec::new();
+    for drag in drags {
+        let n = scene.node(&drag.node).unwrap();
+        let old = layout.nodes.get(&drag.node).unwrap();
+        for r in &scene.relations {
+            if !r.members.contains(&n.id) {
+                continue;
+            }
+            let is_x = relation_constrains_x(r);
+            let is_row = r.axis == Axis::Row;
+            let coord = |p: Point| if is_x { p.x } else { p.y };
+            let disp = |id: &str| {
+                let Some(base) = layout.nodes.get(id) else {
+                    return 0.;
+                };
+                let target = drag_positions.get(id).copied().unwrap_or_else(|| base.center());
+                coord(target) - coord(base.center())
+            };
+            let id_disp = disp(&n.id);
+            if r.members
+                .iter()
+                .any(|peer| (disp(peer) - id_disp).abs() >= 24.)
+                && broken_relations.insert((n.id.clone(), is_row))
             {
                 ops.push(DiagramEditOp::BreakAlignment {
                     node: n.id.clone(),
-                    axis,
+                    axis: r.axis,
                 });
             }
         }
@@ -1014,25 +1156,73 @@ pub fn synthesize_drag(
             });
             continue;
         }
+        #[derive(Clone, Copy)]
+        enum Border {
+            N,
+            E,
+            S,
+            W,
+        }
+        let hw = old.w * 0.5;
+        let hh = old.h * 0.5;
+        let node_left = drag.position.x - hw;
+        let node_right = drag.position.x + hw;
+        let node_top = drag.position.y - hh;
+        let node_bottom = drag.position.y + hh;
         let container = scene
             .nodes
             .iter()
-            .filter(|c| c.container && c.id != n.id && !ancestors(scene, &n.id).contains(&c.id))
-            .filter_map(|c| layout.nodes.get(&c.id).map(|r| (c, r)))
-            .filter(|(_, r)| {
-                drag.position.x >= r.right() && drag.position.x - r.right() <= 6. * GRID
+            .filter(|c| {
+                c.container
+                    && c.id != n.id
+                    && !ancestors(scene, &n.id).contains(&c.id)
+                    && !ancestors(scene, &c.id).contains(&n.id)
             })
-            .min_by(|a, b| {
-                (drag.position.x - a.1.right()).total_cmp(&(drag.position.x - b.1.right()))
-            });
-        let pin = if let Some((c, r)) = container {
-            PinExpr::Relative {
-                x: format!(
-                    "{}.E + {}g",
-                    c.id,
-                    ((drag.position.x - r.right()) / GRID).round()
-                ),
-                y: format!("{}g", (drag.position.y / GRID).round()),
+            .filter_map(|c| layout.nodes.get(&c.id).map(|r| (c, r)))
+            .flat_map(|(c, r)| {
+                let overlap_y = node_bottom > r.top() && node_top < r.bottom();
+                let overlap_x = node_right > r.left() && node_left < r.right();
+                [
+                    (overlap_x && node_bottom <= r.top() + 1e-6)
+                        .then(|| (c, r, Border::N, (r.top() - node_bottom).max(0.))),
+                    (overlap_y && node_left >= r.right() - 1e-6)
+                        .then(|| (c, r, Border::E, (node_left - r.right()).max(0.))),
+                    (overlap_x && node_top >= r.bottom() - 1e-6)
+                        .then(|| (c, r, Border::S, (node_top - r.bottom()).max(0.))),
+                    (overlap_y && node_right <= r.left() + 1e-6)
+                        .then(|| (c, r, Border::W, (r.left() - node_right).max(0.))),
+                ]
+                .into_iter()
+                .flatten()
+            })
+            .filter(|(_, _, _, dist)| *dist <= 6. * GRID)
+            .min_by(|a, b| a.3.total_cmp(&b.3));
+        let grid_offset = |px: f64, min_px: f64| {
+            let g = (px / GRID).round().max((min_px / GRID).ceil()) + 0.0;
+            format!("{g}g")
+        };
+        let grid_abs = |px: f64| {
+            let g = (px / GRID).round() + 0.0;
+            format!("{g}g")
+        };
+        let pin = if let Some((c, r, side, _)) = container {
+            match side {
+                Border::N => PinExpr::Relative {
+                    x: grid_abs(drag.position.x),
+                    y: format!("{}.N - {}", c.id, grid_offset(r.top() - drag.position.y, hh)),
+                },
+                Border::E => PinExpr::Relative {
+                    x: format!("{}.E + {}", c.id, grid_offset(drag.position.x - r.right(), hw)),
+                    y: grid_abs(drag.position.y),
+                },
+                Border::S => PinExpr::Relative {
+                    x: grid_abs(drag.position.x),
+                    y: format!("{}.S + {}", c.id, grid_offset(drag.position.y - r.bottom(), hh)),
+                },
+                Border::W => PinExpr::Relative {
+                    x: format!("{}.W - {}", c.id, grid_offset(r.left() - drag.position.x, hw)),
+                    y: grid_abs(drag.position.y),
+                },
             }
         } else {
             PinExpr::AbsoluteGrid {
@@ -1045,6 +1235,45 @@ pub fn synthesize_drag(
             pin,
             size_lock: None,
         });
+    }
+    // If breaking a member out of a `distribute` relation leaves pinned members
+    // whose coordinates conflict with the remaining spacing rule, dissolve it.
+    loop {
+        let mut changed = false;
+        for r in &scene.relations {
+            if !r.distribute {
+                continue;
+            }
+            let is_row = r.axis == Axis::Row;
+            let remaining: Vec<&str> = r
+                .members
+                .iter()
+                .filter(|m| !broken_relations.contains(&(m.to_string(), is_row)))
+                .map(String::as_str)
+                .collect();
+            let min_remaining = if r.gap_grid.is_some() { 2 } else { 3 };
+            let is_x = relation_constrains_x(r);
+            if remaining.len() >= min_remaining
+                && remaining.len() < r.members.len()
+                && remaining
+                    .iter()
+                    .all(|id| drag_positions.contains_key(*id) || has_axis_pin(scene, id, is_x))
+                && !distribute_subset_valid(r, &remaining, &layout.nodes, &drag_positions, GRID)
+            {
+                for m in remaining {
+                    if broken_relations.insert((m.to_string(), is_row)) {
+                        ops.push(DiagramEditOp::BreakAlignment {
+                            node: m.to_string(),
+                            axis: r.axis,
+                        });
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
     }
     Ok(ops)
 }
