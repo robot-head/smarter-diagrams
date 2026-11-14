@@ -1,6 +1,9 @@
 //! Accessible, deterministic vector output. User strings are always XML escaped.
 use crate::{layout::*, model::*};
-use std::{collections::BTreeMap, fmt::Write};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Write,
+};
 pub fn escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -259,11 +262,22 @@ pub fn description(scene: &SceneGraph) -> String {
 pub fn zone_contours(scene: &SceneGraph, l: &Layout, zone: &Zone) -> Vec<Vec<Point>> {
     crate::zones::contours(scene, l, zone)
 }
-fn zone_titles<'a>(scene: &'a SceneGraph, l: &Layout) -> Vec<(&'a Zone, Rect)> {
+fn all_zone_contours(scene: &SceneGraph, l: &Layout) -> Vec<Vec<Vec<Point>>> {
+    scene
+        .zones
+        .iter()
+        .map(|zone| crate::zones::contours(scene, l, zone))
+        .collect()
+}
+fn zone_titles_from_contours<'a>(
+    scene: &'a SceneGraph,
+    l: &Layout,
+    zone_contours_list: &[Vec<Vec<Point>>],
+) -> Vec<(&'a Zone, Rect)> {
     let mut titles = Vec::new();
     let mut occupied = Vec::new();
-    for zone in &scene.zones {
-        for contour in crate::zones::contours(scene, l, zone) {
+    for (zone, contours) in scene.zones.iter().zip(zone_contours_list) {
+        for contour in contours {
             let area: f64 = contour
                 .iter()
                 .zip(contour.iter().cycle().skip(1))
@@ -273,7 +287,7 @@ fn zone_titles<'a>(scene: &'a SceneGraph, l: &Layout) -> Vec<(&'a Zone, Rect)> {
             if area <= 1e-6 {
                 continue;
             }
-            if let Some(r) = zone_title_at(scene, zone, l, &contour, &occupied) {
+            if let Some(r) = zone_title_at(scene, zone, l, contour, &occupied) {
                 occupied.push(r);
                 titles.push((zone, r));
             }
@@ -298,7 +312,7 @@ fn zone_title_at(
         !occupied.iter().any(|old| r.inflate(4.).intersects(*old))
             && !scene.nodes.iter().any(|n| {
                 let node = l.nodes[&n.id];
-                if crate::layout::container_header_rect(n, node)
+                if crate::layout::container_header_rect_with_ports(n, node, &l.ports)
                     .is_some_and(|h| r.inflate(4.).intersects(h))
                 {
                     return true;
@@ -318,23 +332,23 @@ fn zone_title_at(
                 .any(|label| r.inflate(4.).intersects(label.bounds))
     };
     let mut r = Rect::new(left + w / 2., top - h / 2. - 6., w, h);
-    // Search along the boundary before climbing away from it. A connector
+    // Search finely along the contour edge before climbing away from it. A connector
     // entering near the left corner should not push the title above unrelated
     // nodes and make its scope ambiguous.
-    let columns = ((right - left - w).max(0.) / 16.).ceil() as usize;
-    let columns = columns.min(128);
+    let columns = ((right - left - w).max(0.) / 8.).ceil() as usize;
+    let columns = columns.min(256);
     for row in 0..scene.nodes.len() + l.labels.len() + 4 {
         let candidates_y = if row == 0 {
             vec![top - h / 2. - 6., bottom + h / 2. + 6.]
         } else {
             vec![
-                top - h / 2. - 6. - row as f64 * 32.,
-                bottom + h / 2. + 6. + row as f64 * 32.,
+                top - h / 2. - 6. - row as f64 * 20.,
+                bottom + h / 2. + 6. + row as f64 * 20.,
             ]
         };
         for y in candidates_y {
             for col in 0..=columns + 1 {
-                let x = left + w / 2. + col as f64 * 16.;
+                let x = left + w / 2. + col as f64 * 8.;
                 r = Rect::new(x, y, w, h);
                 if clear(r) {
                     return Some(r);
@@ -390,14 +404,58 @@ fn crossing_gaps(l: &Layout, visible: impl Fn(&str) -> bool) -> BTreeMap<String,
     }
     gaps
 }
-fn gap_mask(id: &str, gaps: &BTreeMap<String, Vec<Point>>) -> String {
-    gaps.keys()
+#[derive(Default)]
+struct EdgeMask {
+    crossings: Vec<Point>,
+    knockouts: Vec<Rect>,
+}
+
+fn edge_masks(
+    scene: &SceneGraph,
+    l: &Layout,
+    visible: impl Fn(&str) -> bool,
+) -> BTreeMap<String, EdgeMask> {
+    let mut masks: BTreeMap<String, EdgeMask> = crossing_gaps(l, &visible)
+        .into_iter()
+        .map(|(id, crossings)| {
+            (
+                id,
+                EdgeMask {
+                    crossings,
+                    knockouts: Vec::new(),
+                },
+            )
+        })
+        .collect();
+    for label in &l.labels {
+        if label.knockout
+            && !label.callout
+            && visible(&label.feature)
+            && scene.edge(&label.feature).is_some()
+        {
+            masks
+                .entry(label.feature.clone())
+                .or_default()
+                .knockouts
+                .push(label.bounds);
+        }
+    }
+    masks
+}
+
+fn gap_mask(id: &str, masks: &BTreeMap<String, EdgeMask>) -> String {
+    masks
+        .keys()
         .position(|key| key == id)
         .map(|i| format!(" mask=\"url(#gap-{i})\""))
         .unwrap_or_default()
 }
-/// Bounds of every painted feature, including external record and zone titles.
-pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
+fn bounds_with(
+    scene: &SceneGraph,
+    l: &Layout,
+    zone_contours_list: &[Vec<Vec<Point>>],
+    titles: &[(&Zone, Rect)],
+) -> Rect {
     let ink = l
         .nodes
         .values()
@@ -419,14 +477,13 @@ pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
                 .flat_map(|z| z.iter().map(|p| Rect::new(p.x, p.y, 1., 1.))),
         )
         .chain(
-            scene
-                .zones
+            zone_contours_list
                 .iter()
-                .flat_map(|z| crate::zones::contours(scene, l, z))
+                .flatten()
                 .flatten()
                 .map(|p| Rect::new(p.x, p.y, 1., 1.)),
         )
-        .chain(zone_titles(scene, l).into_iter().map(|(_, r)| r))
+        .chain(titles.iter().map(|(_, r)| *r))
         .chain(
             scene
                 .flows
@@ -443,6 +500,12 @@ pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
         .unwrap_or(Rect::new(0., 0., 160., 80.));
     Rect::new(ink.x, ink.y, ink.w + 96., ink.h + 64.)
 }
+/// Bounds of every painted feature, including external record and zone titles.
+pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
+    let contours = all_zone_contours(scene, l);
+    let titles = zone_titles_from_contours(scene, l, &contours);
+    bounds_with(scene, l, &contours, &titles)
+}
 
 pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
     svg_with_decorations(scene, l, |_| true, |_, _| String::new())
@@ -455,8 +518,10 @@ pub(crate) fn svg_with_decorations(
     edge_visible: impl Fn(&str) -> bool,
     decorate: impl Fn(&Node, Rect) -> String,
 ) -> String {
-    let bounds = bounds(scene, l);
-    let gaps = crossing_gaps(l, edge_visible);
+    let contours = all_zone_contours(scene, l);
+    let titles = zone_titles_from_contours(scene, l, &contours);
+    let bounds = bounds_with(scene, l, &contours, &titles);
+    let masks = edge_masks(scene, l, &edge_visible);
     let mut s = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:var(--sd-fg,#233347)}}.node-title{{font-weight:600;font-size:16px}}.port-label{{font-size:13px}}.edge{{fill:none;stroke:var(--sd-edge,#53657a);stroke-width:1.7;stroke-linejoin:round}}.flow{{fill:none;stroke:var(--sd-flow,#356bd9);stroke-width:3;stroke-linejoin:round}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:var(--sd-edge,#53657a)}}</style>",
         bounds.left(),
@@ -467,7 +532,7 @@ pub(crate) fn svg_with_decorations(
         bounds.h,
         escape(&description(scene))
     );
-    for (i, (_, points)) in gaps.iter().enumerate() {
+    for (i, (_, em)) in masks.iter().enumerate() {
         let _ = write!(
             s,
             "<defs><mask id=\"gap-{i}\" maskUnits=\"userSpaceOnUse\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"white\"/>",
@@ -480,11 +545,21 @@ pub(crate) fn svg_with_decorations(
             bounds.w,
             bounds.h
         );
-        for p in points {
+        for p in &em.crossings {
             let _ = write!(
                 s,
                 "<circle data-crossing=\"true\" cx=\"{}\" cy=\"{}\" r=\"4\" fill=\"black\"/>",
                 p.x, p.y
+            );
+        }
+        for r in &em.knockouts {
+            let _ = write!(
+                s,
+                "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"5\" fill=\"black\"/>",
+                r.left() - 4.,
+                r.top() - 4.,
+                r.w + 8.,
+                r.h + 8.
             );
         }
         s.push_str("</mask></defs>");
@@ -508,9 +583,8 @@ pub(crate) fn svg_with_decorations(
         s.push_str(&decorate(n, r));
         s.push_str("</g>");
     }
-    for z in &scene.zones {
-        let contours = crate::zones::contours(scene, l, z);
-        if !contours.is_empty() {
+    for (z, zone_polys) in scene.zones.iter().zip(&contours) {
+        if !zone_polys.is_empty() {
             let (tint, alpha) = paint(
                 z.attrs
                     .get("tint")
@@ -521,12 +595,17 @@ pub(crate) fn svg_with_decorations(
                 s,
                 "<path data-zone=\"{}\" d=\"{}\" fill=\"{}\" fill-opacity=\"{}\" fill-rule=\"evenodd\"/>",
                 escape(&z.id),
-                contours.iter().map(|p| rounded_hull(p)).collect::<String>(),
+                zone_polys.iter().map(|p| rounded_hull(p)).collect::<String>(),
                 escape(&tint),
                 alpha
             );
         }
     }
+    let in_flow: BTreeSet<&str> = scene
+        .flows
+        .iter()
+        .flat_map(|f| f.edges.iter().map(String::as_str))
+        .collect();
     for e in &scene.edges {
         let r = &l.routes[&e.id];
         let dashed = e.attrs.get("style").is_some_and(|v| v.text == "dashed");
@@ -540,22 +619,25 @@ pub(crate) fn svg_with_decorations(
         } else {
             ""
         };
-        let color = if e.attrs.contains_key("active") {
+        let active = e.attrs.contains_key("active");
+        let color = if active {
             "var(--sd-flow,#356bd9)"
         } else if e.attrs.contains_key("phantom") {
             "#c345ac"
         } else {
             "var(--sd-edge,#53657a)"
         };
-        let width = if e.attrs.contains_key("active") {
+        let width = if active {
             4.0
         } else if e.kind == EdgeKind::Bold {
             3.0
         } else {
             1.7
         };
-        let (shaft, heads) = connector(&r.points, e.kind, width);
-        let mask = gap_mask(&e.id, &gaps);
+        let covered_by_flow = in_flow.contains(e.id.as_str());
+        let trim_width = if covered_by_flow && !active { 3.0 } else { width };
+        let (shaft, heads) = connector(&r.points, e.kind, trim_width);
+        let mask = gap_mask(&e.id, &masks);
         let _ = write!(
             s,
             "<path data-edge=\"{}\" class=\"edge\" style=\"stroke:{color};stroke-width:{width}\" d=\"{}\"{mask}{dash}{phantom}><title>{}</title></path>",
@@ -566,13 +648,15 @@ pub(crate) fn svg_with_decorations(
                 e.source.node, e.target.node, e.label
             ))
         );
-        for (end, points) in heads {
-            let _ = write!(
-                s,
-                "<path data-edge=\"{}\" data-arrowhead=\"{end}\" d=\"{}Z\" fill=\"{color}\"/>",
-                escape(&e.id),
-                path(&points)
-            );
+        if !covered_by_flow {
+            for (end, points) in heads {
+                let _ = write!(
+                    s,
+                    "<path data-edge=\"{}\" data-arrowhead=\"{end}\" d=\"{}Z\" fill=\"{color}\"/>",
+                    escape(&e.id),
+                    path(&points)
+                );
+            }
         }
     }
     for n in scene
@@ -769,14 +853,29 @@ pub(crate) fn svg_with_decorations(
             );
         }
     }
+    let mut emitted_flows = BTreeSet::new();
     for flow in &scene.flows {
         for (step, id) in flow.edges.iter().enumerate() {
+            if !emitted_flows.insert(id.as_str()) {
+                continue;
+            }
             if let Some(r) = l.routes.get(id) {
-                let (shaft, heads) = connector(&r.points, scene.edge(id).unwrap().kind, 3.);
-                let mask = gap_mask(id, &gaps);
+                let edge = scene.edge(id).unwrap();
+                let flow_width = if edge.attrs.contains_key("active") {
+                    4.
+                } else {
+                    3.
+                };
+                let (shaft, heads) = connector(&r.points, edge.kind, flow_width);
+                let mask = gap_mask(id, &masks);
+                let width_attr = if flow_width != 3. {
+                    format!(" style=\"stroke-width:{flow_width}\"")
+                } else {
+                    String::new()
+                };
                 let _ = write!(
                     s,
-                    "<g aria-label=\"{} step {}\"><path data-edge=\"{}\" class=\"flow\" d=\"{}\"{mask}/></g>",
+                    "<g aria-label=\"{} step {}\"><path data-edge=\"{}\" class=\"flow\"{width_attr} d=\"{}\"{mask}/></g>",
                     escape(&flow.label),
                     step + 1,
                     escape(id),
@@ -799,13 +898,15 @@ pub(crate) fn svg_with_decorations(
         .filter(|n| n.container && n.shape != "sql_table")
     {
         let r = l.nodes[&n.id];
+        let hx = container_header_rect_with_ports(n, r, &l.ports)
+            .map_or(r.left() + 16., |hr| hr.left() + 4.);
         let _ = write!(
             s,
             "<text data-owner-node=\"{}\" class=\"node-title\" x=\"{}\" y=\"{}\">{}</text>",
             escape(&n.id),
-            r.left() + 16.,
+            hx,
             r.top() + 22. + (header_height(n) - 24.) / 2.,
-            text_content(&n.label, r.left() + 16., 20.)
+            text_content(&n.label, hx, 20.)
         );
     }
     for label in &l.labels {
@@ -826,6 +927,14 @@ pub(crate) fn svg_with_decorations(
         };
         let flow = scene.flows.iter().any(|f| f.edges.contains(&label.feature));
         if flow || label.knockout && !label.callout {
+            let inside_container = !flow
+                && scene.nodes.iter().any(|n| {
+                    n.container
+                        && n.shape != "sql_table"
+                        && l.nodes
+                            .get(&n.id)
+                            .is_some_and(|nr| nr.contains(r.center()))
+                });
             let _ = write!(
                 s,
                 "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"5\" fill=\"{}\"/>",
@@ -835,6 +944,8 @@ pub(crate) fn svg_with_decorations(
                 r.h + 8.,
                 if flow {
                     "var(--sd-flow,#356bd9)"
+                } else if inside_container {
+                    "var(--sd-container,#f0f4f9)"
                 } else {
                     "var(--sd-bg,#ffffff)"
                 }
@@ -854,7 +965,7 @@ pub(crate) fn svg_with_decorations(
         );
         s.push_str("</g>");
     }
-    for (z, r) in zone_titles(scene, l) {
+    for (z, r) in titles {
         let _ = write!(
             s,
             "<rect data-zone-title-surface=\"{}\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"8\" fill=\"var(--sd-bg,#ffffff)\" stroke=\"var(--sd-border,#6b8198)\"/>",
@@ -883,8 +994,7 @@ type Arrowheads = Vec<(&'static str, [Point; 3])>;
 /// stroke width, color and the exact silhouette attachment independent of SVG
 /// marker scaling and avoids a square shaft protruding through the tip.
 fn connector(points: &[Point], kind: EdgeKind, width: f64) -> (Vec<Point>, Arrowheads) {
-    let mut shaft = points.to_vec();
-    shaft.dedup();
+    let mut shaft = crate::routing::coalesced(points);
     let mut heads = Vec::new();
     if shaft.len() < 2 || kind == EdgeKind::Undirected {
         return (shaft, heads);
@@ -1175,5 +1285,51 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn inline_knockout_emits_mask_cutout_and_container_aware_fill() {
+        let root_diag = crate::compile(
+            "a @pin(grid: 0, 0)\nb @pin(grid: 20, 0)\na.E -> b.W: payload @label(slot: inline, slide: 0.5)\n",
+        )
+        .unwrap();
+        let root_svg = root_diag.to_svg();
+        assert!(root_svg.contains("fill=\"black\"/>"));
+        assert!(root_svg.contains("fill=\"var(--sd-bg,#ffffff)\"/>"));
+        assert!(root_svg.contains("mask=\"url(#"));
+
+        let cont_diag = crate::compile(
+            "box {\n a @pin(grid: 0, 0)\n b @pin(grid: 20, 0)\n a.E -> b.W: payload @label(slot: inline, slide: 0.5)\n}\n",
+        )
+        .unwrap();
+        let cont_svg = cont_diag.to_svg();
+        assert!(cont_svg.contains("fill=\"black\"/>"));
+        assert!(cont_svg.contains("fill=\"var(--sd-container,#f0f4f9)\"/>"));
+    }
+
+    #[test]
+    fn overlapping_flows_deduplicate_arrowheads_and_coalesced_connector_handles_collinear_stubs() {
+        let diag = crate::compile(
+            "a @pin(grid: 0, 0)\nb @pin(grid: 20, 0)\na -> b\nflow f1 { a -> b }\nflow f2 { a -> b }\n",
+        )
+        .unwrap();
+        let out_svg = diag.to_svg();
+        assert_eq!(out_svg.matches("class=\"flow\"").count(), 1);
+        assert_eq!(out_svg.matches("data-arrowhead=\"end\"").count(), 1);
+        assert!(out_svg.contains("fill=\"var(--sd-flow,#356bd9)\""));
+
+        // Collinear vertex only 2px from end must coalesce so arrowhead is not squished to 1.6px.
+        let (shaft, heads) = connector(
+            &[
+                Point::new(0., 0.),
+                Point::new(98., 0.),
+                Point::new(100., 0.),
+            ],
+            EdgeKind::Directed,
+            1.7,
+        );
+        assert_eq!(shaft.len(), 2);
+        let tip = heads[0].1[0];
+        assert!((shaft[1].distance(tip) - 9.7).abs() < 1e-6);
     }
 }
