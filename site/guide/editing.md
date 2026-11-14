@@ -58,7 +58,40 @@ The plain leaf-label incremental path verifies declaration identity and shifts s
 
 For a continuous canvas gesture, use `Document::begin_drag()`, update its `DragSession` with precise pixel coordinates, and display `session.snapshot()`. `Document::commit_drag(&session)` saves that exact validated snapshot in one undo step. A stale session or invalid placement cannot commit. Returning to the starting position is a no-op.
 
-The [browser playground](/playground) uses this transaction through `WasmDocument.begin_drag()` and `commit_drag(preview)`. Automatic positions are captured in an `@layout` block, preserving existing relative anchors and locks; canvas placement has no hidden grid/peer snap on release. The router builds each candidate from the current geometry and retains the gesture’s original neighboring paths when their endpoints and clearance remain valid. For small movements, turns and adjacent runs follow outward stubs and moving clearance boundaries while preserving the corridor. A genuinely blocked path forces a detour or rejects the placement. Automatic attachment changes compare complete route and caption candidates, including changing either end independently, with a switching cost; explicit sides remain fixed. Clear caption positions are retained for straight lines and simple elbows as well as detours. Clear caption boxes can keep their position with orthogonal leaders that bend around nodes; nearby diagonal positions and a bounded tether allow gradual movement when needed. Rendering and collision checks use the same leader segments. Exact canvas pins constrain body clearance; actual stubs are validated by the router rather than a rectangular reservation along an entire node side. Stationary route preferences use the gesture baseline. Obstacle detours additionally retain the current valid corridor and caption slot until obstructed or more than 25% plus 32 px longer than a fresh route. This deliberate hysteresis prevents equal-cost detours from alternating; complete path validation and the length bound prevent stale or growing detours. Returning to the starting position still restores the exact baseline. Facing ports prefer a balanced corridor while it remains clear, so tiny pointer changes do not switch elbow positions. Protocol flow captions on facing horizontal ports prefer a consistent rail above the endpoint pair rather than alternating inline and callout slots. Explicit route and label annotations retain control. A fresh source compilation may optimize automatic routes and caption positions again; the source does not encode gesture history. Commits and Undo/Redo retain the exact validated preview. The camera remains fixed until **Fit** is chosen. The semantic snapping helper above remains available to hosts that explicitly want those gestures.
+### 1. Transactional drag lifecycle & `@layout` pins
+
+The [browser playground](/playground) drives interactive placement through `WasmDocument.begin_drag()`, `preview.update(...)`, and `commit_drag(preview)`:
+
+- **Source capture without hidden post-drop jumps**: Dropping a node writes its committed canvas position into an `@layout` block (preserving existing relative anchors and locks) without applying an unrequested grid or peer snap on mouse release.
+- **Exact baseline & undo**: A fresh compilation from scratch may pick new automatic routes (because `.diagram` text does not record gesture history), whereas commits and Undo/Redo replay the exact validated preview snapshot.
+- **Camera stability**: The viewport keeps its pan/zoom frame across drag previews and commits until you press **Fit**.
+- **Explicit host snapping**: Hosts that want semantic peer/grid snapping can still invoke `edit::synthesize_drag`.
+
+![Browser playground showing live @layout pin capture alongside preserved orthogonal routes after dragging API Gateway](/figures/gesture-node-corridor.png)
+
+### 2. Route hysteresis & corridor preservation
+
+Instead of re-solving all routes from scratch on every pointer frame, the router preserves existing geometry whenever endpoints and body clearance remain valid:
+
+- **Small motions & stubs**: Outward port stubs follow the moving body clearance box rather than reserving an entire node side, keeping bends and adjacent corridor lanes stationary until a path is genuinely blocked.
+- **Detour hysteresis**: Active detours and clear caption slots keep their corridor until obstructed or more than `25% + 32 px` longer than a fresh route, preventing equal-cost elbows from flickering back and forth as you drag.
+- **Facing-port rails**: Facing horizontal ports retain a balanced elbow corridor and prefer a shared rail above the endpoint pair for protocol flow labels. Returning to the starting coordinates restores the exact baseline route.
+- **Independent attachment search**: Only when an automatic port attachment is blocked does the router evaluate complete route+caption candidates on each end (with a switching cost); explicit `.N`/`.E`/`.S`/`.W` sides always remain fixed.
+
+### 3. Direct caption tethering & orthogonal leaders
+
+Edge captions track straight lines, simple elbows, and obstacle detours without jumping away on neighboring node moves:
+
+- When you drag a caption (`preview.update_label(...)`), the canvas attaches an orthogonal dashed leader bent cleanly around nearby node bodies, using the exact same leader segments for collision checks and rendering.
+- Nearby diagonal positions and a bounded tether let captions slide smoothly as attached nodes move. Double-clicking a dragged caption resets it to automatic placement (`preview.reset_label`).
+
+![Dragging the publish caption below its bus produces an obstacle-aware dashed orthogonal leader](/figures/gesture-label-leader.png)
+
+### 4. Grid overlay & alignment guides
+
+Open the **Grid & snap** toolbar menu in the playground to toggle visual authoring aids (**Show grid**, **Snap to grid**, and **Align & equal spacing**). Hold `Alt` / `Option` during a drag to bypass magnetic guides temporarily without losing your settings.
+
+![Mid-drag preview with the grid overlay and vertical alignment guide active between Worker A and Worker B](/figures/gesture-snap-guides.png)
 
 ## Moving captions directly
 

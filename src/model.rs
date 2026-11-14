@@ -122,6 +122,12 @@ pub struct Node {
     pub declaration_index: usize,
     pub explicit: bool,
 }
+impl Node {
+    /// Return the validated hyperlink URL attached via `[link: "..."]` or `[href: "..."]`, if any.
+    pub fn link(&self) -> Option<String> {
+        extract_link(&self.attrs).ok().flatten()
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Endpoint {
     pub raw_constraint: PortConstraint,
@@ -148,6 +154,54 @@ pub struct Edge {
     pub attrs: Attributes,
     pub annotations: Vec<Annotation>,
     pub origin: SourceOrigin,
+}
+impl Edge {
+    /// Return the validated hyperlink URL attached via `[link: "..."]` or `[href: "..."]`, if any.
+    pub fn link(&self) -> Option<String> {
+        extract_link(&self.attrs).ok().flatten()
+    }
+}
+
+/// Extract and validate a node/edge hyperlink from `[link: "..."]` or `[href: "..."]`.
+/// Allows `https://`, `http://`, `mailto:`, `#`, `/`, `./`, `../`, and scheme-less relative URLs,
+/// while rejecting scriptable/data schemes (`javascript:`, `data:`, `vbscript:`, etc.).
+pub fn extract_link(attrs: &Attributes) -> Result<Option<String>, Diagnostic> {
+    let Some(val) = attrs.get("link").or_else(|| attrs.get("href")) else {
+        return Ok(None);
+    };
+    let unquoted = unquote(val.text.trim());
+    let trimmed = unquoted.trim();
+    if trimmed.is_empty() {
+        return Err(Diagnostic {
+            severity: Severity::Error,
+            span: val.span,
+            message: "link target must not be empty".into(),
+        });
+    }
+    let normalized: String = trimmed
+        .chars()
+        .filter(|c| !c.is_control() && !c.is_ascii_whitespace())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    let safe_scheme = normalized.starts_with("https://")
+        || normalized.starts_with("http://")
+        || normalized.starts_with("mailto:")
+        || normalized.starts_with('/')
+        || normalized.starts_with('#')
+        || normalized.starts_with("./")
+        || normalized.starts_with("../");
+    if safe_scheme {
+        return Ok(Some(trimmed.to_string()));
+    }
+    let prefix = normalized.split(['/', '?', '#']).next().unwrap_or("");
+    if prefix.contains(':') {
+        return Err(Diagnostic {
+            severity: Severity::Error,
+            span: val.span,
+            message: format!("unsafe or unsupported link scheme in {trimmed:?}"),
+        });
+    }
+    Ok(Some(trimmed.to_string()))
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Axis {
@@ -885,6 +939,9 @@ impl Lower<'_> {
             let end = matching(&ts, i);
             attrs = attributes(self.source, &ts[i + 1..end]);
         }
+        if let Err(diag) = extract_link(&attrs) {
+            self.scene.diagnostics.push(diag);
+        }
         let anns = annotations(self.source, &ts);
         let span = Span::from(stmt.text_range());
         let has_owned = stmt
@@ -1134,6 +1191,9 @@ impl Lower<'_> {
         if ts.get(i).is_some_and(|t| t.kind == Kind::LBracket) {
             let end = matching(&ts, i);
             attrs = attributes(self.source, &ts[i + 1..end]);
+        }
+        if let Err(diag) = extract_link(&attrs) {
+            self.scene.diagnostics.push(diag);
         }
         let anns = annotations(self.source, &ts);
         for (j, &op) in ops.iter().enumerate() {
@@ -1596,5 +1656,34 @@ mod tests {
             Some("global")
         );
         assert!(resolve_scoped_node(&scene, Some("outer.inner"), "missing").is_none());
+    }
+
+    #[test]
+    fn extract_link_accepts_safe_urls_and_rejects_unsafe_schemes() {
+        let ok = lower(&syntax::parse(
+            "a [link: \"https://example.com/docs\"]\nb [href: \"#sec-1\"]\nc [link: \"/guide/cli\"]\na -> b [link: \"./runbook.md\"]\n",
+        ));
+        assert!(ok.diagnostics.is_empty(), "{:?}", ok.diagnostics);
+        assert_eq!(
+            ok.node("a").unwrap().link().as_deref(),
+            Some("https://example.com/docs")
+        );
+        assert_eq!(ok.node("b").unwrap().link().as_deref(), Some("#sec-1"));
+        assert_eq!(ok.node("c").unwrap().link().as_deref(), Some("/guide/cli"));
+        assert_eq!(ok.edges[0].link().as_deref(), Some("./runbook.md"));
+
+        for bad in [
+            "a [link: \"javascript:alert(1)\"]\n",
+            "a [href: \"data:text/html,<svg>\"]\n",
+            "a [link: \"java\\tscript:alert(1)\"]\n",
+            "a [link: \"\"]\n",
+            "a -> b [link: \"vbscript:msgbox(1)\"]\n",
+        ] {
+            let scene = lower(&syntax::parse(bad));
+            assert!(
+                !scene.diagnostics.is_empty(),
+                "expected diagnostic rejecting unsafe link in {bad:?}"
+            );
+        }
     }
 }

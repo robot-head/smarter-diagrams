@@ -529,7 +529,16 @@ fn align_container_columns(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOpt
                 PortConstraint::FixedPos {
                     side: Side::W | Side::E,
                     offset_grid,
-                } => return Some(r.top() + crate::layout::record_slot_offset(&scene.nodes[idx], offset_grid, o.grid)),
+                } => {
+                    return Some(
+                        r.top()
+                            + crate::layout::record_slot_offset(
+                                &scene.nodes[idx],
+                                offset_grid,
+                                o.grid,
+                            ),
+                    );
+                }
                 _ => {}
             }
         }

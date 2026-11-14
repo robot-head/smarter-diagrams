@@ -1,0 +1,34 @@
+# Multi-tier event-driven architecture inspired by D2's TALA gallery.
+ingest: "Edge Ingestion" {
+  webhook: "Webhook API" [shape: actor]
+  validator: "Schema Check" [shape: decision]
+  webhook.E -> validator.W: "verify JWT"
+}
+
+streaming: "Event Backbone" {
+  kafka: "orders.events" [shape: queue]
+  dlq: "orders.dlq" [shape: queue]
+  kafka.S -> dlq.N: "poison pill" [style: dashed]
+  align col [kafka, dlq]
+}
+
+compute: "Fulfillment & State" {
+  worker: "Fulfillment Worker"
+  dedupe: "Idempotency Cache" [shape: cache]
+  schema: "OrderEvent" [shape: class, stereotype: "Avro v3", methods: "+partitionKey(): Uuid"] {
+    port event_id: UUID [side: W, pos: 1]
+    port status: OrderStatus [side: E, pos: 2]
+  }
+  lake: "Analytics Lakehouse" [shape: database]
+
+  worker.N -> dedupe.W: "SETNX 24h"
+  worker.S -> schema#event_id: "decode"
+  schema#status -> lake.W: "append"
+}
+
+ingest.validator.E -> streaming.kafka.W: "publish"
+streaming.kafka.E -> compute.worker.W: "consume" [style: marching-ants]
+
+view ingest_only {
+  include ingest.webhook -> ingest.validator -> streaming.kafka -> streaming.dlq
+}

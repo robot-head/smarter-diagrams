@@ -1,0 +1,13 @@
+# Clickable nodes and edges: safe URLs render interactive SVG links.
+client: "Developer Portal" [shape: actor, link: "https://example.com/portal"]
+apigw: "API Gateway" [link: "/guide/getting-started"]
+service: "Checkout API" [link: "https://example.com/services/checkout"]
+orders_db: "Orders Cluster" [shape: database, link: "https://example.com/db/orders"]
+runbook: "Incident Runbook" [href: "https://example.com/runbooks/checkout-503"]
+
+client -> apigw: "OpenAPI spec" [link: "https://example.com/openapi.json"]
+apigw -> service: "REST v2" [link: "https://example.com/docs/checkout-api"]
+service -> orders_db: "SQL Pool" [link: "https://example.com/db/schema"]
+service -> runbook: "On-call alert" [style: marching-ants, link: "https://example.com/alerts/p1"]
+
+align row [client, apigw, service, orders_db]

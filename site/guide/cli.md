@@ -45,3 +45,37 @@ With `export`, call `export::png(&svg, scale)` or `export::pdf(&svg)`. PNG scale
 Native text export loads installed fonts and chooses an available sans-serif family. Install a TrueType/OpenType font if the machine has none. Exact glyph metrics can differ between machines; the layout uses conservative text-width estimates. Keep a consistent font environment for reproducible raster/PDF output.
 
 Browser SVG colors use CSS custom properties such as `--sd-fg`, `--sd-edge`, `--sd-bg`, and `--sd-database`, with light-mode color fallbacks. Inline SVG inherits these properties from its host; an SVG used as an image needs the palette embedded in the file. Native PNG/PDF exports resolve the emitted fallbacks so browser theming does not remove fills or text.
+
+## Export pipeline and runtime matrix
+
+Every output target shares the same parse, lower, and constraint/orthogonal-routing core, then forks at serialization:
+
+```diagram
+src: "Source or @patch"
+core: "smarter-diagrams core\nParse · Lower · Layout · Route" [shape: service]
+svg: "SVG output\n--sd-* vars + fallbacks" [shape: queue]
+json: "JSON IR\nnodes · edges · routes · labels"
+native: "Native resolve\nembed palette + system fonts" [shape: worker]
+png: "resvg raster\nPNG (<= 8x, 100 MP cap)" [shape: database]
+pdf: "svg2pdf vector\nPDF document" [shape: database]
+browser: "Browser DOM / SVG\nCSS theme vars + web fonts" [shape: cache]
+
+src -> core: "compile"
+core -> svg: "--format svg"
+core -> json: "--format json"
+svg -> browser: "Wasm / inline HTML"
+svg -> native: "export feature"
+native -> png: "--format png"
+native -> pdf: "--format pdf"
+```
+
+### Formats and where each step runs
+
+| Stage / Format | Where it runs | Inputs & dependencies | Notes |
+| --- | --- | --- | --- |
+| `--format svg` | Core CLI, Native lib, Wasm | Pure Rust (`no_std`-friendly core, zero raster deps) | Emits standalone SVG with CSS custom properties (`--sd-*`) and literal fallback colors; `--theme` / `--theme-file` overrides the palette directly. |
+| `--format json` | Core CLI, Native lib, Wasm | Pure Rust (`serde_json`) | Outputs geometry (`x`, `y`, `width`, `height`), container bounds, edge waypoints, label frames, diagnostics, and layout scores. |
+| `--format check` / `lint` | Core CLI, Native lib | Pure Rust | Validates syntax, constraint feasibility, and lint rules without writing SVG/PNG bytes. |
+| `--format png` | Native CLI / Rust `export` feature | `resvg` + `usvg` + `fontdb` + system TrueType/OpenType fonts | Resolves `var(--sd-*, fallback)` declarations into concrete SVG attributes (`export::native_svg`) before rasterization. Scale `(0, 8]`, capped at 100 MP. |
+| `--format pdf` | Native CLI / Rust `export` feature | `svg2pdf` + system fonts | Converts resolved vector SVG paths and text outlines into PDF without rasterizing vector geometry. |
+| Playground SVG / PNG | Browser (`web/pkg` Wasm + `<canvas>`) | Wasm compiles SVG; browser `<canvas>` rasterizes | In the browser, Wasm runs only parsing, layout, and SVG generation; PNG download uses the browser's HTML5 Canvas API and loaded web fonts rather than `resvg`. |

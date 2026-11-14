@@ -627,6 +627,21 @@ pub(crate) fn svg_with_decorations(
     svg_themed_with_decorations(scene, l, owned.as_ref(), edge_visible, decorate)
 }
 
+fn write_link_open(s: &mut String, href: &str) {
+    let lower = href.trim_start().to_ascii_lowercase();
+    let external = lower.starts_with("https://") || lower.starts_with("http://");
+    let _ = write!(
+        s,
+        "<a class=\"sd-link\" data-link=\"true\" href=\"{}\"{}>",
+        escape(href),
+        if external {
+            " target=\"_blank\" rel=\"noopener noreferrer\""
+        } else {
+            ""
+        }
+    );
+}
+
 fn edge_stroke_style(e: &Edge) -> (&'static str, &'static str) {
     let style_val = e
         .attrs
@@ -687,7 +702,7 @@ pub(crate) fn svg_themed_with_decorations(
         })
         .unwrap_or_default();
     let mut s = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\"{theme_attrs} role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:var(--sd-fg,#233347)}}.node-title{{font-weight:600;font-size:16px}}.port-label{{font-size:13px}}.edge{{fill:none;stroke:var(--sd-edge,#53657a);stroke-width:1.85;stroke-linejoin:round}}.flow{{fill:none;stroke:var(--sd-flow,#356bd9);stroke-width:3.2;stroke-linejoin:round}}.class-hdr{{fill:var(--sd-node,#e5eef6)}}.class-sub{{font:500 11.5px/1.2 var(--sd-font,Inter,ui-sans-serif,system-ui,sans-serif);fill:var(--sd-edge,#53657a)}}.port-type{{font:500 12px/1.35 ui-monospace,'SFMono-Regular',Consolas,monospace;fill:var(--sd-edge,#53657a)}}.class-rule{{stroke:var(--sd-border,#6b8198);stroke-opacity:.36}}.row-rule{{stroke:var(--sd-border,#6b8198);stroke-opacity:.22}}.code-box{{fill:var(--sd-code-bg,#f1f5fa);stroke:var(--sd-code-border,#c2d0e0);stroke-width:1}}.code-hdr{{fill:var(--sd-code-header,#e4ecf5)}}.code-lang{{font:600 10.5px/1 ui-monospace,'SFMono-Regular',Consolas,monospace;fill:var(--sd-edge,#53657a)}}.code-line{{font:500 12.5px/1.35 ui-monospace,'SFMono-Regular',Consolas,monospace;fill:var(--sd-fg,#233347)}}.syn-kw{{fill:var(--sd-syn-kw,#6d28d9);font-weight:600}}.syn-str{{fill:var(--sd-syn-str,#047857)}}.syn-num{{fill:var(--sd-syn-num,#b45309)}}.syn-cmt{{fill:var(--sd-syn-cmt,#526378);font-style:italic}}.syn-type{{fill:var(--sd-syn-type,#0f766e)}}.syn-fn{{fill:var(--sd-syn-fn,#1d4ed8)}}@keyframes sd-marching-ants{{from{{stroke-dashoffset:20}}to{{stroke-dashoffset:0}}}}.marching-ants{{stroke-dasharray:6 4;animation:sd-marching-ants .85s linear infinite}}@media(prefers-reduced-motion:reduce){{.marching-ants{{animation:none}}}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:var(--sd-edge,#53657a)}}</style>{theme_bg_rect}",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\"{theme_attrs} role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:var(--sd-fg,#233347)}}.node-title{{font-weight:600;font-size:16px}}.port-label{{font-size:13px}}.edge{{fill:none;stroke:var(--sd-edge,#53657a);stroke-width:1.85;stroke-linejoin:round}}.flow{{fill:none;stroke:var(--sd-flow,#356bd9);stroke-width:3.2;stroke-linejoin:round}}.class-hdr{{fill:var(--sd-node,#e5eef6)}}.class-sub{{font:500 11.5px/1.2 var(--sd-font,Inter,ui-sans-serif,system-ui,sans-serif);fill:var(--sd-edge,#53657a)}}.port-type{{font:500 12px/1.35 ui-monospace,'SFMono-Regular',Consolas,monospace;fill:var(--sd-edge,#53657a)}}.class-rule{{stroke:var(--sd-border,#6b8198);stroke-opacity:.36}}.row-rule{{stroke:var(--sd-border,#6b8198);stroke-opacity:.22}}.code-box{{fill:var(--sd-code-bg,#f1f5fa);stroke:var(--sd-code-border,#c2d0e0);stroke-width:1}}.code-hdr{{fill:var(--sd-code-header,#e4ecf5)}}.code-lang{{font:600 10.5px/1 ui-monospace,'SFMono-Regular',Consolas,monospace;fill:var(--sd-edge,#53657a)}}.code-line{{font:500 12.5px/1.35 ui-monospace,'SFMono-Regular',Consolas,monospace;fill:var(--sd-fg,#233347)}}.syn-kw{{fill:var(--sd-syn-kw,#6d28d9);font-weight:600}}.syn-str{{fill:var(--sd-syn-str,#047857)}}.syn-num{{fill:var(--sd-syn-num,#b45309)}}.syn-cmt{{fill:var(--sd-syn-cmt,#526378);font-style:italic}}.syn-type{{fill:var(--sd-syn-type,#0f766e)}}.syn-fn{{fill:var(--sd-syn-fn,#1d4ed8)}}@keyframes sd-marching-ants{{from{{stroke-dashoffset:20}}to{{stroke-dashoffset:0}}}}.marching-ants{{stroke-dasharray:6 4;animation:sd-marching-ants .85s linear infinite}}@media(prefers-reduced-motion:reduce){{.marching-ants{{animation:none}}}}.sd-link{{cursor:pointer}}.sd-link:hover [data-silhouette]{{stroke-width:2.2}}.sd-link:hover path.edge{{stroke-width:2.6}}.sd-link .node-title,.sd-link .connection-label{{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:var(--sd-edge,#53657a)}}</style>{theme_bg_rect}",
         bounds.left(),
         bounds.top(),
         bounds.w,
@@ -734,6 +749,10 @@ pub(crate) fn svg_themed_with_decorations(
         .filter(|n| n.container && !crate::layout::is_record_shape(&n.shape))
     {
         let r = l.nodes[&n.id];
+        let link = n.link();
+        if let Some(href) = &link {
+            write_link_open(&mut s, href);
+        }
         let _ = write!(
             s,
             "<g data-node=\"{}\" data-shape=\"container\" aria-label=\"{}\"><rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"12\" fill=\"var(--sd-container,#f0f4f9)\" stroke=\"var(--sd-muted,#73869b)\"/>",
@@ -746,6 +765,9 @@ pub(crate) fn svg_themed_with_decorations(
         );
         s.push_str(&decorate(n, r));
         s.push_str("</g>");
+        if link.is_some() {
+            s.push_str("</a>");
+        }
     }
     for (z, ellipse) in scene.zones.iter().zip(&ellipses) {
         if let Some(e) = ellipse {
@@ -805,6 +827,10 @@ pub(crate) fn svg_themed_with_decorations(
         };
         let (shaft, heads) = connector(&r.points, e.kind, trim_width);
         let mask = gap_mask(&e.id, &masks);
+        let edge_link = e.link();
+        if let Some(href) = &edge_link {
+            write_link_open(&mut s, href);
+        }
         let _ = write!(
             s,
             "<path data-edge=\"{}\" class=\"edge{extra_class}\" style=\"stroke:{color};stroke-width:{width}\" d=\"{}\"{mask}{dash}{phantom}><title>{}</title></path>",
@@ -825,6 +851,9 @@ pub(crate) fn svg_themed_with_decorations(
                 );
             }
         }
+        if edge_link.is_some() {
+            s.push_str("</a>");
+        }
     }
     for n in scene
         .nodes
@@ -832,6 +861,10 @@ pub(crate) fn svg_themed_with_decorations(
         .filter(|n| !n.container || crate::layout::is_record_shape(&n.shape))
     {
         let r = l.nodes[&n.id];
+        let node_link = n.link();
+        if let Some(href) = &node_link {
+            write_link_open(&mut s, href);
+        }
         let _ = write!(
             s,
             "<g data-node=\"{}\" data-shape=\"{}\" aria-label=\"{}\"><title>{}</title>",
@@ -1179,6 +1212,9 @@ pub(crate) fn svg_themed_with_decorations(
             );
         }
         s.push_str("</g>");
+        if node_link.is_some() {
+            s.push_str("</a>");
+        }
     }
     for p in l.ports.values() {
         let unused = p
@@ -1246,6 +1282,10 @@ pub(crate) fn svg_themed_with_decorations(
                     String::new()
                 };
                 let (extra_class, dash) = edge_stroke_style(edge);
+                let edge_link = edge.link();
+                if let Some(href) = &edge_link {
+                    write_link_open(&mut s, href);
+                }
                 let _ = write!(
                     s,
                     "<g aria-label=\"{} step {}\"><path data-edge=\"{}\" class=\"flow{extra_class}\"{width_attr}{dash} d=\"{}\"{mask}/></g>",
@@ -1262,6 +1302,9 @@ pub(crate) fn svg_themed_with_decorations(
                         path(&points)
                     );
                 }
+                if edge_link.is_some() {
+                    s.push_str("</a>");
+                }
             }
         }
     }
@@ -1273,6 +1316,10 @@ pub(crate) fn svg_themed_with_decorations(
         let r = l.nodes[&n.id];
         let hx = container_header_rect_with_ports(n, r, &l.ports)
             .map_or(r.left() + 16., |hr| hr.left() + 4.);
+        let link = n.link();
+        if let Some(href) = &link {
+            write_link_open(&mut s, href);
+        }
         let _ = write!(
             s,
             "<text data-owner-node=\"{}\" class=\"node-title\" x=\"{}\" y=\"{}\">{}</text>",
@@ -1281,8 +1328,15 @@ pub(crate) fn svg_themed_with_decorations(
             r.top() + 22. + (header_height(n) - 24.) / 2.,
             text_content(&n.label, hx, 20.)
         );
+        if link.is_some() {
+            s.push_str("</a>");
+        }
     }
     for label in &l.labels {
+        let edge_link = scene.edge(&label.feature).and_then(|e| e.link());
+        if let Some(href) = &edge_link {
+            write_link_open(&mut s, href);
+        }
         let _ = write!(
             s,
             "<g data-label=\"{}\" data-draggable-label=\"{}\" data-label-x=\"{}\" data-label-y=\"{}\" data-knockout=\"{}\">",
@@ -1335,6 +1389,9 @@ pub(crate) fn svg_themed_with_decorations(
             text_content(&label.text, r.x, 18.)
         );
         s.push_str("</g>");
+        if edge_link.is_some() {
+            s.push_str("</a>");
+        }
     }
     for (z, r) in titles {
         let _ = write!(
@@ -1703,5 +1760,23 @@ mod tests {
         assert_eq!(shaft.len(), 2);
         let tip = heads[0].1[0];
         assert!((shaft[1].distance(tip) - 9.7).abs() < 1e-6);
+    }
+
+    #[test]
+    fn hyperlinks_wrap_nodes_containers_edges_and_labels_safely() {
+        let diag = crate::compile(
+            "svc: \"Order Service\" [link: \"https://example.com/services/orders\"]\n\
+             store: \"Storage\" [link: \"/guide/concepts\"] {\n\
+               db: \"Orders DB\" [href: \"https://example.com/db\"]\n\
+             }\n\
+             svc -> store.db: \"writes\" [link: \"https://example.com/runbooks/db-writes\"]\n",
+        )
+        .unwrap();
+        let out = diag.to_svg();
+        assert!(out.contains("class=\"sd-link\" data-link=\"true\" href=\"https://example.com/services/orders\" target=\"_blank\" rel=\"noopener noreferrer\""));
+        assert!(out.contains("href=\"/guide/concepts\""));
+        assert!(!out.contains("href=\"/guide/concepts\" target=\"_blank\""));
+        assert!(out.contains("href=\"https://example.com/runbooks/db-writes\""));
+        assert!(crate::compile("bad [link: \"javascript:alert(1)\"]\n").is_err());
     }
 }

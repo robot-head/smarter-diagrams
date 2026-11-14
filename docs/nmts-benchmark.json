@@ -1,0 +1,214 @@
+{
+  "generatedAt": "2026-11-14T21:19:22.485Z",
+  "timeoutMs": 35000,
+  "environment": {
+    "os": "win32",
+    "arch": "x64",
+    "node": "v22.10.0",
+    "graphvizVersion": "dot - graphviz version 16.1.1 (20261108.1752)"
+  },
+  "results": [
+    {
+      "id": "internal_fabric",
+      "label": "nmts/v1/examples/internal_fabric",
+      "synthetic": false,
+      "entities": 7,
+      "edges": 6,
+      "lowerMs": 0.98,
+      "nmtscliMs": 12.91,
+      "dotMs": 377.06,
+      "dotTotalMs": 389.97,
+      "dotDims": {
+        "width": 638,
+        "height": 574,
+        "aspectRatio": 1.11
+      },
+      "sdDefaultMs": 14.05,
+      "sdDims": {
+        "width": 1223,
+        "height": 480,
+        "aspectRatio": 2.55
+      },
+      "sdFastMs": 13.94
+    },
+    {
+      "id": "ethernet",
+      "label": "nmts/v1/examples/ethernet",
+      "synthetic": false,
+      "entities": 17,
+      "edges": 18,
+      "lowerMs": 1.35,
+      "nmtscliMs": 16.86,
+      "dotMs": 375.7,
+      "dotTotalMs": 392.56,
+      "dotDims": {
+        "width": 1952,
+        "height": 574,
+        "aspectRatio": 3.4
+      },
+      "sdDefaultMs": 174.42,
+      "sdDims": {
+        "width": 2492,
+        "height": 904,
+        "aspectRatio": 2.76
+      },
+      "sdFastMs": 168.65
+    },
+    {
+      "id": "satellite_mef",
+      "label": "nmts/v1/examples/satellite_mef",
+      "synthetic": false,
+      "entities": 45,
+      "edges": 26,
+      "lowerMs": 2.07,
+      "nmtscliMs": 101.09,
+      "dotMs": 352.06,
+      "dotTotalMs": 453.15,
+      "dotDims": {
+        "width": 6275,
+        "height": 850,
+        "aspectRatio": 7.38
+      },
+      "sdDefaultMs": 47.76,
+      "sdDims": {
+        "width": 2112,
+        "height": 2122,
+        "aspectRatio": 1
+      },
+      "sdFastMs": 47.53
+    },
+    {
+      "id": "synth-24",
+      "label": "Synthetic constellation (3 platforms, 24 entities)",
+      "synthetic": true,
+      "entities": 24,
+      "edges": 18,
+      "lowerMs": 0.64,
+      "nmtscliMs": 24.15,
+      "dotMs": 365.27,
+      "dotTotalMs": 389.42,
+      "dotDims": {
+        "width": 1941,
+        "height": 1037,
+        "aspectRatio": 1.87
+      },
+      "sdDefaultMs": 21.33,
+      "sdDims": {
+        "width": 3094,
+        "height": 833,
+        "aspectRatio": 3.72
+      },
+      "sdFastMs": 21.12
+    },
+    {
+      "id": "synth-64",
+      "label": "Synthetic constellation (8 platforms, 64 entities)",
+      "synthetic": true,
+      "entities": 64,
+      "edges": 48,
+      "lowerMs": 0.72,
+      "nmtscliMs": 116.41,
+      "dotMs": 363.37,
+      "dotTotalMs": 479.78,
+      "dotDims": {
+        "width": 5111,
+        "height": 2297,
+        "aspectRatio": 2.23
+      },
+      "sdDefaultMs": 68.67,
+      "sdDims": {
+        "width": 8419,
+        "height": 833,
+        "aspectRatio": 10.11
+      },
+      "sdFastMs": 68.01
+    },
+    {
+      "id": "synth-160",
+      "label": "Synthetic constellation (20 platforms, 160 entities)",
+      "synthetic": true,
+      "entities": 160,
+      "edges": 120,
+      "lowerMs": 1.39,
+      "nmtscliMs": 1144.3,
+      "dotMs": 383.39,
+      "dotTotalMs": 1527.69,
+      "dotDims": {
+        "width": 10720,
+        "height": 5321,
+        "aspectRatio": 2.01
+      },
+      "sdDefaultMs": 288.11,
+      "sdDims": {
+        "width": 21198,
+        "height": 833,
+        "aspectRatio": 25.46
+      },
+      "sdFastMs": 287.68
+    },
+    {
+      "id": "synth-320",
+      "label": "Synthetic constellation (40 platforms, 320 entities)",
+      "synthetic": true,
+      "entities": 320,
+      "edges": 240,
+      "lowerMs": 2.79,
+      "nmtscliMs": 8489.49,
+      "dotMs": 421.2,
+      "dotTotalMs": 8910.69,
+      "dotDims": {
+        "width": 9258,
+        "height": 10361,
+        "aspectRatio": 1.12
+      },
+      "sdDefaultMs": 1035.55,
+      "sdDims": {
+        "width": 42496,
+        "height": 833,
+        "aspectRatio": 51.05
+      },
+      "sdFastMs": 1043.01
+    },
+    {
+      "id": "synth-640",
+      "label": "Synthetic constellation (80 platforms, 640 entities)",
+      "synthetic": true,
+      "entities": 640,
+      "edges": 480,
+      "lowerMs": 7.39,
+      "nmtscliMsFailed": "timeout > 35000ms",
+      "sdDefaultMs": 4018.16,
+      "sdDims": {
+        "width": 85093,
+        "height": 833,
+        "aspectRatio": 102.21
+      },
+      "sdFastMs": 3896.58
+    },
+    {
+      "id": "synth-1280",
+      "label": "Synthetic constellation (160 platforms, 1280 entities)",
+      "synthetic": true,
+      "entities": 1280,
+      "edges": 960,
+      "lowerMs": 12.77,
+      "sdDefaultMs": 15838.47,
+      "sdDims": {
+        "width": 170287,
+        "height": 833,
+        "aspectRatio": 204.55
+      },
+      "sdFastMs": 16086.27
+    },
+    {
+      "id": "synth-2560",
+      "label": "Synthetic constellation (320 platforms, 2560 entities)",
+      "synthetic": true,
+      "entities": 2560,
+      "edges": 1920,
+      "lowerMs": 25.3,
+      "sdDefaultMsFailed": "timeout > 35000ms",
+      "sdFastMsFailed": "timeout > 35000ms"
+    }
+  ]
+}

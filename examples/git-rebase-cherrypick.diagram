@@ -1,0 +1,50 @@
+# Branch, cherry-pick, and release lanes inspired by Pikchr's Fossil/Git DAGs.
+f1: "f1: tokenize"
+f2: "f2: highlight"
+
+m1: "m1: init"
+m2: "m2: parser"
+m3: "m3: layout"
+m4: "m4: v2.5 rc"
+
+r1: "r1: v2.4.0"
+r2: "r2: v2.4.1"
+
+m1.E -> m2.W
+m2.E -> m3.W
+m3.E -> m4.W
+
+m2.N -> f1.W: "branch"
+f1.E -> f2.W: "commit"
+f2.E -> m4.N: "merge"
+
+m3.S -> r1.W: "release"
+r1.E -> r2.W
+f1.S -> r2.N: "cherry-pick" [style: marching-ants]
+
+align row [f1, f2]
+align row [m1, m2, m3, m4]
+align row [r1, r2]
+align col [m3, f1, r1]
+align col [m4, f2, r2]
+distribute col [f1, m3, r1] [gap: 4g]
+distribute col [f2, m4, r2] [gap: 4g]
+distribute row [m1, m2, m3, m4] [gap: 4g]
+
+zone feature_scope "feat/highlight" around [f1, f2] {
+  padding: 1.1g
+  tint: oklch(0.80 0.09 165 / 0.16)
+}
+zone main_scope "main" around [m1, m2, m3, m4] {
+  padding: 1.1g
+  tint: oklch(0.80 0.07 230 / 0.16)
+}
+zone hotfix_scope "release/2.4 hotfix" around [r1, r2] {
+  padding: 1.1g
+  tint: oklch(0.80 0.10 45 / 0.16)
+}
+
+view hotfix_backport {
+  include m1 -> m2 -> m3 -> r1 -> r2
+  include m2 -> f1 -> r2
+}

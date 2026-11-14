@@ -42,148 +42,29 @@ Modeled after Pikchr's self-documenting Markdown pipeline: fenced `diagram` bloc
 
 ## Domain demonstrations
 
-See [Domain demonstrations](/guide/demonstrations) for the accompanying Rust binaries (`kube_operator_reconcile`, `nmts_fragment`, and `grafana_service_graph`).
+Full runnable Rust programs and end-to-end architecture walkthroughs live on [Domain demonstrations](/guide/demonstrations):
 
-### Kubernetes operator reconciliation loop
+- [Kubernetes operator reconciliation loop](/guide/demonstrations#_1-kubernetes-operator-reconciliation-loop) — custom resource `#spec`/`#status` ports, queue burst simulation, and bounded finalizer verification ([`kube-operator.diagram`](/examples/kube-operator.diagram)).
+- [Outernet Council NMTS fragment & Graphviz benchmark](/guide/demonstrations#_2-outernet-council-nmts-fragment) — `nmts.v1.Fragment` entities, logical/physical strata, and `nmtscli` + `dot` benchmarks ([`nmts-fragment.diagram`](/examples/nmts-fragment.diagram)).
+- [Grafana service graph & OTLP drift](/guide/demonstrations#_3-grafana-service-graph-and-otlp-trace-drift) — Tempo RED span metrics, error-budget zones, and live OTLP drift reconciliation ([`grafana-service-graph.diagram`](/examples/grafana-service-graph.diagram)).
 
-Level-triggered controller reconciling `PostgresCluster CR` `#spec` and `#status` ports through an informer, indexer cache, rate-limiting workqueue, and backoff loop.
+### Clickable nodes and edges (hyperlinks)
 
-[Open in the editor](/demo/?example=kube-operator) · [Download source](/examples/kube-operator.diagram) · [Walkthrough](/guide/demonstrations#_1-kubernetes-operator-reconciliation-loop)
+Attach `[link: "..."]` or `[href: "..."]` to any node, container, or connection to wrap the silhouette, path, and edge caption in an accessible `<a class="sd-link">` SVG hyperlink (`https://`, `http://`, `mailto:`, `#`, or site-relative paths; `javascript:` and `data:` schemes are rejected at compile time).
 
-```diagram views=control_loop,owned_resources
-kubectl: "kubectl / GitOps" [shape: actor] @sim(rate: 45, service_rate: 160)
+[Open in the editor](/demo/?example=hyperlinks) · [Download source](/examples/hyperlinks.diagram)
 
-apiserver: "kube-apiserver" {
-  sts: "StatefulSet & Svc"
-  cr: "PostgresCluster CR" [shape: class, stereotype: "CustomResource", methods: "+reconcile(ctx: Context): Result"] {
-    port spec: ClusterSpec [side: W, pos: 1]
-    port status: ClusterStatus [side: E, pos: 2]
-  }
-  etcd: "etcd Quorum" [shape: database] @sim(service_rate: 180)
-  sts -> etcd: "store"
-  cr -> etcd: "RAFT"
-}
-
-operator: "Operator Controller" {
-  informer: "ListWatch Informer" @sim(service_rate: 150, queue_cap: 160)
-  workqueue: "RateLimitingQueue" [shape: queue] @sim(service_rate: 95, queue_cap: 140)
-  cache: "Indexer Cache" [shape: cache]
-  reconciler: "Reconciler" @sim(service_rate: 65, queue_cap: 90, retry: exp_backoff(0.4, 0.25))
-
-  informer -> workqueue: "key"
-  informer -> cache: "sync"
-  workqueue -> reconciler: "pop"
-  cache -> reconciler: "get"
-  reconciler -> workqueue: "requeue"
-}
-
-kubectl -> apiserver.cr#spec: "apply"
-apiserver.cr -> operator.informer: "watch"
-operator.reconciler -> apiserver.cr#status: "status"
-operator.reconciler -> apiserver.sts: "SSA patch"
-
-zone rbac "Controller RBAC scope" around [apiserver.sts, apiserver.cr] {
-  padding: 1.15g
-  tint: oklch(0.79 0.08 175 / 0.16)
-}
-view control_loop {
-  include apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> apiserver.cr
-}
-view owned_resources {
-  include kubectl -> apiserver.cr -> operator.informer -> operator.workqueue -> operator.reconciler -> apiserver.sts -> apiserver.etcd
-}
-flow converge "Converged reconciliation" {
-  kubectl -> apiserver.cr#spec -> operator.informer -> operator.workqueue -> operator.reconciler -> apiserver.sts -> apiserver.etcd
-}
-```
-
-### Outernet Council NMTS fragment
-
-Temporospatial `nmts.v1.Fragment` entity-relationship graph spanning `GS Arlington (EK_PLATFORM)`, a 29.5 GHz `EK_PHYSICAL_MEDIUM_LINK`, and `LEO-142 Sat (EK_PLATFORM)` across `logical` and `physical` strata.
-
-[Open in the editor](/demo/?example=nmts-fragment) · [Download source](/examples/nmts-fragment.diagram) · [Walkthrough](/guide/demonstrations#_2-outernet-council-nmts-fragment)
-
-```diagram views=rf_chain,logical_bearer
-strata [logical, physical]
-
-gs_arlington: "GS Arlington (EK_PLATFORM)" {
-  sdn_gs: "Spacetime SDN\n(EK_SDN_AGENT)" [stratum: logical]
-  gs_node: "Gateway Router\n(EK_NETWORK_NODE)" [stratum: logical]
-  mod_ka: "DVB-S2X Mod\n(EK_MODULATOR)" [stratum: physical]
-  ant_gs: "4.5m Ka Dish\n(EK_ANTENNA)" [stratum: physical]
-
-  sdn_gs -> mod_ka: "RK_CONTROLS"
-  gs_node -> mod_ka: "RK_TRAVERSES"
-  mod_ka -> ant_gs: "RK_SIGNAL_TRANSITS"
-}
-
-ka_uplink: "Ka Uplink 29.5 GHz\n(EK_PHYSICAL_MEDIUM_LINK)" [shape: queue, stratum: physical]
-
-leo_142: "LEO-142 Sat (EK_PLATFORM)" {
-  ant_sat: "Phased Array\n(EK_ANTENNA)" [stratum: physical]
-  demod_ka: "Ka Demod\n(EK_DEMODULATOR)" [stratum: physical]
-  sat_node: "Onboard Switch\n(EK_NETWORK_NODE)" [stratum: logical]
-  isl_port: "Optical ISL0\n(EK_PORT)" [stratum: physical]
-
-  ant_sat -> demod_ka: "RK_SIGNAL_TRANSITS"
-  demod_ka -> sat_node: "RK_TRAVERSES"
-  demod_ka -> isl_port: "RK_SIGNAL_TRANSITS"
-}
-
-gs_arlington.ant_gs -> ka_uplink: "RK_SIGNAL_TRANSITS"
-ka_uplink -> leo_142.ant_sat: "RK_SIGNAL_TRANSITS"
-
-zone contact_window "Contact window T+120s..540s" around [ka_uplink] {
-  padding: 1.4g
-  tint: oklch(0.80 0.09 205 / 0.18)
-}
-view rf_chain {
-  include gs_arlington.mod_ka -> gs_arlington.ant_gs -> ka_uplink -> leo_142.ant_sat -> leo_142.demod_ka
-}
-view logical_bearer {
-  include gs_arlington.gs_node
-  include leo_142.sat_node
-}
-```
-
-### Grafana service graph and SLO burn
-
-Grafana Tempo `traces_service_graph_request_*` RED span metrics with `@bind(otel: ...)` service bindings, `@sim(...)` queue parameters, and an `slo_hotpath` projection.
-
-[Open in the editor](/demo/?example=grafana-service-graph) · [Download source](/examples/grafana-service-graph.diagram) · [Walkthrough](/guide/demonstrations#_3-grafana-service-graph-and-otlp-trace-drift)
-
-```diagram views=slo_hotpath
-ingress: "ingress-nginx" @sim(rate: 240, service_rate: 420) @bind(otel: "service.name=ingress-nginx")
-frontend: "shop-frontend" @sim(service_rate: 300, queue_cap: 220) @bind(otel: "service.name=shop-frontend")
-catalog: "catalog-api" @sim(service_rate: 240, queue_cap: 160) @bind(otel: "service.name=catalog-api")
-checkout: "checkout-api" @sim(service_rate: 95, queue_cap: 120, retry: exp_backoff(0.3, 0.2)) @bind(otel: "service.name=checkout-api")
-redis: "redis-cart" [shape: cache] @sim(service_rate: 520) @bind(otel: "service.name=redis-cart")
-orders_db: "postgres-orders" [shape: database] @sim(service_rate: 150) @bind(otel: "service.name=postgres-orders")
-kafka: "kafka-orders" [shape: queue] @sim(service_rate: 200, queue_cap: 240) @bind(otel: "service.name=kafka-orders")
-payments: "payment-gw\n(virtual)" @sim(service_rate: 55, queue_cap: 80) @bind(otel: "service.name=payment-gw")
-
-ingress -> frontend: "240 rps"
-frontend -> catalog: "165 rps"
-frontend -> checkout: "1.9% err"
-catalog -> redis: "1ms"
-checkout -> orders_db: "14ms"
-checkout -> kafka: "60 rps"
-checkout -> payments: "p95 184ms"
-
-zone slo_burn "SLO error budget burn" around [payments] {
-  padding: 1.15g
-  tint: oklch(0.76 0.12 35 / 0.16)
-}
-view slo_hotpath {
-  include ingress -> frontend -> checkout -> payments
-  include checkout -> orders_db
-}
-flow tail_latency "p95 checkout trace" {
-  ingress -> frontend -> checkout -> payments
-}
-```
+<<< ../examples/hyperlinks.diagram
 
 ## Version-control histories & swimlanes
+
+### Release cherry-pick and hotfix branch DAG
+
+Branch, cherry-pick (`[style: marching-ants]`), and merge history lanes alongside Pikchr-style horizontal commit tracks and `hotfix_backport` view projection.
+
+[Open in the editor](/demo/?example=git-rebase-cherrypick) · [Download source](/examples/git-rebase-cherrypick.diagram)
+
+<<< ../examples/git-rebase-cherrypick.diagram
 
 ### Fossil branch, merge, and rebase commit DAG
 
@@ -260,6 +141,14 @@ Four autonomous repositories sync, branch offline, and merge without a central l
 <<< ../examples/fossil-swimlanes.diagram
 
 ## Multi-tier & TALA-style domain architectures
+
+### Multi-tier event-driven streaming platform
+
+Nested edge validation, Kafka event & DLQ queues, an Avro schema UML `class` node, Redis deduplication cache, and lakehouse storage.
+
+[Open in the editor](/demo/?example=tala-event-platform) · [Download source](/examples/tala-event-platform.diagram)
+
+<<< ../examples/tala-event-platform.diagram
 
 ### Institutional securities and risk data mesh
 

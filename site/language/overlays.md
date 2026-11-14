@@ -127,3 +127,16 @@ Every diagram viewer includes a live **Theme** switcher, and authors or CI expor
 - **Built-in palettes**: `light`, `dark`, Catppuccin (`catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `catppuccin-mocha`), Solarized (`solarized-light`, `solarized-dark`), and Base16 presets (`base16-nord`, `base16-ocean`, `base16-eighties`, `base16-gruvbox-dark`, `base16-onedark`, `base16-dracula`, `base16-tokyo-night`, `base16-github`).
 - **Source directive**: add `theme: <name>` or `@theme(<name>)` at top level so SVGs and PNG/PDF exports bake in that theme.
 - **Custom Base16 scheme families**: load any standard `base00`–`base0F` YAML or JSON scheme with `--theme-file path/to/scheme.yaml`, `ThemePalette::from_base16_str(...)`, `ThemePalette::from_base16_dir(...)`, or **Import Base16** in the browser playground. All derived shape fills, borders, and syntax token colors are checked to satisfy WCAG contrast (`>= 4.5:1` text, `>= 3:1` outlines).
+
+## Hyperlinks on nodes and edges
+
+```diagram
+portal: "Developer Portal" [shape: actor, link: "https://example.com/portal"]
+service: "Checkout API" [href: "/guide/getting-started"]
+db: "Orders DB" [shape: database, link: "https://example.com/db/orders"]
+
+portal -> service: "REST" [link: "https://example.com/openapi"]
+service -> db: "SQL" [link: "https://example.com/db/schema"]
+```
+
+Attach `[link: "..."]` or `[href: "..."]` to any leaf node, container, or connection. External `http://` and `https://` URLs open in a new tab with `rel="noopener noreferrer"`; internal `/`, `./`, `../`, `#`, and `mailto:` targets remain same-page links, and dangerous schemes (`javascript:`, `data:`, `vbscript:`) are rejected with a compile diagnostic.

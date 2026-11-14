@@ -210,6 +210,44 @@ Run the NMTS fragment pipeline:
 cargo run --locked --all-features --example nmts_fragment
 ```
 
+### Benchmark vs. `nmtscli export dot | dot -Tsvg`
+
+We benchmarked the upstream `outernetcouncil/nmts` pipeline (`nmtscli export dot <files...> | dot -Tsvg`, timing `nmtscli` and Graphviz `dot 16.1.1` separately) against `smarter-diagrams` (both default layout and `--no-explore-candidates`) across real `nmts/v1/examples` fragments and synthetic constellation rings scaling from 24 to 2,560 entities (8 entities per platform; 35 s per-stage timeout, measured on Windows x64 by [benchmark-nmts.cjs](https://github.com/robot-head/smarter-diagrams/blob/main/scripts/benchmark-nmts.cjs)).
+
+![Log-log chart comparing nmtscli Prolog export, Graphviz dot -Tsvg, and smarter-diagrams layout and SVG render wall-clock time across 7 to 2560 NMTS entities](/figures/nmts-benchmark-chart.svg)
+
+*Wall-clock time (ms) vs. NMTS entity count (log–log). Squares mark real `nmts/v1/examples` fragments; circles mark synthetic multi-platform fragments; × marks a 35 s timeout.*
+
+| Fragment | Entities / Edges | `nmtscli` (Prolog) | `dot -Tsvg` | `nmtscli + dot` total | `smarter-diagrams` (default) | `smarter-diagrams` (`--no-explore-candidates`) | Canvas (`dot` vs `smarter-diagrams`) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `nmts/v1/examples/internal_fabric` | 7 / 6 | 12.91 ms | 377.06 ms | 389.97 ms | 14.05 ms | 13.94 ms | `638×574` vs `1223×480` |
+| `nmts/v1/examples/ethernet` | 17 / 18 | 16.86 ms | 375.70 ms | 392.56 ms | 174.42 ms | 168.65 ms | `1952×574` vs `2492×904` |
+| `nmts/v1/examples/satellite_mef` | 45 / 26 | 101.09 ms | 352.06 ms | 453.15 ms | 47.76 ms | 47.53 ms | `6275×850` (7.4:1) vs `2112×2122` (1.0:1) |
+| Synthetic (3 platforms) | 24 / 18 | 24.15 ms | 365.27 ms | 389.42 ms | 21.33 ms | 21.12 ms | `1941×1037` vs `3094×833` |
+| Synthetic (8 platforms) | 64 / 48 | 116.41 ms | 363.37 ms | 479.78 ms | 68.67 ms | 68.01 ms | `5111×2297` vs `8419×833` (10.1:1) |
+| Synthetic (20 platforms) | 160 / 120 | 1,144.30 ms | 383.39 ms | 1,527.69 ms | 288.11 ms | 287.68 ms | `10720×5321` vs `21198×833` (25.5:1) |
+| Synthetic (40 platforms) | 320 / 240 | 8,489.49 ms | 421.20 ms | 8,910.69 ms | 1,035.55 ms | 1,043.01 ms | `9258×10361` vs `42496×833` (51.1:1) |
+| Synthetic (80 platforms) | 640 / 480 | >35,000 ms timeout | — | blocked | 4,018.16 ms | 3,896.58 ms | `nmtscli` timed out; `85093×833` (102:1) |
+| Synthetic (160 platforms) | 1,280 / 960 | — | — | blocked | 15,838.47 ms | 16,086.27 ms | `170287×833` (205:1 panorama) |
+| Synthetic (320 platforms) | 2,560 / 1,920 | — | — | blocked | >35,000 ms timeout | >35,000 ms timeout | Both modes exceeded 35 s |
+
+#### Breakdown behavior & readability comparison
+
+- **Where `nmtscli | dot` breaks down**: Graphviz `dot -Tsvg` itself stays near ~360–420 ms through 320 entities, so the Prolog rule evaluation inside `nmtscli export dot` becomes the bottleneck (cubic *O*(*N*³) scaling: 1.14 s at 160 entities, 8.49 s at 320 entities, and >35 s timeout at 640 entities). Even before timing out, flat `RK_CONTAINS` arrows turn `satellite_mef` (45 entities) into a `6275×850` (7.38:1) strip.
+- **Where `smarter-diagrams` breaks down**: For small/medium fragments (`internal_fabric`, `ethernet`, `satellite_mef`), total time is 14–175 ms, and nested containment avoids `RK_CONTAINS` spiderwebs (`2112×2122`, 1.00:1 square on `satellite_mef`). Above ~160 entities in a single flat ring of disjoint top-level platforms, quadratic constraint/routing work pushes wall time to ~4.0 s at 640 entities, ~15.8 s at 1,280 entities, and >35 s at 2,560 entities, while single-row rank placement produces extreme horizontal ribbons (`21k–170k × 833` px) that require pagination or hierarchical chunking to stay readable. Note that `--no-explore-candidates` tracks default timings within ~1–3% on these hierarchical trees because few ambiguous multi-candidate layouts exist per level.
+
+#### Side-by-side readability: `nmts/v1/examples/ethernet` (17 entities, 18 edges)
+
+Comparing the exact same `nmts/v1/examples/ethernet` multi-file fragment rendered by both pipelines (click/zoom in browser to inspect full vector detail):
+
+**1. `nmtscli export dot | dot -Tsvg`** (392.6 ms total, `1952×574` — renders `rk_contains` as explicit edges and leaves `sw1`/`sw2` internals unnested with diagonal crossings):
+
+![Graphviz dot render of NMTS ethernet example](/figures/nmts-mid-graphviz.svg)
+
+**2. `smarter-diagrams`** (174.4 ms total, `2492×904` — lifts `RK_CONTAINS` into nested platform & network-node containers and routes orthogonal trunks between `sw1`, `sw2`, and the logical link queues):
+
+![smarter-diagrams render of NMTS ethernet example](/figures/nmts-mid-smarter.svg)
+
 ## 3. Grafana service graph and OTLP trace drift
 
 [Open in the editor](/demo/?example=grafana-service-graph) · [Download `grafana-service-graph.diagram`](/examples/grafana-service-graph.diagram)

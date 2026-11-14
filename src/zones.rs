@@ -116,7 +116,9 @@ pub(crate) fn ellipse_with_grid(
     let external_rects: Vec<Rect> = scene
         .nodes
         .iter()
-        .filter(|n| !members.contains(&n.id) && !(n.container && !crate::layout::is_record_shape(&n.shape)))
+        .filter(|n| {
+            !members.contains(&n.id) && !(n.container && !crate::layout::is_record_shape(&n.shape))
+        })
         .filter_map(|n| nodes.get(&n.id).map(|&r| effective_member_rect(n, r)))
         .filter(|nr| nr.w > 0. && nr.h > 0. && !point_in_convex_hull(nr.center(), &hull))
         .map(|nr| nr.inflate(4.))
