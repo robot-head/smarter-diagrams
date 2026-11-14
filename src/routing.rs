@@ -144,12 +144,20 @@ pub fn obstacles(scene: &SceneGraph, l: &Layout, e: &Edge, margin: f64) -> Vec<R
         if let Some(header) = crate::layout::container_header_rect(n, r)
             && exclude.contains(&n.id)
         {
-            bodies.extend(carve_rect_for_stubs(header.inflate(margin / 2.), &stubs, margin));
+            bodies.extend(carve_rect_for_stubs(
+                header.inflate(margin / 2.),
+                &stubs,
+                margin,
+            ));
         }
         if let Some(title) = crate::layout::sql_table_title_rect(n, r)
             && exclude.contains(&n.id)
         {
-            bodies.extend(carve_rect_for_stubs(title.inflate(margin / 2.), &stubs, margin));
+            bodies.extend(carve_rect_for_stubs(
+                title.inflate(margin / 2.),
+                &stubs,
+                margin,
+            ));
         }
     }
     if let Some(lca) = strict_lca(scene, &e.source.node, &e.target.node)
@@ -581,9 +589,17 @@ fn route_pair_crossings(
     let mut total_cross = 0;
     let mut stub_cross = 0;
     let mut total_ovlp = 0;
-    let count_against = |edge_id: &str, pts: &[Point], total_cross: &mut usize, stub_cross: &mut usize, total_ovlp: &mut usize| {
+    let count_against = |edge_id: &str,
+                         pts: &[Point],
+                         total_cross: &mut usize,
+                         stub_cross: &mut usize,
+                         total_ovlp: &mut usize| {
         for (other_id, other) in &l.routes {
-            if other_id == id_a || other_id == id_b || other_id == edge_id || other_id.starts_with("@reserved-") {
+            if other_id == id_a
+                || other_id == id_b
+                || other_id == edge_id
+                || other_id.starts_with("@reserved-")
+            {
                 continue;
             }
             let co = coalesced(&other.points);
@@ -623,8 +639,20 @@ fn route_pair_crossings(
             }
         }
     }
-    count_against(id_a, &ca, &mut total_cross, &mut stub_cross, &mut total_ovlp);
-    count_against(id_b, &cb, &mut total_cross, &mut stub_cross, &mut total_ovlp);
+    count_against(
+        id_a,
+        &ca,
+        &mut total_cross,
+        &mut stub_cross,
+        &mut total_ovlp,
+    );
+    count_against(
+        id_b,
+        &cb,
+        &mut total_cross,
+        &mut stub_cross,
+        &mut total_ovlp,
+    );
     (stub_cross, total_cross, total_ovlp)
 }
 fn caption_anchors_ok(l: &Layout, edge_id: &str, pts: &[Point]) -> bool {
@@ -636,10 +664,16 @@ fn caption_anchors_ok(l: &Layout, edge_id: &str, pts: &[Point]) -> bool {
         let mut best = f64::INFINITY;
         for seg in c.windows(2) {
             let dist = if (seg[0].y - seg[1].y).abs() < 1e-6 {
-                let cx = lbl.anchor.x.clamp(seg[0].x.min(seg[1].x), seg[0].x.max(seg[1].x));
+                let cx = lbl
+                    .anchor
+                    .x
+                    .clamp(seg[0].x.min(seg[1].x), seg[0].x.max(seg[1].x));
                 lbl.anchor.distance(Point::new(cx, seg[0].y))
             } else {
-                let cy = lbl.anchor.y.clamp(seg[0].y.min(seg[1].y), seg[0].y.max(seg[1].y));
+                let cy = lbl
+                    .anchor
+                    .y
+                    .clamp(seg[0].y.min(seg[1].y), seg[0].y.max(seg[1].y));
                 lbl.anchor.distance(Point::new(seg[0].x, cy))
             };
             best = best.min(dist);
@@ -650,16 +684,22 @@ fn caption_anchors_ok(l: &Layout, edge_id: &str, pts: &[Point]) -> bool {
     }
     true
 }
+/// Port-swap trials (each reroutes the pair twice) allowed per `route_all` on
+/// graphs with more than 12 edges.
+const SWAP_TRIAL_BUDGET: usize = 12;
 fn swap_edge_ports(
     scene: &SceneGraph,
     o: &LayoutOptions,
     l: &mut Layout,
     used_ports: &std::collections::BTreeSet<String>,
-) {
+) -> usize {
     let radius = 4. * o.stub;
     let swappable_endpoint = |ep: &Endpoint| -> bool {
         ep.port.is_none()
-            && matches!(ep.constraint, PortConstraint::Free | PortConstraint::FixedSide { .. })
+            && matches!(
+                ep.constraint,
+                PortConstraint::Free | PortConstraint::FixedSide { .. }
+            )
     };
     let has_fixed_route_or_label = |e: &Edge| -> bool {
         effective_annotations(scene, &e.id, &e.annotations, o.variant.as_deref())
@@ -670,7 +710,8 @@ fn swap_edge_ports(
                         && (a.attrs.contains_key("x") || a.attrs.contains_key("y")))
             })
     };
-    let mut port_node: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    let mut port_node: std::collections::BTreeMap<String, String> =
+        std::collections::BTreeMap::new();
     for n in &scene.nodes {
         for p in n.ports.values() {
             port_node.insert(format!("{}#{}", n.id, p.id), n.id.clone());
@@ -680,10 +721,50 @@ fn swap_edge_ports(
         port_node.insert(port_key(e, true), e.source.node.clone());
         port_node.insert(port_key(e, false), e.target.node.clone());
     }
-    for _sweep in 0..8 {
+    let mut owners_by_key: std::collections::BTreeMap<String, Vec<(usize, bool)>> =
+        std::collections::BTreeMap::new();
+    for (ei, e) in scene.edges.iter().enumerate() {
+        owners_by_key
+            .entry(port_key(e, true))
+            .or_default()
+            .push((ei, true));
+        owners_by_key
+            .entry(port_key(e, false))
+            .or_default()
+            .push((ei, false));
+    }
+    // At most 4 sweeps; each accepts the first improving swap/slide and restarts.
+    let small = scene.edges.len() <= 12;
+    let mut trials_left: usize = if small { usize::MAX } else { SWAP_TRIAL_BUDGET };
+    let mut tabu: std::collections::BTreeSet<(String, String)> = std::collections::BTreeSet::new();
+    let mut total_swaps = 0;
+    for _sweep in 0..4 {
         let mut improved = false;
-        let (dbg_c, dbg_o, _, _) = route_crossings_and_overlaps(scene, l);
-        if dbg_c == 0 && dbg_o == 0 {
+        let (cur_g_cross, cur_g_ovlp, cur_crossed, _) = route_crossings_and_overlaps(scene, l);
+        if cur_g_cross == 0 && cur_g_ovlp == 0 {
+            break;
+        }
+        let cur_g_len = route_total_length(&l.routes);
+        // Edges worth moving: crossed/overlapping, wrapped (3+ bends) or long detours.
+        let involved: std::collections::BTreeSet<usize> = scene
+            .edges
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| {
+                cur_crossed.contains(&e.id)
+                    || l.routes.get(&e.id).is_some_and(|r| {
+                        let c = coalesced(&r.points);
+                        if c.len() < 2 {
+                            return false;
+                        }
+                        let direct = c[0].manhattan_distance(c[c.len() - 1]);
+                        let len: f64 = c.windows(2).map(|p| p[0].distance(p[1])).sum();
+                        c.len() >= 5 || (direct >= 48. && len > 2.8 * direct)
+                    })
+            })
+            .map(|(ei, _)| ei)
+            .collect();
+        if involved.is_empty() {
             break;
         }
         for node in &scene.nodes {
@@ -695,19 +776,14 @@ fn swap_edge_ports(
                     owner: Option<(usize, bool)>,
                 }
                 let mut slots: Vec<Slot> = Vec::new();
+                let mut face_involved = false;
                 for (key, port) in &l.ports {
                     if port_node.get(key) != Some(&node.id) || port.side != side {
                         continue;
                     }
-                    let mut owners = Vec::new();
-                    for (ei, e) in scene.edges.iter().enumerate() {
-                        if port_key(e, true) == *key {
-                            owners.push((ei, true));
-                        }
-                        if port_key(e, false) == *key {
-                            owners.push((ei, false));
-                        }
-                    }
+                    let owners: &[(usize, bool)] =
+                        owners_by_key.get(key).map_or(&[], |v| v.as_slice());
+                    face_involved |= owners.iter().any(|(ei, _)| involved.contains(ei));
                     let owner = if owners.len() == 1 {
                         let (ei, is_src) = owners[0];
                         let e = &scene.edges[ei];
@@ -727,13 +803,16 @@ fn swap_edge_ports(
                         owner,
                     });
                 }
+                if !face_involved || slots.len() < 2 {
+                    continue;
+                }
                 slots.sort_by(|a, b| a.coord.total_cmp(&b.coord).then(a.key.cmp(&b.key)));
                 for idx in 0..slots.len().saturating_sub(1) {
                     let (Some((ei1, _)), Some((ei2, _))) = (slots[idx].owner, slots[idx + 1].owner)
                     else {
                         continue;
                     };
-                    if ei1 == ei2 {
+                    if ei1 == ei2 || (!involved.contains(&ei1) && !involved.contains(&ei2)) {
                         continue;
                     }
                     let e1 = &scene.edges[ei1];
@@ -757,10 +836,17 @@ fn swap_edge_ports(
                     if old_stub_c == 0 && old_tot_c == 0 && !wrapped_pair {
                         continue;
                     }
-                    let (cur_g_cross, cur_g_ovlp, cur_crossed, _) =
-                        route_crossings_and_overlaps(scene, l);
-                    let cur_g_len = route_total_length(&l.routes);
-                    let old_pair_len = route_total_length(&l.routes);
+                    // Larger graphs: never retry a pair that already failed and
+                    // bound the total number of (4-search) swap trials.
+                    let pair_id = (key1.clone(), key2.clone());
+                    if !small && tabu.contains(&pair_id) {
+                        continue;
+                    }
+                    if trials_left == 0 {
+                        return total_swaps;
+                    }
+                    trials_left -= 1;
+                    let old_pair_len = cur_g_len;
                     let mut best_trial: Option<(Layout, usize, usize, usize, usize, f64)> = None;
                     for &(first_e, second_e) in &[(e1, e2), (e2, e1)] {
                         let mut trial = l.clone();
@@ -879,15 +965,15 @@ fn swap_edge_ports(
                             && new_stub_c < old_stub_c
                             && new_tot_c < old_tot_c;
                         if (g_better || stub_better)
-                            && best_trial.as_ref().is_none_or(
-                                |(_, bgo, bgc, btc, bsc, blen)| {
+                            && best_trial
+                                .as_ref()
+                                .is_none_or(|(_, bgo, bgc, btc, bsc, blen)| {
                                     (g_ovlp, g_cross, new_tot_c, new_stub_c)
                                         < (*bgo, *bgc, *btc, *bsc)
                                         || ((g_ovlp, g_cross, new_tot_c, new_stub_c)
                                             == (*bgo, *bgc, *btc, *bsc)
                                             && g_len < *blen - 1e-6)
-                                },
-                            )
+                                })
                         {
                             best_trial =
                                 Some((trial, g_ovlp, g_cross, new_tot_c, new_stub_c, g_len));
@@ -896,23 +982,24 @@ fn swap_edge_ports(
                     if let Some((accepted, _, _, _, _, _)) = best_trial {
                         *l = accepted;
                         improved = true;
+                        total_swaps += 1;
                         break;
+                    }
+                    if !small {
+                        tabu.insert(pair_id);
                     }
                 }
                 if improved {
                     break;
                 }
                 // Slide a crossed/wrapped port across swappable neighbors on the same face if needed.
-                let (cur_g_cross, cur_g_ovlp, cur_crossed, _) =
-                    route_crossings_and_overlaps(scene, l);
-                if _sweep < 6
-                    && (cur_g_cross > 0 || cur_g_ovlp > 0)
+                // `l` is unchanged since the sweep began, so the cached conflict state applies.
+                if (cur_g_cross > 0 || cur_g_ovlp > 0)
                     && cur_crossed.len() <= 10
                     && scene.edges.len() <= 12
                     && slots.len() >= 3
                     && slots.len() <= 8
                 {
-                    let cur_g_len = route_total_length(&l.routes);
                     let mut best_slide: Option<(Layout, usize, usize, f64)> = None;
                     for src_idx in 0..slots.len() {
                         let Some((ei_src, _)) = slots[src_idx].owner else {
@@ -952,7 +1039,8 @@ fn swap_edge_ports(
                                 .filter_map(|k| slots[k].owner.map(|(ei, _)| ei))
                                 .collect();
                             for (ei, ce) in scene.edges.iter().enumerate() {
-                                if (cur_crossed.contains(&ce.id) || coalesced(&l.routes[&ce.id].points).len() >= 5)
+                                if (cur_crossed.contains(&ce.id)
+                                    || coalesced(&l.routes[&ce.id].points).len() >= 5)
                                     && !has_fixed_route_or_label(ce)
                                     && !rip_eids.contains(&ei)
                                 {
@@ -999,7 +1087,8 @@ fn swap_edge_ports(
                                 if (g_ovlp < cur_g_ovlp
                                     || (g_ovlp == cur_g_ovlp
                                         && (g_cross < cur_g_cross
-                                            || (g_cross == cur_g_cross && g_len < cur_g_len - 32.))))
+                                            || (g_cross == cur_g_cross
+                                                && g_len < cur_g_len - 32.))))
                                     && best_slide.as_ref().is_none_or(|(_, bo, bc, bl)| {
                                         (g_ovlp, g_cross) < (*bo, *bc)
                                             || ((g_ovlp, g_cross) == (*bo, *bc)
@@ -1026,6 +1115,7 @@ fn swap_edge_ports(
             break;
         }
     }
+    total_swaps
 }
 fn route_conflict_counts(l: &Layout, edge_id: &str, pts: &[Point]) -> (usize, usize) {
     let c = coalesced(pts);
@@ -1073,7 +1163,13 @@ fn restore_explicit_stubs(c: &[Point], a: &PortPlacement, b: &PortPlacement) -> 
     dedup_points(&mut out);
     out
 }
+/// Remove interior micro-jogs shorter than one grid unit (the `micro-jog` lint
+/// threshold). Handles staircase jogs (both neighbors continue the same way) and
+/// narrow U-turns/doglegs (neighbors point in opposite directions). Endpoints never
+/// move; a candidate is accepted only if it removes bends, stays valid, and does not
+/// add crossings or overlaps for this edge.
 fn dejitter(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
+    let threshold = o.grid.max(1.) - 1e-6;
     for e in &scene.edges {
         if effective_annotations(scene, &e.id, &e.annotations, o.variant.as_deref())
             .iter()
@@ -1087,62 +1183,82 @@ fn dejitter(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
         let Some(b) = l.ports.get(&port_key(e, false)).cloned() else {
             continue;
         };
-        let cap = l.routes[&e.id].points.len() + 2;
+        let Some(route) = l.routes.get(&e.id) else {
+            continue;
+        };
+        let cap = route.points.len() + 2;
         for _ in 0..cap {
-            let c = coalesced(&l.routes[&e.id].points);
+            let current = &l.routes[&e.id].points;
+            let c = coalesced(current);
             if c.len() < 4 {
                 break;
             }
+            let short: Vec<usize> = (1..c.len() - 2)
+                .filter(|&k| c[k].distance(c[k + 1]) < threshold)
+                .collect();
+            if short.is_empty() {
+                break;
+            }
+            let (base_cross, base_ovlp) = route_conflict_counts(l, &e.id, current);
             let mut updated = None;
-            for k in 1..c.len() - 2 {
-                if c[k].distance(c[k + 1]) >= 12. - 1e-6 {
-                    continue;
-                }
+            for k in short {
                 let prev_dx = c[k].x - c[k - 1].x;
                 let prev_dy = c[k].y - c[k - 1].y;
                 let next_dx = c[k + 2].x - c[k + 1].x;
                 let next_dy = c[k + 2].y - c[k + 1].y;
-                if prev_dx * next_dx + prev_dy * next_dy <= 1e-6 {
+                let dot = prev_dx * next_dx + prev_dy * next_dy;
+                if dot.abs() <= 1e-6 {
                     continue;
                 }
                 let jog_vertical = (c[k].x - c[k + 1].x).abs() < 1e-6;
+                // Move the listed vertices onto `v` across the jog (staircase
+                // alignment) or along it (sliding the jog onto a neighbor bend).
+                let shifted = |idxs: [usize; 2], v: f64, across: bool| -> Vec<Point> {
+                    let mut cand = c.clone();
+                    for i in idxs {
+                        if jog_vertical == across {
+                            cand[i].y = v;
+                        } else {
+                            cand[i].x = v;
+                        }
+                    }
+                    cand
+                };
                 let mut trials = Vec::new();
-                if k + 2 < c.len() - 1 {
-                    let mut cand = c.clone();
-                    if jog_vertical {
-                        let y = cand[k].y;
-                        cand[k + 1].y = y;
-                        cand[k + 2].y = y;
-                    } else {
-                        let x = cand[k].x;
-                        cand[k + 1].x = x;
-                        cand[k + 2].x = x;
+                let along = |p: Point| if jog_vertical { p.y } else { p.x };
+                let perp = |p: Point| if jog_vertical { p.x } else { p.y };
+                if dot > 0. {
+                    // Staircase: align one neighboring run with the other.
+                    if k + 2 < c.len() - 1 {
+                        trials.push(shifted([k + 1, k + 2], along(c[k]), true));
                     }
-                    trials.push(cand);
-                }
-                if k - 1 > 0 {
-                    let mut cand = c.clone();
-                    if jog_vertical {
-                        let y = cand[k + 1].y;
-                        cand[k - 1].y = y;
-                        cand[k].y = y;
-                    } else {
-                        let x = cand[k + 1].x;
-                        cand[k - 1].x = x;
-                        cand[k].x = x;
+                    if k > 1 {
+                        trials.push(shifted([k - 1, k], along(c[k + 1]), true));
                     }
-                    trials.push(cand);
                 }
+                // Staircase or U-turn: slide the jog itself onto the next or
+                // previous bend so two redundant bends collapse. `c[k]` and
+                // `c[k + 1]` are always interior; endpoints never move.
+                trials.push(shifted([k, k + 1], perp(c[k + 2]), false));
+                trials.push(shifted([k, k + 1], perp(c[k - 1]), false));
                 for cand in trials {
                     let simple = coalesced(&cand);
+                    if simple.len() >= c.len()
+                        || simple[0].distance(c[0]) > 1e-6
+                        || simple[simple.len() - 1].distance(c[c.len() - 1]) > 1e-6
+                    {
+                        continue;
+                    }
                     let pts = restore_explicit_stubs(&simple, &a, &b);
                     let cand_route = Route {
                         edge: e.id.clone(),
                         points: pts,
                     };
-                    if route_is_valid(scene, l, e, &cand_route, o.margin)
-                        && route_conflict_counts(l, &e.id, &cand_route.points) == (0, 0)
-                    {
+                    if !route_is_valid(scene, l, e, &cand_route, o.margin) {
+                        continue;
+                    }
+                    let (cross, ovlp) = route_conflict_counts(l, &e.id, &cand_route.points);
+                    if cross <= base_cross && ovlp <= base_ovlp {
                         updated = Some(cand_route);
                         break;
                     }
@@ -1216,7 +1332,13 @@ pub fn route_all(
                 * 10.)
                 .round() as i64;
             let span_q = (a.point.manhattan_distance(b.point) * 1000.).round() as i64;
-            (priority, (min_span * 1000.).round() as i64, bend_lb, span_q, idx)
+            (
+                priority,
+                (min_span * 1000.).round() as i64,
+                bend_lb,
+                span_q,
+                idx,
+            )
         })
         .collect();
     order.sort();
@@ -1254,14 +1376,10 @@ pub fn route_all(
                 .copied()
                 .filter(|&i| {
                     let e = &scene.edges[i];
-                    let has_fixed = effective_annotations(
-                        scene,
-                        &e.id,
-                        &e.annotations,
-                        o.variant.as_deref(),
-                    )
-                    .iter()
-                    .any(|a| a.name == "route");
+                    let has_fixed =
+                        effective_annotations(scene, &e.id, &e.annotations, o.variant.as_deref())
+                            .iter()
+                            .any(|a| a.name == "route");
                     if has_fixed {
                         return false;
                     }
@@ -1525,11 +1643,23 @@ fn step_route_cost(
     prev_pt: Option<Point>,
     ctx: &StepCostCtx<'_>,
 ) -> f64 {
+    step_route_cost_over(u, v, d, nd, prev_pt, ctx, ctx.segs.iter())
+}
+/// `step_route_cost` over a pre-filtered, order-preserving subset of `ctx.segs`.
+fn step_route_cost_over<'s>(
+    u: Point,
+    v: Point,
+    d: usize,
+    nd: usize,
+    prev_pt: Option<Point>,
+    ctx: &StepCostCtx<'_>,
+    segs: impl Iterator<Item = &'s ExistingSegment>,
+) -> f64 {
     let &StepCostCtx {
         start,
         target,
-        segs,
         hotspots,
+        ..
     } = ctx;
     let u_horiz = nd == 0 || nd == 2;
     let vx_min = u.x.min(v.x);
@@ -1548,9 +1678,8 @@ fn step_route_cost(
         if u_horiz == seg.horiz {
             if collinear_overlap(u, v, seg.a, seg.b) > 1e-6 {
                 // Keep prohibitive overlap cost invariant under lattice subdivision.
-                let already = prev_pt.is_some_and(|pr| {
-                    d == nd && collinear_overlap(pr, u, seg.a, seg.b) > 1e-6
-                });
+                let already = prev_pt
+                    .is_some_and(|pr| d == nd && collinear_overlap(pr, u, seg.a, seg.b) > 1e-6);
                 if !already {
                     cost += 1e6;
                 }
@@ -1571,13 +1700,9 @@ fn step_route_cost(
             continue;
         }
         let u_in_open = if seg.horiz {
-            (u.y - seg.a.y).abs() < 1e-6
-                && u.x > seg.x_min + 1e-6
-                && u.x < seg.x_max - 1e-6
+            (u.y - seg.a.y).abs() < 1e-6 && u.x > seg.x_min + 1e-6 && u.x < seg.x_max - 1e-6
         } else {
-            (u.x - seg.a.x).abs() < 1e-6
-                && u.y > seg.y_min + 1e-6
-                && u.y < seg.y_max - 1e-6
+            (u.x - seg.a.x).abs() < 1e-6 && u.y > seg.y_min + 1e-6 && u.y < seg.y_max - 1e-6
         };
         if u_in_open && d == nd {
             cost += seg.cross_weight;
@@ -1609,12 +1734,7 @@ fn step_route_cost(
     }
     cost
 }
-fn exit_cross_cost(
-    target: Point,
-    d: usize,
-    arrival: usize,
-    segs: &[ExistingSegment],
-) -> f64 {
+fn exit_cross_cost(target: Point, d: usize, arrival: usize, segs: &[ExistingSegment]) -> f64 {
     if d != arrival {
         return 0.0;
     }
@@ -1638,6 +1758,31 @@ fn exit_cross_cost(
         }
     }
     cost
+}
+/// Sort lattice tracks and merge values within 1e-3, always keeping the exact
+/// `pinned` coordinates (the search's start and target) as representatives.
+fn dedup_tracks(values: &mut Vec<f64>, pinned: [f64; 2]) {
+    values.extend(pinned);
+    values.sort_by(f64::total_cmp);
+    let is_pinned = |v: f64| pinned.iter().any(|p| p.to_bits() == v.to_bits());
+    let mut out: Vec<f64> = Vec::with_capacity(values.len());
+    for &v in values.iter() {
+        if let Some(last) = out.last_mut()
+            && v - *last < 1e-3
+        {
+            if v.to_bits() == last.to_bits() {
+                continue;
+            }
+            match (is_pinned(*last), is_pinned(v)) {
+                (false, true) => *last = v,
+                (true, true) => out.push(v),
+                _ => {}
+            }
+            continue;
+        }
+        out.push(v);
+    }
+    *values = out;
 }
 fn add_midline_tracks(obstacles: &[Rect], tol: f64, xs: &mut Vec<f64>, ys: &mut Vec<f64>) {
     let mut by_left: Vec<usize> = (0..obstacles.len()).collect();
@@ -1790,17 +1935,20 @@ fn search_with_history(
             ys.extend([p.y - gap, p.y + gap]);
         }
     }
-    let box_pad = 8. * o.stub;
+    // Bound distant port/route tracks to the relevant search corridor once the
+    // lattice would otherwise be large (20+ node DAGs in unoptimized builds).
+    let box_pad = (8. * o.stub).max(160.);
     let search_x_min = start.x.min(target.x) - box_pad;
     let search_x_max = start.x.max(target.x) + box_pad;
     let search_y_min = start.y.min(target.y) - box_pad;
     let search_y_max = start.y.max(target.y) + box_pad;
-    let dense = obstacles.len() > 80;
+    let dense = obstacles.len() > 14 || routed.routes.len() > 12;
+    let outside = |p: &Point| {
+        p.x < search_x_min || p.x > search_x_max || p.y < search_y_min || p.y > search_y_max
+    };
     for port in routed.ports.values() {
         let p = port.stub;
-        if dense
-            && (p.x < search_x_min || p.x > search_x_max || p.y < search_y_min || p.y > search_y_max)
-        {
+        if dense && outside(&p) {
             continue;
         }
         xs.extend([p.x - gap, p.x, p.x + gap]);
@@ -1810,6 +1958,9 @@ fn search_with_history(
         if id.starts_with("@reserved-port:")
             && let Some(p) = route.points.last()
         {
+            if dense && outside(p) {
+                continue;
+            }
             xs.extend([p.x - gap, p.x, p.x + gap]);
             ys.extend([p.y - gap, p.y, p.y + gap]);
         } else if !id.starts_with("@reserved-") {
@@ -1844,13 +1995,84 @@ fn search_with_history(
     if let Some(max) = ys.iter().copied().reduce(f64::max) {
         ys.push(max + o.stub);
     }
-    xs.sort_by(f64::total_cmp);
-    xs.dedup_by(|a, b| (*a - *b).abs() < 1e-7);
-    ys.sort_by(f64::total_cmp);
-    ys.dedup_by(|a, b| (*a - *b).abs() < 1e-7);
+    dedup_tracks(&mut xs, [start.x, target.x]);
+    dedup_tracks(&mut ys, [start.y, target.y]);
     let nx = xs.len();
     let ny = ys.len();
-    let point = |i: usize| Point::new(xs[i % nx], ys[i / nx]);
+    // Per-row/column candidate lists. A horizontal step on row `y` can only be
+    // blocked by an obstacle whose open band contains `y`, and only meets existing
+    // segments whose closed y-range contains `y` (the exact bounding-box rejects
+    // used by `Rect::blocks`/`contains` and `step_route_cost`), and vice versa.
+    let row_obs: Vec<Vec<usize>> = ys
+        .iter()
+        .map(|&y| {
+            (0..obstacles.len())
+                .filter(|&k| y > obstacles[k].top() + 1e-6 && y < obstacles[k].bottom() - 1e-6)
+                .collect()
+        })
+        .collect();
+    let col_obs: Vec<Vec<usize>> = xs
+        .iter()
+        .map(|&x| {
+            (0..obstacles.len())
+                .filter(|&k| x > obstacles[k].left() + 1e-6 && x < obstacles[k].right() - 1e-6)
+                .collect()
+        })
+        .collect();
+    let row_segs: Vec<Vec<usize>> = ys
+        .iter()
+        .map(|&y| {
+            (0..segs.len())
+                .filter(|&k| y >= segs[k].y_min - 1e-6 && y <= segs[k].y_max + 1e-6)
+                .collect()
+        })
+        .collect();
+    let col_segs: Vec<Vec<usize>> = xs
+        .iter()
+        .map(|&x| {
+            (0..segs.len())
+                .filter(|&k| x >= segs[k].x_min - 1e-6 && x <= segs[k].x_max + 1e-6)
+                .collect()
+        })
+        .collect();
+    let step_ctx = StepCostCtx {
+        start,
+        target,
+        segs: &segs,
+        hotspots: &history.hotspots,
+    };
+    let points: Vec<Point> = (0..nx * ny)
+        .map(|i| Point::new(xs[i % nx], ys[i / nx]))
+        .collect();
+    let point = |i: usize| points[i];
+    // Precompute lattice edge obstacle blockage. Each undirected grid segment
+    // (x, y)-(x+1, y) and (x, y)-(x, y+1) is tested against row/column obstacles
+    // once, turning the inner A* obstacle test into a single boolean lookup.
+    let mut edge_blocked = vec![false; nx * ny * 4];
+    for y in 0..ny {
+        let py = ys[y];
+        for x in 0..nx {
+            let px = xs[x];
+            let p = Point::new(px, py);
+            let i = y * nx + x;
+            if x + 1 < nx {
+                let v = Point::new(xs[x + 1], py);
+                let blocked = row_obs[y]
+                    .iter()
+                    .any(|&k| obstacles[k].contains(v) || obstacles[k].blocks(p, v));
+                edge_blocked[i * 4] = blocked;
+                edge_blocked[(i + 1) * 4 + 2] = blocked;
+            }
+            if y + 1 < ny {
+                let v = Point::new(px, ys[y + 1]);
+                let blocked = col_obs[x]
+                    .iter()
+                    .any(|&k| obstacles[k].contains(v) || obstacles[k].blocks(p, v));
+                edge_blocked[i * 4 + 1] = blocked;
+                edge_blocked[(i + nx) * 4 + 3] = blocked;
+            }
+        }
+    }
     let nearest = |values: &[f64], target: f64| {
         values
             .iter()
@@ -1877,15 +2099,7 @@ fn search_with_history(
     });
     let dx_st = target.x - start.x;
     let dy_st = target.y - start.y;
-    let is_backward = |dir_idx: usize| -> bool {
-        let (vx, vy) = match dir_idx {
-            0 => (1., 0.),
-            1 => (0., 1.),
-            2 => (-1., 0.),
-            _ => (0., -1.),
-        };
-        vx * dx_st + vy * dy_st < -1e-6
-    };
+    let backward_dir = [dx_st < -1e-6, dy_st < -1e-6, -dx_st < -1e-6, -dy_st < -1e-6];
     let mut finish = None;
     let mut best = f64::INFINITY;
     while let Some(q) = open.pop() {
@@ -1905,9 +2119,8 @@ fn search_with_history(
             if d == opposite(arrival) {
                 continue;
             }
-            let total = q.g
-                + turns(d, arrival) * o.weights.bend
-                + exit_cross_cost(p, d, arrival, &segs);
+            let total =
+                q.g + turns(d, arrival) * o.weights.bend + exit_cross_cost(p, d, arrival, &segs);
             if total < best {
                 best = total;
                 finish = Some(q.state);
@@ -1916,12 +2129,7 @@ fn search_with_history(
         }
         let x = i % nx;
         let y = i / nx;
-        let prev_pt = if parent[q.state] != usize::MAX {
-            Some(point(parent[q.state] / 4))
-        } else {
-            None
-        };
-        let was_backward = is_backward(d);
+        let was_backward = backward_dir[d];
         let neighbors = [
             (x + 1 < nx, i + 1, 0),
             (y + 1 < ny, i + nx, 1),
@@ -1932,37 +2140,50 @@ fn search_with_history(
             if !valid || nd == opposite(d) {
                 continue;
             }
-            let v = point(j);
-            if obstacles.iter().any(|r| r.contains(v) || r.blocks(p, v)) {
+            if edge_blocked[i * 4 + nd] {
                 continue;
             }
+            let v = point(j);
             let mut cost =
                 p.manhattan_distance(v) / o.grid * o.weights.length + turns(d, nd) * o.weights.bend;
-            if !was_backward && is_backward(nd) {
+            if !was_backward && backward_dir[nd] {
                 cost += o.weights.backward;
             }
-            cost += step_route_cost(
-                p,
-                v,
-                d,
-                nd,
-                prev_pt,
-                &StepCostCtx {
-                    start,
-                    target,
-                    segs: &segs,
-                    hotspots: &history.hotspots,
-                },
-            );
+            let horizontal_step = nd == 0 || nd == 2;
+            let lane_segs = if horizontal_step {
+                &row_segs[y]
+            } else {
+                &col_segs[x]
+            };
+            if !lane_segs.is_empty() || !history.hotspots.is_empty() {
+                let prev_pt = if parent[q.state] != usize::MAX {
+                    Some(point(parent[q.state] / 4))
+                } else {
+                    None
+                };
+                cost += step_route_cost_over(
+                    p,
+                    v,
+                    d,
+                    nd,
+                    prev_pt,
+                    &step_ctx,
+                    lane_segs.iter().map(|&k| &segs[k]),
+                );
+            }
             let g = q.g + cost;
             let state = j * 4 + nd;
             if g + 1e-8 < distance[state] {
-                distance[state] = g;
-                parent[state] = q.state;
                 let heuristic = v.manhattan_distance(target) / o.grid * o.weights.length
                     + bend_lower_bound(v, target, nd, arrival) * o.weights.bend;
+                let f = g + heuristic;
+                if f >= best {
+                    continue;
+                }
+                distance[state] = g;
+                parent[state] = q.state;
                 open.push(Queue {
-                    f: g + heuristic,
+                    f,
                     g,
                     x: v.x,
                     y: v.y,
@@ -2274,8 +2495,16 @@ pub fn nudge_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
     // tracks from the updated routes before nudging Y.
     nudge_channels_axis(scene, o, l, false);
     nudge_channels_axis(scene, o, l, true);
+    // Lane separation shifts interior runs and can leave sub-grid staircase or
+    // U-turn jogs behind; straighten them once lanes are final.
+    dejitter(scene, o, l);
 }
-fn nudge_channels_axis(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout, target_horizontal: bool) {
+fn nudge_channels_axis(
+    scene: &SceneGraph,
+    o: &LayoutOptions,
+    l: &mut Layout,
+    target_horizontal: bool,
+) {
     use std::collections::BTreeMap;
     #[derive(Clone)]
     struct Segment {
@@ -2423,7 +2652,9 @@ fn nudge_channels_axis(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout, ta
         }
         true
     };
-    let edge_conflicts = |routes: &BTreeMap<String, Route>, targets: &BTreeMap<String, Route>| -> (usize, usize) {
+    let edge_conflicts = |routes: &BTreeMap<String, Route>,
+                          targets: &BTreeMap<String, Route>|
+     -> (usize, usize) {
         let mut cross = 0;
         let mut ovlp = 0;
         let all_coalesced: BTreeMap<&str, Vec<Point>> = scene
@@ -2600,11 +2831,7 @@ fn nudge_channels_axis(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout, ta
                 let mut constraints = Vec::new();
                 for (i, s) in group.iter().enumerate() {
                     if i > 0 && !(group[i - 1].fixed && s.fixed) {
-                        constraints.push(crate::solver::Constraint::separation(
-                            i - 1,
-                            i,
-                            spacing,
-                        ));
+                        constraints.push(crate::solver::Constraint::separation(i - 1, i, spacing));
                     }
                     if s.fixed {
                         constraints.push(crate::solver::Constraint::fixed(i, s.coord));
@@ -2672,9 +2899,7 @@ fn nudge_channels_axis(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout, ta
                         let (nx, ny) = port.side.normal();
                         let dx = tip.x - port.point.x;
                         let dy = tip.y - port.point.y;
-                        if dx * nx + dy * ny < o.margin - 1e-6
-                            || (dx * ny - dy * nx).abs() > 1e-6
-                        {
+                        if dx * nx + dy * ny < o.margin - 1e-6 || (dx * ny - dy * nx).abs() > 1e-6 {
                             valid = false;
                         }
                     }
@@ -2901,7 +3126,8 @@ mod stage2_routing_tests {
         let mut l = Layout::default();
         l.nodes.insert("a".into(), Rect::new(-200., 0., 112., 48.));
         l.nodes.insert("b".into(), Rect::new(200., 0., 112., 48.));
-        l.nodes.insert("c".into(), Rect::new(-200., 120., 112., 48.));
+        l.nodes
+            .insert("c".into(), Rect::new(-200., 120., 112., 48.));
         l.nodes.insert("d".into(), Rect::new(200., 120., 112., 48.));
         let e0 = &scene.edges[0];
         let e1 = &scene.edges[1];
@@ -3025,10 +3251,164 @@ mod stage2_routing_tests {
         assert!(
             c.windows(2)
                 .enumerate()
-                .all(|(k, p)| k == 0 || k + 2 == c.len() || p[0].distance(p[1]) >= 12. - 1e-6),
+                .all(|(k, p)| k == 0 || k + 2 == c.len() || p[0].distance(p[1]) >= o.grid - 1e-6),
             "Z-jog should be removed: {c:?}"
         );
         crate::layout::validate(&scene, &l, &o).unwrap();
+    }
+
+    #[test]
+    fn dejitter_collapses_narrow_uturn_dogleg() {
+        let o = LayoutOptions::default();
+        let scene = crate::model::lower(&crate::syntax::parse("a.E -> b.W\n"));
+        let mut l = Layout::default();
+        l.nodes.insert("a".into(), Rect::new(-120., 0., 80., 48.));
+        l.nodes.insert("b".into(), Rect::new(120., 40., 80., 48.));
+        let e = &scene.edges[0];
+        l.ports.insert(
+            port_key(e, true),
+            PortPlacement {
+                key: port_key(e, true),
+                side: Side::E,
+                point: Point::new(-80., 0.),
+                stub: Point::new(-64., 0.),
+            },
+        );
+        l.ports.insert(
+            port_key(e, false),
+            PortPlacement {
+                key: port_key(e, false),
+                side: Side::W,
+                point: Point::new(80., 40.),
+                stub: Point::new(64., 40.),
+            },
+        );
+        // Narrow 8px U-turn: East to (40, 0), North by 8px to (40, 8), West to (20, 8),
+        // South/East to (20, 40) -> (64, 40) -> (80, 40).
+        l.routes.insert(
+            e.id.clone(),
+            Route {
+                edge: e.id.clone(),
+                points: vec![
+                    Point::new(-80., 0.),
+                    Point::new(-64., 0.),
+                    Point::new(-20., 0.),
+                    Point::new(40., 0.),
+                    Point::new(40., 8.),
+                    Point::new(20., 8.),
+                    Point::new(20., 40.),
+                    Point::new(64., 40.),
+                    Point::new(80., 40.),
+                ],
+            },
+        );
+        dejitter(&scene, &o, &mut l);
+        let c = coalesced(&l.routes[&e.id].points);
+        assert!(
+            c.windows(2)
+                .enumerate()
+                .all(|(k, p)| k == 0 || k + 2 == c.len() || p[0].distance(p[1]) >= o.grid - 1e-6),
+            "U-turn jog should be removed: {c:?}"
+        );
+        assert!(
+            c.len() <= 6,
+            "Narrow U-turn should collapse redundant bends: {c:?}"
+        );
+        crate::layout::validate(&scene, &l, &o).unwrap();
+    }
+
+    #[test]
+    fn dense_24_node_30_edge_dag_routes_under_budget() {
+        let mut d = String::new();
+        // 4 ranks of 6 nodes each
+        for r in 0..4 {
+            for c in 0..6 {
+                let id = format!("n_{r}_{c}");
+                d.push_str(&format!("{id}: \"Node {r}-{c}\" [shape: rect]\n"));
+            }
+        }
+        // 30 forward edges across ranks
+        let mut edge_count = 0;
+        'outer: for r in 0..3 {
+            for c in 0..6 {
+                let u = format!("n_{r}_{c}");
+                let v = format!("n_{}_{c}", r + 1);
+                d.push_str(&format!("{u} -> {v}\n"));
+                edge_count += 1;
+                if edge_count == 30 {
+                    break 'outer;
+                }
+                if c + 1 < 6 {
+                    let v2 = format!("n_{}_{}", r + 1, c + 1);
+                    d.push_str(&format!("{u} -> {v2}\n"));
+                    edge_count += 1;
+                    if edge_count == 30 {
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        assert_eq!(edge_count, 30);
+        let scene = crate::model::lower(&crate::syntax::parse(&d));
+        let o = LayoutOptions::default();
+        let mut l = Layout::default();
+        for (i, node) in scene.nodes.iter().enumerate() {
+            let r = (i / 6) as f64;
+            let c = (i % 6) as f64;
+            l.nodes
+                .insert(node.id.clone(), Rect::new(c * 160., r * 120., 100., 50.));
+        }
+        let mut edges_by_node: std::collections::BTreeMap<(String, bool), Vec<String>> =
+            std::collections::BTreeMap::new();
+        for e in &scene.edges {
+            edges_by_node
+                .entry((e.source.node.clone(), true))
+                .or_default()
+                .push(e.id.clone());
+            edges_by_node
+                .entry((e.target.node.clone(), false))
+                .or_default()
+                .push(e.id.clone());
+        }
+        for e in &scene.edges {
+            let src_rect = &l.nodes[&e.source.node];
+            let tgt_rect = &l.nodes[&e.target.node];
+            let src_group = &edges_by_node[&(e.source.node.clone(), true)];
+            let tgt_group = &edges_by_node[&(e.target.node.clone(), false)];
+            let src_idx = src_group.iter().position(|id| id == &e.id).unwrap();
+            let tgt_idx = tgt_group.iter().position(|id| id == &e.id).unwrap();
+            let src_x = src_rect.left()
+                + (src_idx as f64 + 1.) / (src_group.len() as f64 + 1.) * src_rect.w;
+            let tgt_x = tgt_rect.left()
+                + (tgt_idx as f64 + 1.) / (tgt_group.len() as f64 + 1.) * tgt_rect.w;
+            l.ports.insert(
+                port_key(e, true),
+                PortPlacement {
+                    key: port_key(e, true),
+                    side: Side::S,
+                    point: Point::new(src_x, src_rect.bottom()),
+                    stub: Point::new(src_x, src_rect.bottom() + o.stub),
+                },
+            );
+            l.ports.insert(
+                port_key(e, false),
+                PortPlacement {
+                    key: port_key(e, false),
+                    side: Side::N,
+                    point: Point::new(tgt_x, tgt_rect.top()),
+                    stub: Point::new(tgt_x, tgt_rect.top() - o.stub),
+                },
+            );
+        }
+        let start = std::time::Instant::now();
+        route_all(&scene, &o, None, &mut l).unwrap();
+        let elapsed = start.elapsed();
+        assert!(
+            elapsed < std::time::Duration::from_millis(500),
+            "Dense 24-node / 30-edge DAG routing took {:?}, expected < 500ms",
+            elapsed
+        );
+        assert_eq!(l.routes.len(), 30);
     }
 }
 
