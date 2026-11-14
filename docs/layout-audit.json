@@ -1,6 +1,6 @@
 {
-  "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
-  "baseRevision": "97b8421ea06b4be7b8ccdd736b4923018e4ec4d6",
+  "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
+  "baseRevision": "e53f434c2b0e7df13226f4116882869228eff00d",
   "method": "Current semantic, native geometry, Chromium paint and repeated-compilation checks, followed by individual visual inspection. Earlier findings and scores are preserved under historicalAudits.",
   "knownDiagnostics": {},
   "counts": {
@@ -22,11 +22,11 @@
     "cases": [
       {
         "id": "01-pipeline",
-        "svgSha256": "371a9444c4f45edb747a93310fa154452ece6e7aca8d29e600428e316e673819",
+        "svgSha256": "ab5db83418bd7634d2d5cb2fb073e8ba513876964b3678f15af0b55c897fdbc3",
         "beauty": 5,
         "clarity": 5,
         "review": "Four aligned stages, short facing connectors and local captions preserve the request progression.",
-        "minFitTextPx": 12.051242608399505,
+        "minFitTextPx": 11.696843149530034,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -38,7 +38,7 @@
       },
       {
         "id": "02-long-pipeline",
-        "svgSha256": "1d0cef5acd593e994854339f25b4e5cc36f53ab549eed52658fb7ff603464bba",
+        "svgSha256": "c50111567de6d73681c031a6ff71914de4d3256d366e09126274b5bdbc3c4ef1",
         "beauty": 5,
         "clarity": 5,
         "review": "The eight stages fold in an obvious snake with labeled turns and readable boxes.",
@@ -54,7 +54,7 @@
       },
       {
         "id": "03-fan-out",
-        "svgSha256": "c17c8e45f38275f043a96ef2eb0d49499ddfcef0315cd1f697d664b17ccf1ccd",
+        "svgSha256": "8471f163c539b581abafc4e74c7b7d2f9783da40d6746ef6897138c40f9dce59",
         "beauty": 5,
         "clarity": 5,
         "review": "Five ordered consumer branches have separate shafts and the same caption position near each leaf.",
@@ -70,7 +70,7 @@
       },
       {
         "id": "04-fan-in",
-        "svgSha256": "18f075f5045a9ce42e1070275d0b0cd31d237b33acb611271b647649bfeaf464",
+        "svgSha256": "0a2c538866a7be33b3904d7242860186207af8fa8dfafd0f491edad4bdb4c345",
         "beauty": 5,
         "clarity": 5,
         "review": "Aligned producers feed ordered ports; upload captions stay beside their individual source branches.",
@@ -86,7 +86,7 @@
       },
       {
         "id": "05-decision",
-        "svgSha256": "41c4ccd3f033a728771d4dc1da22f80467ab5ec3f04042ac462bc6b859d37e46",
+        "svgSha256": "f9923f77600b7cf270a9c016d3e4251488e3f9822e0b0a2c089bf40c0ad8badf",
         "beauty": 5,
         "clarity": 5,
         "review": "The diamond branches into distinct yes/no rows and rejoins at Response without a crossing.",
@@ -102,15 +102,15 @@
       },
       {
         "id": "06-feedback",
-        "svgSha256": "014473ede59744457a0400b4e883d450f4e239ec3e4125f37e92562ac4b0fda9",
+        "svgSha256": "99fb862ea53f4c56304276096bb7352b2788ec20cabbfcb4bee6b3d00741899a",
         "beauty": 5,
         "clarity": 5,
         "review": "The retry connector visibly returns above Jobs and Worker; persistence leaves below the main progression.",
-        "minFitTextPx": 15,
+        "minFitTextPx": 10.634681435792961,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.6,
+          "maxDetourRatio": 1.4313861043899068,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -118,7 +118,7 @@
       },
       {
         "id": "07-ring",
-        "svgSha256": "761ef9358a2199677f2da73b67ee47f2b1b684472b068953db6d4f36f5f78616",
+        "svgSha256": "8ecdc2f1c0c3d887ba3629674dbe15956a81d6236bb0aa08c9d501de815aff68",
         "beauty": 5,
         "clarity": 5,
         "review": "Four peers form an unmistakable directed loop, with captions or short leaders identifying each side.",
@@ -127,18 +127,14 @@
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
           "maxDetourRatio": 1,
-          "calloutCount": 2,
-          "mostRemoteCallout": {
-            "feature": "a->b",
-            "text": "token",
-            "centerToAnchorPx": 46
-          }
+          "calloutCount": 0,
+          "mostRemoteCallout": null
         },
         "paintFailures": []
       },
       {
         "id": "08-self-loop",
-        "svgSha256": "0bb65cccf159395ec0634b5e2e9a4e428c20fceeadbf3d8478a836d7243b4f80",
+        "svgSha256": "64a16c1a9b5f7990b6f565e2a08825333a1e81180d5ef3bc2d2e6b5430fc952c",
         "beauty": 5,
         "clarity": 5,
         "review": "The service has a real outside return loop with a clean incoming arrow and readable retry caption.",
@@ -154,7 +150,7 @@
       },
       {
         "id": "09-parallel",
-        "svgSha256": "9029d7f87c8670a3c23a3dcf3e1a4ec7806a210f096471673203f19da3f4f7e8",
+        "svgSha256": "81541040921c122653f464ca493e2bf616683f77de48cc67a3bfade8c390cec4",
         "beauty": 5,
         "clarity": 5,
         "review": "Three protocol tracks face across the gap; their captions sit separately above their shafts.",
@@ -170,11 +166,11 @@
       },
       {
         "id": "10-bidirectional",
-        "svgSha256": "e96a3adfd6612f3aeb4051dd0c5eb1f54fe171958f07a2cc5e7e0afada73576b",
+        "svgSha256": "08aa478d2b606db51902a19a4fdaff6635479e18d84ebd837fb405144faa063a",
         "beauty": 5,
         "clarity": 5,
         "review": "Both arrowheads are visible and the request/reply and publish/ack descriptions belong to their own links.",
-        "minFitTextPx": 14.169804370312006,
+        "minFitTextPx": 15,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -186,7 +182,7 @@
       },
       {
         "id": "11-disconnected",
-        "svgSha256": "f7bb615a7a1a337f2dd3fd77ffff29deabb5158fc8903f33a131cf6a311ff88b",
+        "svgSha256": "91643efd1c4732e04a32d2bf3efa2732897180f96220e82c2f82991332127058",
         "beauty": 5,
         "clarity": 5,
         "review": "Checkout and Search occupy separate coherent rows and the standalone Observer is kept apart.",
@@ -202,7 +198,7 @@
       },
       {
         "id": "12-butterfly",
-        "svgSha256": "de111bb9bfb68d2bcde77c39d9144f52aa274304695372b444d2a93b8dc02348",
+        "svgSha256": "91287a1af5ea2dfcdecaabda6dae46bcbb1afba40948003bd77e124c3b2f7abd",
         "beauty": 5,
         "clarity": 5,
         "review": "The two primary paths remain horizontal and the fallback links use distinct inside/outside channels.",
@@ -210,7 +206,7 @@
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.3374067265058938,
+          "maxDetourRatio": 1.337444997220836,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -218,15 +214,15 @@
       },
       {
         "id": "13-mesh",
-        "svgSha256": "b1714f148956433dbe734558da6e938358eec7f17104f2367fc759553426753b",
+        "svgSha256": "ab16fb39ca674096a5a38c2e4c096141b7f01ef49bbf5ecd6ef08b7f1896afb2",
         "beauty": 5,
         "clarity": 5,
         "review": "The K3,3 presentation keeps all nine dependencies traceable, with a visible bridge at its unavoidable crossing.",
-        "minFitTextPx": 10.400616332819723,
+        "minFitTextPx": 13.708576601843287,
         "routeMetrics": {
           "properCrossings": 1,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.6830188679245284,
+          "maxDetourRatio": 1,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -234,11 +230,11 @@
       },
       {
         "id": "14-long-labels",
-        "svgSha256": "c04204ced5de5b9411de167d7a52703b572e9ebc4391a69f2ccab2f966c50419",
+        "svgSha256": "426b4640434a72d5ccaee6ba76a6aef5cae5b95e323953133918b401641873a1",
         "beauty": 5,
         "clarity": 5,
         "review": "Wrapped node titles and captions form a compact vertical progression with straight facing attachments.",
-        "minFitTextPx": 12.980769230769232,
+        "minFitTextPx": 13.392857142857144,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -250,79 +246,91 @@
       },
       {
         "id": "15-unicode",
-        "svgSha256": "c152d011b68407d90b7847579b0a7e4c83f35a317273a6a285f8bd4304457b9b",
+        "svgSha256": "0a4b70bb1771af96b5d6cdc5c7e804d16fade7d2dc2299d9388363289a9ed34d",
         "beauty": 5,
         "clarity": 5,
         "review": "Japanese, accented Latin and Greek glyphs retain their hierarchy and fit inside their shapes.",
-        "minFitTextPx": 13.902643492907748,
-        "routeMetrics": {
-          "properCrossings": 0,
-          "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
-        },
-        "paintFailures": []
-      },
-      {
-        "id": "16-container",
-        "svgSha256": "d29f33e37ae4cff93c27db3c1e27939db0d3058d56541017beafe4f90f229d79",
-        "beauty": 5,
-        "clarity": 5,
-        "review": "Production encloses its API and database tightly; the external HTTPS entry clears the header.",
-        "minFitTextPx": 14.739137796653155,
-        "routeMetrics": {
-          "properCrossings": 0,
-          "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
-        },
-        "paintFailures": []
-      },
-      {
-        "id": "17-nested",
-        "svgSha256": "2619cc6dde1f6ea54b36711b6e10d29c79017dade40edd0825fe1aa356efd4cc",
-        "beauty": 5,
-        "clarity": 5,
-        "review": "Cloud and Region ownership remain distinct and the audit connection leaves the inner group cleanly.",
-        "minFitTextPx": 10.395799328660257,
+        "minFitTextPx": 15,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
           "maxDetourRatio": 1,
           "calloutCount": 1,
           "mostRemoteCallout": {
-            "feature": "cloud.region.api->cloud.log",
-            "text": "audit",
-            "centerToAnchorPx": 46
+            "feature": "b->c",
+            "text": "übertragen",
+            "centerToAnchorPx": 56
+          }
+        },
+        "paintFailures": []
+      },
+      {
+        "id": "16-container",
+        "svgSha256": "ee70b2574c8beeef75be83c82cba28b8d9bd2efc429646c3f036208293dcd47e",
+        "beauty": 5,
+        "clarity": 5,
+        "review": "Production encloses its API and database tightly; the external HTTPS entry clears the header.",
+        "minFitTextPx": 15,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 0.9999999999999998,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "client->prod.api",
+            "text": "HTTPS",
+            "centerToAnchorPx": 79.99999999999999
+          }
+        },
+        "paintFailures": []
+      },
+      {
+        "id": "17-nested",
+        "svgSha256": "61a8ccfda72fdda52b472869c8794f07be291e95dfe47f0f1bda3b1163d116ac",
+        "beauty": 5,
+        "clarity": 5,
+        "review": "Cloud and Region ownership remain distinct and the audit connection leaves the inner group cleanly.",
+        "minFitTextPx": 11.995924704250529,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1.0749713579547648,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "client->cloud.region.api",
+            "text": "HTTPS",
+            "centerToAnchorPx": 128
           }
         },
         "paintFailures": []
       },
       {
         "id": "18-cross-scope",
-        "svgSha256": "9184c4c35c64099e5be2ee59cbdb2b0799f6d79c2a1c59398b26dcf7985813b6",
+        "svgSha256": "f73dcb3555909360d28844d801ff72f826c16c94c3cff240e8c57f5de5193c39",
         "beauty": 5,
         "clarity": 5,
         "review": "Both peer ownership groups contain compact sequences with one direct replicate connection between them.",
-        "minFitTextPx": 10.55380957624941,
+        "minFitTextPx": 12.58794309391575,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
           "maxDetourRatio": 1,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "west.queue->east.worker",
+            "text": "replicate",
+            "centerToAnchorPx": 80
+          }
         },
         "paintFailures": []
       },
       {
         "id": "19-zone",
-        "svgSha256": "f5de1e36272338beceea8fcc5190358f030e336727fbb6e9dbb10b86b74b67c7",
+        "svgSha256": "72f3ce2c8aa24f81b3c250f17df4394ee0a7a8e51f5e2460074d73630c384ee3",
         "beauty": 5,
         "clarity": 5,
         "review": "API, Ledger and Key service share one contiguous trust enclosure, while Browser stays outside.",
-        "minFitTextPx": 15,
+        "minFitTextPx": 14.808904618595475,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -334,7 +342,7 @@
       },
       {
         "id": "20-records",
-        "svgSha256": "4b1ef5395da7e67335e17eddeace6864147065a216e7c9c4a600245260b7e1f8",
+        "svgSha256": "6d292ca1935baa0e1d64dbeb1337dc8b392d9da82324f6acb978f1adcd2518be",
         "beauty": 5,
         "clarity": 5,
         "review": "Insert and lookup are separate ordered tracks aimed at the correct visible rows under an external table title.",
@@ -350,10 +358,10 @@
       },
       {
         "id": "21-ports",
-        "svgSha256": "b62c1c751da6843a84c427b3e9c7aa90c79ab6a545cb5f8a62439f7f27b96a46",
+        "svgSha256": "ca513df05607273bcb59a2cf71dd4f24092851d9a48e9879362b6e8d57324adf",
         "beauty": 5,
         "clarity": 5,
-        "review": "Publish and acknowledgment directions are distinct; the input name remains beside the queue attachment.",
+        "review": "Facing publish and ack connectors run along separated horizontal lanes with crisp orthogonal port steps and clear port and edge captions.",
         "minFitTextPx": 15,
         "routeMetrics": {
           "properCrossings": 0,
@@ -366,7 +374,7 @@
       },
       {
         "id": "22-obstacle",
-        "svgSha256": "a74ed10fa5c8a0e8cf07aed08b26885f1951e7e08597f290ffa054fd9c28e336",
+        "svgSha256": "7458d783e4848685257b0b899e71d18030c4f00c4ef716f7b8fe6515484784f7",
         "beauty": 5,
         "clarity": 5,
         "review": "The tunnel takes a compact orthogonal detour around the authored firewall position.",
@@ -374,7 +382,7 @@
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.121212121212121,
+          "maxDetourRatio": 1.1212539428711399,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -382,27 +390,23 @@
       },
       {
         "id": "23-trace",
-        "svgSha256": "f4b686f625af6f2dad64f08bf31986a42422823f92b87ee9f68b34910be4a07d",
+        "svgSha256": "c5368ef2c2a8875d66d4f63c8b4372badcc9b5028c3729552995dd2b550fc82e",
         "beauty": 5,
         "clarity": 5,
         "review": "Numbered blue caption pills and continuous shafts make the three-step request order clear.",
-        "minFitTextPx": 11.81816247509705,
+        "minFitTextPx": 14.30084745762712,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
           "maxDetourRatio": 1,
-          "calloutCount": 3,
-          "mostRemoteCallout": {
-            "feature": "api->worker",
-            "text": "2 · jobs",
-            "centerToAnchorPx": 60
-          }
+          "calloutCount": 0,
+          "mostRemoteCallout": null
         },
         "paintFailures": []
       },
       {
         "id": "24-vertical",
-        "svgSha256": "6d6d076d17f0dfd2410ea32a4d66222243f3ea73de07c1ef7bcdfa53db62345d",
+        "svgSha256": "acfa64af429813b75d28f6e443df29cee6ff308e734f81ea3ea7ff3222ff6328",
         "beauty": 5,
         "clarity": 5,
         "review": "Three centered stages retain north/south attachments and centered gap captions.",
@@ -418,11 +422,11 @@
       },
       {
         "id": "fuzz-dag-0",
-        "svgSha256": "6c175d86feee6859e4fb762fb5126d48efc1d5a5dbb4d4735ffb7ff66ec5b0cd",
+        "svgSha256": "aed8d2376fdfd8843e83c25224c0e32640076e2687a6cf65a8d211476888aad8",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text.",
-        "minFitTextPx": 13.081395348837209,
+        "minFitTextPx": 10.620036050328391,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -434,15 +438,15 @@
       },
       {
         "id": "fuzz-dag-1",
-        "svgSha256": "90cef3ddd1060cc6bd4cb0b0f3e3e628b983e77890479be19d719f9535a0426d",
+        "svgSha256": "cbadd8628f9520088b9ebc4545f149fde6093746c807da2e0bc82b0b446a335a",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text.",
-        "minFitTextPx": 9.89010989010989,
+        "minFitTextPx": 12.379176022964206,
         "routeMetrics": {
-          "properCrossings": 2,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 2.297204250014839,
+          "maxDetourRatio": 1.0558851846047064,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -450,15 +454,15 @@
       },
       {
         "id": "fuzz-dag-2",
-        "svgSha256": "a4e9d60687175d264cb461dd03f0b28cbc9b742bc3fe25874a2552366434f65d",
+        "svgSha256": "9465383cadaf01e33ed717789b7580cc8ce410397b603e96b5946fb3f96ffef9",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text.",
-        "minFitTextPx": 12.26158038147139,
+        "minFitTextPx": 14.737991266375545,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.1963135687319564,
+          "maxDetourRatio": 1,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -466,11 +470,11 @@
       },
       {
         "id": "fuzz-dag-3",
-        "svgSha256": "a6101970493de78821d9b85bedf492a32bfb38609b87bfdbd53c757615814fbe",
+        "svgSha256": "ad85f012a91a08e6c52a9588609ebdd6128ab2fbf0fc1d5d292100bcd74d3f42",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text.",
-        "minFitTextPx": 12.228260869565217,
+        "minFitTextPx": 12.558059345952607,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -482,15 +486,15 @@
       },
       {
         "id": "fuzz-dag-4",
-        "svgSha256": "2712ba02c01578edb87a5122a291b88c7af7ccdda9c9e57b26b22958a7f75e2f",
+        "svgSha256": "4d5ae43c01b36a336c2fb471443c296f0b4a40cbd0959bd28e197b446901701f",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
-        "minFitTextPx": 8.088675853804673,
+        "minFitTextPx": 8.595314117267609,
         "routeMetrics": {
-          "properCrossings": 2,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 2.0029891929179127,
+          "maxDetourRatio": 3.8905661609465456,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -498,15 +502,15 @@
       },
       {
         "id": "fuzz-dag-5",
-        "svgSha256": "d2c9dd6c554ae7162230829a25077b8b0c211e3fe621a2e4a3bbf0da69ee94bd",
+        "svgSha256": "3c78dc91b3566f006200f0a79d571a9a7d8ad8a69350f08b5c1bdb51491ed2c3",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text.",
-        "minFitTextPx": 10.657349596385961,
+        "minFitTextPx": 14.3214005092822,
         "routeMetrics": {
-          "properCrossings": 1,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.6231550440081246,
+          "maxDetourRatio": 1.848270216303494,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -514,15 +518,15 @@
       },
       {
         "id": "fuzz-dag-6",
-        "svgSha256": "9a97ab3a492b454b5c7d5536033fa3c60cdb27cec1a9365baa5d6e16a62de00d",
+        "svgSha256": "deb935ff2428971aadf58fc1b3bc37b76333d68ecf65f1f1884a377e1a03446a",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text.",
-        "minFitTextPx": 8.522727272727273,
+        "minFitTextPx": 10.481678061242912,
         "routeMetrics": {
-          "properCrossings": 1,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.4875396465790667,
+          "maxDetourRatio": 1.6293863901512686,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -530,11 +534,11 @@
       },
       {
         "id": "fuzz-dag-7",
-        "svgSha256": "94c1d42ee00deb5a410118b8f76fae47ea92e32988e1dc404bea87d5d55a3c86",
+        "svgSha256": "520228ce4fcfe1ada62e22089315d8e3b3c439e43725eb285f5d809e67ac0579",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text.",
-        "minFitTextPx": 15,
+        "minFitTextPx": 12.142247291163503,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -546,15 +550,15 @@
       },
       {
         "id": "fuzz-cycle-0",
-        "svgSha256": "c09b5ff8a8bba065341ea479bdafca1ad2139dbadbd14adb0e52a055abe515e2",
+        "svgSha256": "24e7090d3defabf80a7e0b8c7913568597ecd79eaa04fee75426bfdb697eb970",
         "beauty": 5,
         "clarity": 5,
         "review": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths.",
-        "minFitTextPx": 8.374689826302731,
+        "minFitTextPx": 10.579937304075235,
         "routeMetrics": {
           "properCrossings": 1,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.5838303512259773,
+          "maxDetourRatio": 2.2863886703383174,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -562,15 +566,15 @@
       },
       {
         "id": "fuzz-cycle-1",
-        "svgSha256": "73af4dc7dfcf1354cc4ac3804beb57afa76d4188e147d34b542365f7d4fe529d",
+        "svgSha256": "6786971183ae5cc0fc589f5340c02cf877db0d8805f74c524bd3bbb9ca8d577e",
         "beauty": 5,
         "clarity": 5,
         "review": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths.",
-        "minFitTextPx": 9.545394906470934,
+        "minFitTextPx": 9.258867605761152,
         "routeMetrics": {
-          "properCrossings": 3,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.4320793325987726,
+          "maxDetourRatio": 1,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -578,15 +582,15 @@
       },
       {
         "id": "fuzz-cycle-2",
-        "svgSha256": "b3edbd549dd7a1dbdf62398453fb413fabdd765e01a1532344791937b5daec3a",
+        "svgSha256": "f30f2ddfd3c868f5d6f371a8aaa082186fc96899911b5a8b1714c6d13f57fec2",
         "beauty": 5,
         "clarity": 5,
         "review": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths. Also inspected at native size.",
-        "minFitTextPx": 8.440282272371817,
+        "minFitTextPx": 8.189487809173425,
         "routeMetrics": {
-          "properCrossings": 3,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.9651206400800107,
+          "maxDetourRatio": 1,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -594,47 +598,55 @@
       },
       {
         "id": "fuzz-cycle-3",
-        "svgSha256": "be2dd7d41b569b8ca694a102f5aa3acba8f72883aeefc59be1483153c2bc74c8",
+        "svgSha256": "08ec2d2aa6397839740ef0fcde4ef86435d74cddcc116adadde19545ab6bd4eb",
         "beauty": 5,
         "clarity": 5,
         "review": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths.",
-        "minFitTextPx": 11.402027027027026,
+        "minFitTextPx": 10.688453847490212,
         "routeMetrics": {
-          "properCrossings": 1,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 2.0767736714324254,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
+          "maxDetourRatio": 2.243605548022706,
+          "calloutCount": 3,
+          "mostRemoteCallout": {
+            "feature": "n0->n1",
+            "text": "validate\norganization\naccess",
+            "centerToAnchorPx": 128
+          }
         },
         "paintFailures": []
       },
       {
         "id": "fuzz-cycle-4",
-        "svgSha256": "807f67597960d8c8455a86b791116f9fe355fbfd2b70b071fcf8093da1883ecf",
+        "svgSha256": "02a94cd7e9feeb3d944766279551fbd0c1b1ac5d6787cb3533c85481030a0c96",
         "beauty": 5,
         "clarity": 5,
         "review": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths.",
-        "minFitTextPx": 12.93103448275862,
+        "minFitTextPx": 11.591962965638437,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.124031007751938,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
+          "maxDetourRatio": 1,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "n5->n0",
+            "text": "read through",
+            "centerToAnchorPx": 128
+          }
         },
         "paintFailures": []
       },
       {
         "id": "fuzz-cycle-5",
-        "svgSha256": "182f76063b63ec75d3ee41aef83479efdae85a32f508f988362c9b180fa2bcf1",
+        "svgSha256": "8b11e7dfecb53df314e4649e8f5ccf0bb93fd0e0d2b9bacec22f21a412caf9f2",
         "beauty": 5,
         "clarity": 5,
         "review": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths.",
-        "minFitTextPx": 12.228260869565217,
+        "minFitTextPx": 11.446551458145727,
         "routeMetrics": {
-          "properCrossings": 1,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.4919286321155483,
+          "maxDetourRatio": 1.0040614529791034,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -642,31 +654,35 @@
       },
       {
         "id": "fuzz-cycle-6",
-        "svgSha256": "cdfb72396208252fd338f1c0a3e6d3a69cad0d04795c8013c127944cdbc9e696",
+        "svgSha256": "646d3301a84a027344c582658f90c3553e43791b3d8bf026cb4ba9041599817b",
         "beauty": 5,
         "clarity": 5,
         "review": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths.",
-        "minFitTextPx": 8.849843193261592,
+        "minFitTextPx": 11.637546442719731,
         "routeMetrics": {
-          "properCrossings": 5,
+          "properCrossings": 1,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.7590779917903374,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
+          "maxDetourRatio": 1,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "n3->n5",
+            "text": "validate\norganization\naccess",
+            "centerToAnchorPx": 133.27741677600596
+          }
         },
         "paintFailures": []
       },
       {
         "id": "fuzz-cycle-7",
-        "svgSha256": "af324234a4ec6523f33f1cf1003cf46a5a722247232923d33d331f00552a3af7",
+        "svgSha256": "dd80f4a7a2a888e9adf137991d48aeb899a0d50f446743ac96de9a92b3e3aca3",
         "beauty": 5,
         "clarity": 5,
         "review": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths.",
-        "minFitTextPx": 10.103619589639573,
+        "minFitTextPx": 13.175626624188526,
         "routeMetrics": {
           "properCrossings": 1,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.7408793264733393,
+          "maxDetourRatio": 1,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -674,15 +690,15 @@
       },
       {
         "id": "fuzz-parallel-0",
-        "svgSha256": "9965456b8b65ca670f5f11e88d8c7380a5917a354933fbc9ffa5bc72b923a184",
+        "svgSha256": "b1cf994c6d1d08f5f6a87a2476a8a911985096d1551f3d71fce957bb8f6175ab",
         "beauty": 5,
         "clarity": 5,
         "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded.",
-        "minFitTextPx": 9.48084814222625,
+        "minFitTextPx": 9.46691307421703,
         "routeMetrics": {
-          "properCrossings": 0,
+          "properCrossings": 1,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.169981716438584,
+          "maxDetourRatio": 1.8215022756274117,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -690,35 +706,31 @@
       },
       {
         "id": "fuzz-parallel-1",
-        "svgSha256": "4e4772ad334b541231c931d0cb6cad96078d85ace83f1b31469fee060d7d7861",
+        "svgSha256": "5224475521fde6e2b0ab56829acbb1cd10b78970ac4a31ab7d993d5cb969c49c",
         "beauty": 5,
         "clarity": 5,
         "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded.",
-        "minFitTextPx": 9.859091306261675,
+        "minFitTextPx": 11.322978954401993,
         "routeMetrics": {
-          "properCrossings": 1,
+          "properCrossings": 2,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.264305351320248,
-          "calloutCount": 1,
-          "mostRemoteCallout": {
-            "feature": "n7->n8",
-            "text": "read through",
-            "centerToAnchorPx": 46
-          }
+          "maxDetourRatio": 1.1302791696492485,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
         },
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-2",
-        "svgSha256": "dc10d5bb5b32e970d11b899ad778073b4150b2f79fb58006983dfaec66299a34",
+        "svgSha256": "b02bd04b62dd447c4ec068dee2d019734c9828b75e56ad2aa67aac05063afc70",
         "beauty": 5,
         "clarity": 5,
         "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded.",
-        "minFitTextPx": 10.145370102699614,
+        "minFitTextPx": 12.400204010384098,
         "routeMetrics": {
-          "properCrossings": 2,
+          "properCrossings": 1,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.3765632693254555,
+          "maxDetourRatio": 1.8695956115582573,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -726,35 +738,31 @@
       },
       {
         "id": "fuzz-parallel-3",
-        "svgSha256": "81ab1df7000e170b74ce9f56727722769554d79a82693147d959329bfa838cb0",
+        "svgSha256": "a8634829dfcb4a2decc82e8336b0203a31836d6be3ef699043bb702af9f721fa",
         "beauty": 5,
         "clarity": 5,
         "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size.",
-        "minFitTextPx": 9.246827402533626,
+        "minFitTextPx": 8.899111184127506,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.2103641823600662,
-          "calloutCount": 2,
-          "mostRemoteCallout": {
-            "feature": "n3->n4~2",
-            "text": "validate\norganization\naccess",
-            "centerToAnchorPx": 112
-          }
+          "maxDetourRatio": 1,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
         },
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-4",
-        "svgSha256": "6634b063ce94624f413fbd988b3e38cc97c386a75888436f5fa6b84e41ebbe2a",
+        "svgSha256": "f548f43594f589b21d3c3cd59b4751bd2b7dd9db77bdc8376bbdb6d046c20442",
         "beauty": 5,
         "clarity": 5,
         "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded.",
-        "minFitTextPx": 10.808646917534027,
+        "minFitTextPx": 11.20216074782975,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.29364161849711,
+          "maxDetourRatio": 2.206027419261757,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -762,15 +770,15 @@
       },
       {
         "id": "fuzz-parallel-5",
-        "svgSha256": "e1c74e320c48ee372f581d1eb0284dd62b9e8fd785a8a471a394c3ceddec8f47",
+        "svgSha256": "28ae85ed802904c9db2cff9f723eecead3621cf0174eadc2612c3cfa1269a5b1",
         "beauty": 5,
         "clarity": 5,
         "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded.",
-        "minFitTextPx": 8.066119911668908,
+        "minFitTextPx": 9.544563085639574,
         "routeMetrics": {
-          "properCrossings": 0,
+          "properCrossings": 1,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.2850702393196667,
+          "maxDetourRatio": 2.0451676446802507,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -778,35 +786,31 @@
       },
       {
         "id": "fuzz-parallel-6",
-        "svgSha256": "f80dc6fb2a4ca1ee02a9abf7dbcb482e2536c37f129e6395ebccc86e19617069",
+        "svgSha256": "292c5cc2b416a1c0783703e1a9405e4907f631d9abab6f7176b27d785a8e7364",
         "beauty": 5,
         "clarity": 5,
         "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded.",
-        "minFitTextPx": 9.751015513374513,
+        "minFitTextPx": 10.408474654754343,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.181959564541213,
-          "calloutCount": 2,
-          "mostRemoteCallout": {
-            "feature": "n7->n8",
-            "text": "read through",
-            "centerToAnchorPx": 112
-          }
+          "maxDetourRatio": 3.1849151708496963,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
         },
         "paintFailures": []
       },
       {
         "id": "fuzz-parallel-7",
-        "svgSha256": "ee5c363b9af70251fca0fbeb4b716e3e2f7375b15473ac45ad5392e25fc2daf1",
+        "svgSha256": "83f0da6405f8313408a734bea77b4adfdf6a2eb0bc2f9a158ea5a7b88131465e",
         "beauty": 5,
         "clarity": 5,
         "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size.",
-        "minFitTextPx": 9.169165035443957,
+        "minFitTextPx": 10.287003149321317,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.268529530627562,
+          "maxDetourRatio": 1,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -814,15 +818,15 @@
       },
       {
         "id": "fuzz-pinned-0",
-        "svgSha256": "9eec7251b20571e3256c16da5a0ec915239c0f9909e0d14bafb647638367195f",
+        "svgSha256": "d66622708b4886685226651e59fffebef87e7a27b15dc7139bd0db060b5f6ef4",
         "beauty": 5,
         "clarity": 5,
         "review": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes.",
-        "minFitTextPx": 9.822301041858745,
+        "minFitTextPx": 9.773731636199845,
         "routeMetrics": {
-          "properCrossings": 1,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.084759576202119,
+          "maxDetourRatio": 1.85264355441484,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -830,15 +834,15 @@
       },
       {
         "id": "fuzz-pinned-1",
-        "svgSha256": "3fdfbc2b3463e07b000fb177743c359c787d28e14b95b629928a9214a055191e",
+        "svgSha256": "512a0164e2464ec038f74e099b92180363eb829235eedcd6825431b4907f7a24",
         "beauty": 5,
         "clarity": 5,
         "review": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes.",
-        "minFitTextPx": 10.304427373478632,
+        "minFitTextPx": 10.382492599633672,
         "routeMetrics": {
           "properCrossings": 1,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.0855183541750706,
+          "maxDetourRatio": 1.5581639195388512,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -846,11 +850,11 @@
       },
       {
         "id": "fuzz-pinned-2",
-        "svgSha256": "85224d8174096aec9e88e8d41a1d3ec9b26fb6847a950f064f28e3a1fbb400bf",
+        "svgSha256": "fe02b1b0f718fe55e1d146c3356a2ee89888fd9a4dd92f4d31275a85b27a1312",
         "beauty": 5,
         "clarity": 5,
         "review": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes.",
-        "minFitTextPx": 9.714078040620004,
+        "minFitTextPx": 10.074626865671643,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -862,15 +866,15 @@
       },
       {
         "id": "fuzz-pinned-3",
-        "svgSha256": "1c847b5337b9ed2dc67e12565f1bb07f6e9b1cc54ed1d6c28e41f1f2d8d15ba3",
+        "svgSha256": "1e5fdc8d1714254bc5ac3f87c20e5b3390171861eb6290644e5d84cecbd0b22f",
         "beauty": 5,
         "clarity": 5,
         "review": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes.",
-        "minFitTextPx": 9.8219493562306,
+        "minFitTextPx": 9.892760711108346,
         "routeMetrics": {
-          "properCrossings": 1,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.1970684039087947,
+          "maxDetourRatio": 2.031613173953255,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -878,15 +882,15 @@
       },
       {
         "id": "fuzz-pinned-4",
-        "svgSha256": "28627eeab6c0a7d9578074d4c033f49460054981694d7c084c38bdda2a914399",
+        "svgSha256": "c2389f16b4a746369c8db5e238443829ce2d074e29dcaec5c37a5b81ddc178a3",
         "beauty": 5,
         "clarity": 5,
         "review": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes.",
-        "minFitTextPx": 9.030927835051546,
+        "minFitTextPx": 9.84194525791722,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.1028958718422675,
+          "maxDetourRatio": 1.6174297399319342,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -894,15 +898,15 @@
       },
       {
         "id": "fuzz-pinned-5",
-        "svgSha256": "f8fde0609b6f3f1d3f9e4440c4d57548eed92129f70e5fc601af3cb8597138f4",
+        "svgSha256": "fdda61120262a6aa62ddce9548b9d62fc86c4d76203477a13ea9187a21691412",
         "beauty": 5,
         "clarity": 5,
         "review": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes.",
-        "minFitTextPx": 10.065448349866072,
+        "minFitTextPx": 10.22046328109111,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.0816647035728308,
+          "maxDetourRatio": 1.4158814071278845,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -910,15 +914,15 @@
       },
       {
         "id": "fuzz-pinned-6",
-        "svgSha256": "2f327fb1aadeea5e1db5021102c67753a0ffa9c1fdd4478cd8415b6315dfa47b",
+        "svgSha256": "f74aae9da200ffdd0ddd9eea41fea93461a5b6fdd9dc135ad152d730deaf8af7",
         "beauty": 5,
         "clarity": 5,
         "review": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes.",
-        "minFitTextPx": 9.472318339100346,
+        "minFitTextPx": 9.991787349265334,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.2145239376008607,
+          "maxDetourRatio": 1.3764847919999317,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -926,15 +930,15 @@
       },
       {
         "id": "fuzz-pinned-7",
-        "svgSha256": "ae381b72147fd16d6425ee298b739e8f3015171c7dc15b4321ae50435484cff5",
+        "svgSha256": "990083fef1a4b9871a86bdb60d9aa1db7be9f6b71c8f400b0a91e627edb9de6b",
         "beauty": 5,
         "clarity": 5,
         "review": "The authored node positions are preserved; detours clear the bodies and labels stay attached to their individual routes.",
-        "minFitTextPx": 9.447148096039856,
+        "minFitTextPx": 10.77861968387647,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.141548709408826,
+          "maxDetourRatio": 1.3758333959828701,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -942,11 +946,11 @@
       },
       {
         "id": "fuzz-tree-0",
-        "svgSha256": "1a49bbb2f471a888461aacd2b0b189849bac7f984c897387aa0aa18fd0ab5ac4",
+        "svgSha256": "6aad59d575950dcf7b18123008c1abbf161ce8551cb82b2e914d9971a160abb7",
         "beauty": 5,
         "clarity": 5,
         "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
-        "minFitTextPx": 11.034858085618982,
+        "minFitTextPx": 10.774271655601513,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -958,15 +962,15 @@
       },
       {
         "id": "fuzz-tree-1",
-        "svgSha256": "fefe8737b68cdc090530ca94afa91dc82bd0e6012f4a42ca7afe1f8072e2b91e",
+        "svgSha256": "79b2f4a726b23a1b56dc0928c0c6c96ed5337437f2d2c1d85c94b039e15fab49",
         "beauty": 5,
         "clarity": 5,
         "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
-        "minFitTextPx": 9.221311475409836,
+        "minFitTextPx": 11.402027027027026,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.0000000000000002,
+          "maxDetourRatio": 1.1761219305673158,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -974,11 +978,11 @@
       },
       {
         "id": "fuzz-tree-2",
-        "svgSha256": "07d7509253de8e24d0753f3d0ffa137ec6a7658852416ae750f59563a5d1f4eb",
+        "svgSha256": "822bbd25bca5ad6819c07c80a97ee920ece89ffc148c295b69408e270e86c869",
         "beauty": 5,
         "clarity": 5,
         "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
-        "minFitTextPx": 8.783539714882375,
+        "minFitTextPx": 8.755446996556968,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -990,11 +994,11 @@
       },
       {
         "id": "fuzz-tree-3",
-        "svgSha256": "06fa92bb27d2c09dbae8a1fb17c742fb42ef4bd3dc5c661bb18509a56188259d",
+        "svgSha256": "2ce4c92d18a4ad9fbe26309d2288b08df5a9638c939044f926f3ffbab7b9c93b",
         "beauty": 5,
         "clarity": 5,
         "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
-        "minFitTextPx": 11.218342562372221,
+        "minFitTextPx": 11.391654674212472,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -1006,11 +1010,11 @@
       },
       {
         "id": "fuzz-tree-4",
-        "svgSha256": "de8bb479eb53ff242daa5c58b95ecb6e1e35764a9dc04d769fcfc99c0c5ae997",
+        "svgSha256": "81efc4f6e4f7a22ee1e0be66471061910afce833b2bacaefcb854c41f37aa1f9",
         "beauty": 5,
         "clarity": 5,
         "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
-        "minFitTextPx": 12.695063740747411,
+        "minFitTextPx": 13.635004939706999,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -1022,11 +1026,11 @@
       },
       {
         "id": "fuzz-tree-5",
-        "svgSha256": "eed0059e3f085ed123da06ab177bfe7969b344c2ced3da4253583390fe43a992",
+        "svgSha256": "67873b077b6a69e0da628fc5c9a2bd008e3603773afb4ea59c44e1849b6f5e00",
         "beauty": 5,
         "clarity": 5,
         "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
-        "minFitTextPx": 10.7484076433121,
+        "minFitTextPx": 10.135978937615114,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -1038,11 +1042,11 @@
       },
       {
         "id": "fuzz-tree-6",
-        "svgSha256": "4ce1765d6e03f51ffc7a3b8622529a307133610827ec1e1b5a25de8928480c51",
+        "svgSha256": "01acedb0873c112fac6d20a4e22fba3c5def34fdc1d33d3e3e8eb178031f1b86",
         "beauty": 5,
         "clarity": 5,
         "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
-        "minFitTextPx": 9.494411254291423,
+        "minFitTextPx": 11.461407967548089,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -1054,15 +1058,15 @@
       },
       {
         "id": "fuzz-tree-7",
-        "svgSha256": "0a34e4fdb0272817649fa7f080655239515df5bb137fef31c8c2e72869803c08",
+        "svgSha256": "3f0d681a00ab9e133236f8abd93b9d32f2742522dfae75e8611bb406dae04b3b",
         "beauty": 5,
         "clarity": 5,
         "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
-        "minFitTextPx": 11.680124709664868,
+        "minFitTextPx": 12.298672046311967,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1,
+          "maxDetourRatio": 1.319984371947646,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },

@@ -2,7 +2,7 @@
   "status": "complete",
   "reviewer": "Codex visual inspection",
   "reviewedAt": "2026-11-13",
-  "engineFingerprint": "aa660a7fb7020de32a50a3d80d456d9c4b2f4cbefa9b7858e31351a58d436add",
+  "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
   "method": "Inspect every distinct SVG on Chromium contact sheets; reopen dense or ambiguous examples at native size. Reuse a review only when SVG SHA-256 bytes match. Scores are subjective visual judgments, separate from semantic and geometry assertions. After discovery, every one of the 220 distinct sources was recompiled in each of five complete confirmation passes; every SVG byte hash matched its inspected image.",
   "rubric": {
     "beauty": "5: no observed material spacing, alignment, shape, clipping or connector defect at readable/native zoom; 4 or below: a concrete visual improvement remains.",
@@ -22,7 +22,7 @@
   "images": [
     {
       "id": "01-pipeline",
-      "svgSha256": "371a9444c4f45edb747a93310fa154452ece6e7aca8d29e600428e316e673819",
+      "svgSha256": "ab5db83418bd7634d2d5cb2fb073e8ba513876964b3678f15af0b55c897fdbc3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
@@ -30,7 +30,7 @@
     },
     {
       "id": "02-long-pipeline",
-      "svgSha256": "1d0cef5acd593e994854339f25b4e5cc36f53ab549eed52658fb7ff603464bba",
+      "svgSha256": "c50111567de6d73681c031a6ff71914de4d3256d366e09126274b5bdbc3c4ef1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
@@ -38,7 +38,7 @@
     },
     {
       "id": "03-fan-out",
-      "svgSha256": "c17c8e45f38275f043a96ef2eb0d49499ddfcef0315cd1f697d664b17ccf1ccd",
+      "svgSha256": "8471f163c539b581abafc4e74c7b7d2f9783da40d6746ef6897138c40f9dce59",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
@@ -46,7 +46,7 @@
     },
     {
       "id": "04-fan-in",
-      "svgSha256": "18f075f5045a9ce42e1070275d0b0cd31d237b33acb611271b647649bfeaf464",
+      "svgSha256": "0a2c538866a7be33b3904d7242860186207af8fa8dfafd0f491edad4bdb4c345",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
@@ -54,7 +54,7 @@
     },
     {
       "id": "05-decision",
-      "svgSha256": "3a52f125cfa6172b59d9c8e2a7e1cd2492f089ac574196ca6a63ceea8c948003",
+      "svgSha256": "f9923f77600b7cf270a9c016d3e4251488e3f9822e0b0a2c089bf40c0ad8badf",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
@@ -62,7 +62,7 @@
     },
     {
       "id": "06-feedback",
-      "svgSha256": "9bf7ffd18ca1abc1edb89c970d90289216d6a69c19938e703e51b220051d5a76",
+      "svgSha256": "99fb862ea53f4c56304276096bb7352b2788ec20cabbfcb4bee6b3d00741899a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-01.png",
@@ -70,7 +70,7 @@
     },
     {
       "id": "07-ring",
-      "svgSha256": "6637965af9f77c653b7e3a2a578c9b3bc5d7ddd23219428c67678b76b82ba317",
+      "svgSha256": "8ecdc2f1c0c3d887ba3629674dbe15956a81d6236bb0aa08c9d501de815aff68",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
@@ -78,7 +78,7 @@
     },
     {
       "id": "08-self-loop",
-      "svgSha256": "0bb65cccf159395ec0634b5e2e9a4e428c20fceeadbf3d8478a836d7243b4f80",
+      "svgSha256": "64a16c1a9b5f7990b6f565e2a08825333a1e81180d5ef3bc2d2e6b5430fc952c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
@@ -86,7 +86,7 @@
     },
     {
       "id": "09-parallel",
-      "svgSha256": "9029d7f87c8670a3c23a3dcf3e1a4ec7806a210f096471673203f19da3f4f7e8",
+      "svgSha256": "81541040921c122653f464ca493e2bf616683f77de48cc67a3bfade8c390cec4",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
@@ -94,7 +94,7 @@
     },
     {
       "id": "10-bidirectional",
-      "svgSha256": "e96a3adfd6612f3aeb4051dd0c5eb1f54fe171958f07a2cc5e7e0afada73576b",
+      "svgSha256": "08aa478d2b606db51902a19a4fdaff6635479e18d84ebd837fb405144faa063a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
@@ -102,7 +102,7 @@
     },
     {
       "id": "11-disconnected",
-      "svgSha256": "f7bb615a7a1a337f2dd3fd77ffff29deabb5158fc8903f33a131cf6a311ff88b",
+      "svgSha256": "91643efd1c4732e04a32d2bf3efa2732897180f96220e82c2f82991332127058",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
@@ -110,7 +110,7 @@
     },
     {
       "id": "12-butterfly",
-      "svgSha256": "3d0711321891b8db131134df18d60a48d0cfc1f33361fac17bf04039f4f6f1b7",
+      "svgSha256": "91287a1af5ea2dfcdecaabda6dae46bcbb1afba40948003bd77e124c3b2f7abd",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-02.png",
@@ -118,7 +118,7 @@
     },
     {
       "id": "13-mesh",
-      "svgSha256": "92a414688f4d57bfee59b61a121b960d09ceab178eaa7727c3b743e5c899d49e",
+      "svgSha256": "ab16fb39ca674096a5a38c2e4c096141b7f01ef49bbf5ecd6ef08b7f1896afb2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -126,7 +126,7 @@
     },
     {
       "id": "14-long-labels",
-      "svgSha256": "c04204ced5de5b9411de167d7a52703b572e9ebc4391a69f2ccab2f966c50419",
+      "svgSha256": "426b4640434a72d5ccaee6ba76a6aef5cae5b95e323953133918b401641873a1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -134,7 +134,7 @@
     },
     {
       "id": "15-unicode",
-      "svgSha256": "c152d011b68407d90b7847579b0a7e4c83f35a317273a6a285f8bd4304457b9b",
+      "svgSha256": "0a4b70bb1771af96b5d6cdc5c7e804d16fade7d2dc2299d9388363289a9ed34d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -142,7 +142,7 @@
     },
     {
       "id": "16-container",
-      "svgSha256": "13c0e0d86407ef29d09b47dfe9e15ef4238eced817d4959d307d27e3580fc223",
+      "svgSha256": "ee70b2574c8beeef75be83c82cba28b8d9bd2efc429646c3f036208293dcd47e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -150,7 +150,7 @@
     },
     {
       "id": "17-nested",
-      "svgSha256": "024052ef307db56f94278cc556f696e5359f87dae613e3e723cbcf57dc3fc189",
+      "svgSha256": "61a8ccfda72fdda52b472869c8794f07be291e95dfe47f0f1bda3b1163d116ac",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -158,7 +158,7 @@
     },
     {
       "id": "18-cross-scope",
-      "svgSha256": "fa8b8421707594a11a9199518e6bee70b4e09ab6b527553e8fbb2cf3c863bc48",
+      "svgSha256": "f73dcb3555909360d28844d801ff72f826c16c94c3cff240e8c57f5de5193c39",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-03.png",
@@ -166,7 +166,7 @@
     },
     {
       "id": "19-zone",
-      "svgSha256": "f5de1e36272338beceea8fcc5190358f030e336727fbb6e9dbb10b86b74b67c7",
+      "svgSha256": "72f3ce2c8aa24f81b3c250f17df4394ee0a7a8e51f5e2460074d73630c384ee3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
@@ -174,7 +174,7 @@
     },
     {
       "id": "20-records",
-      "svgSha256": "4b1ef5395da7e67335e17eddeace6864147065a216e7c9c4a600245260b7e1f8",
+      "svgSha256": "6d292ca1935baa0e1d64dbeb1337dc8b392d9da82324f6acb978f1adcd2518be",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
@@ -182,15 +182,15 @@
     },
     {
       "id": "21-ports",
-      "svgSha256": "3f6f5a50598cec22be39789c1f2650944626314313262a36f7f1cf95a0ef7d52",
+      "svgSha256": "ca513df05607273bcb59a2cf71dd4f24092851d9a48e9879362b6e8d57324adf",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
-      "notes": "Facing publish and ack connectors run along straight horizontal lanes with clear port and edge captions."
+      "notes": "Facing publish and ack connectors run along separated horizontal lanes with crisp orthogonal port steps and clear port and edge captions."
     },
     {
       "id": "22-obstacle",
-      "svgSha256": "24a952bcd7a67e68d61e9fa5b9642fe18ba5eb6008038d09f340bc818bbcdff0",
+      "svgSha256": "7458d783e4848685257b0b899e71d18030c4f00c4ef716f7b8fe6515484784f7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
@@ -198,7 +198,7 @@
     },
     {
       "id": "23-trace",
-      "svgSha256": "9c4cc2adcb97368fa67449b5696d3ad58c4c5f0d3b2fe72863037b250e5e86d9",
+      "svgSha256": "c5368ef2c2a8875d66d4f63c8b4372badcc9b5028c3729552995dd2b550fc82e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
@@ -206,7 +206,7 @@
     },
     {
       "id": "24-vertical",
-      "svgSha256": "6d6d076d17f0dfd2410ea32a4d66222243f3ea73de07c1ef7bcdfa53db62345d",
+      "svgSha256": "acfa64af429813b75d28f6e443df29cee6ff308e734f81ea3ea7ff3222ff6328",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-04.png",
@@ -214,7 +214,7 @@
     },
     {
       "id": "fuzz-dag-0",
-      "svgSha256": "6c175d86feee6859e4fb762fb5126d48efc1d5a5dbb4d4735ffb7ff66ec5b0cd",
+      "svgSha256": "aed8d2376fdfd8843e83c25224c0e32640076e2687a6cf65a8d211476888aad8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -222,7 +222,7 @@
     },
     {
       "id": "fuzz-dag-1",
-      "svgSha256": "4a0d88c78f2dce20ba0342343153ad63d6ecb8e86ad72383b947ad7e35d46c5a",
+      "svgSha256": "cbadd8628f9520088b9ebc4545f149fde6093746c807da2e0bc82b0b446a335a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -230,7 +230,7 @@
     },
     {
       "id": "fuzz-dag-2",
-      "svgSha256": "a4e9d60687175d264cb461dd03f0b28cbc9b742bc3fe25874a2552366434f65d",
+      "svgSha256": "9465383cadaf01e33ed717789b7580cc8ce410397b603e96b5946fb3f96ffef9",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -238,7 +238,7 @@
     },
     {
       "id": "fuzz-dag-3",
-      "svgSha256": "a6101970493de78821d9b85bedf492a32bfb38609b87bfdbd53c757615814fbe",
+      "svgSha256": "ad85f012a91a08e6c52a9588609ebdd6128ab2fbf0fc1d5d292100bcd74d3f42",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -246,7 +246,7 @@
     },
     {
       "id": "fuzz-dag-4",
-      "svgSha256": "b8cf7a376c8013539c7dc869b351a561d6f2a48498cc65c70764e155e6ae7d6e",
+      "svgSha256": "4d5ae43c01b36a336c2fb471443c296f0b4a40cbd0959bd28e197b446901701f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -254,7 +254,7 @@
     },
     {
       "id": "fuzz-dag-5",
-      "svgSha256": "ef889b65e401f902515d4cde6b27f7291bd98172a1b14bb2d4e877355f37782e",
+      "svgSha256": "3c78dc91b3566f006200f0a79d571a9a7d8ad8a69350f08b5c1bdb51491ed2c3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-05.png",
@@ -262,7 +262,7 @@
     },
     {
       "id": "fuzz-dag-6",
-      "svgSha256": "bf433c1bcc3241d9a96779f983c6ee27146c31cfd7108c161e14b0beae53ba0f",
+      "svgSha256": "deb935ff2428971aadf58fc1b3bc37b76333d68ecf65f1f1884a377e1a03446a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -270,7 +270,7 @@
     },
     {
       "id": "fuzz-dag-7",
-      "svgSha256": "94c1d42ee00deb5a410118b8f76fae47ea92e32988e1dc404bea87d5d55a3c86",
+      "svgSha256": "520228ce4fcfe1ada62e22089315d8e3b3c439e43725eb285f5d809e67ac0579",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -278,7 +278,7 @@
     },
     {
       "id": "fuzz-cycle-0",
-      "svgSha256": "bb9f40204b076334df7da21c50841a2a90bd96a6c840c30fae3febb94a32028b",
+      "svgSha256": "24e7090d3defabf80a7e0b8c7913568597ecd79eaa04fee75426bfdb697eb970",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -286,7 +286,7 @@
     },
     {
       "id": "fuzz-cycle-1",
-      "svgSha256": "fb6873ac34d0574135f644856ce81a93ece334a393b44bda8a97b35bec95b727",
+      "svgSha256": "6786971183ae5cc0fc589f5340c02cf877db0d8805f74c524bd3bbb9ca8d577e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -294,7 +294,7 @@
     },
     {
       "id": "fuzz-cycle-2",
-      "svgSha256": "38477a824715c55cd40cdc745e7ba4198df3528d30cf6cfc2072554c06288479",
+      "svgSha256": "f30f2ddfd3c868f5d6f371a8aaa082186fc96899911b5a8b1714c6d13f57fec2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -302,7 +302,7 @@
     },
     {
       "id": "fuzz-cycle-3",
-      "svgSha256": "b48a46c307afeaedb031682e7737e5e77ca25071b08e8630546174cd08b2f590",
+      "svgSha256": "08ec2d2aa6397839740ef0fcde4ef86435d74cddcc116adadde19545ab6bd4eb",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-06.png",
@@ -310,7 +310,7 @@
     },
     {
       "id": "fuzz-cycle-4",
-      "svgSha256": "db9229cabad330af494ff699a4f3d8caf392730b7b7773b9ce298859dbdb4298",
+      "svgSha256": "02a94cd7e9feeb3d944766279551fbd0c1b1ac5d6787cb3533c85481030a0c96",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -318,7 +318,7 @@
     },
     {
       "id": "fuzz-cycle-5",
-      "svgSha256": "3dad776e42b849005eb5659d4934307d90249d6d72c56e94884f9704785608ee",
+      "svgSha256": "8b11e7dfecb53df314e4649e8f5ccf0bb93fd0e0d2b9bacec22f21a412caf9f2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -326,7 +326,7 @@
     },
     {
       "id": "fuzz-cycle-6",
-      "svgSha256": "f3e67232e5c8a49584bf1aa90d24149f0beaacd1f25f4a45da7c6a0e0bf208f7",
+      "svgSha256": "646d3301a84a027344c582658f90c3553e43791b3d8bf026cb4ba9041599817b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -334,7 +334,7 @@
     },
     {
       "id": "fuzz-cycle-7",
-      "svgSha256": "416dc69c44a5cb143f4da6b47b8448a5ce778dedc96aa3b91505ff321ee56297",
+      "svgSha256": "dd80f4a7a2a888e9adf137991d48aeb899a0d50f446743ac96de9a92b3e3aca3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -342,7 +342,7 @@
     },
     {
       "id": "fuzz-parallel-0",
-      "svgSha256": "73a244e601dda62c03d3c34a04dd1b254f1a3223c2409933ca43ab8b41e545ce",
+      "svgSha256": "b1cf994c6d1d08f5f6a87a2476a8a911985096d1551f3d71fce957bb8f6175ab",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -350,7 +350,7 @@
     },
     {
       "id": "fuzz-parallel-1",
-      "svgSha256": "64c281b3164a42ee38e324e216762f55a91aa67f483ef445991d38597f6d2978",
+      "svgSha256": "5224475521fde6e2b0ab56829acbb1cd10b78970ac4a31ab7d993d5cb969c49c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-07.png",
@@ -358,7 +358,7 @@
     },
     {
       "id": "fuzz-parallel-2",
-      "svgSha256": "bfdd56bf5892367bdc61c3983f6283cee53c202bbca7ab6062be9a00b6a3281b",
+      "svgSha256": "b02bd04b62dd447c4ec068dee2d019734c9828b75e56ad2aa67aac05063afc70",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -366,7 +366,7 @@
     },
     {
       "id": "fuzz-parallel-3",
-      "svgSha256": "d3d9ec533ddc8bad43a91d88729304d749b3e6db3c4d4649ec48c21f296cd74a",
+      "svgSha256": "a8634829dfcb4a2decc82e8336b0203a31836d6be3ef699043bb702af9f721fa",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -374,7 +374,7 @@
     },
     {
       "id": "fuzz-parallel-4",
-      "svgSha256": "2c7dc74c8f76038b3056d7c94594db3a665984ca7eeee7cb2ae431c513bdcacf",
+      "svgSha256": "f548f43594f589b21d3c3cd59b4751bd2b7dd9db77bdc8376bbdb6d046c20442",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -382,7 +382,7 @@
     },
     {
       "id": "fuzz-parallel-5",
-      "svgSha256": "d613d3814fd68ffddd1b154cbfaf65da9952f21d5a5bab42528385c60884d191",
+      "svgSha256": "28ae85ed802904c9db2cff9f723eecead3621cf0174eadc2612c3cfa1269a5b1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -390,7 +390,7 @@
     },
     {
       "id": "fuzz-parallel-6",
-      "svgSha256": "b37c909e7ae9eb1b447650ebb1f030d94e73703aa1b1d8215e3c711bae951969",
+      "svgSha256": "292c5cc2b416a1c0783703e1a9405e4907f631d9abab6f7176b27d785a8e7364",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -398,7 +398,7 @@
     },
     {
       "id": "fuzz-parallel-7",
-      "svgSha256": "e06d9c9df1ce30ecb47b73610bca82180fb3d313c14ac6d0342078f74595113b",
+      "svgSha256": "83f0da6405f8313408a734bea77b4adfdf6a2eb0bc2f9a158ea5a7b88131465e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-08.png",
@@ -406,7 +406,7 @@
     },
     {
       "id": "fuzz-pinned-0",
-      "svgSha256": "8240079d0d30434bfb54e80709460f2e5c38d50275b98133a2bb7389f624051f",
+      "svgSha256": "d66622708b4886685226651e59fffebef87e7a27b15dc7139bd0db060b5f6ef4",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -414,7 +414,7 @@
     },
     {
       "id": "fuzz-pinned-1",
-      "svgSha256": "764e9500713eb7d7570ab71b253143fcf1b00ca34787bbd6363913194751f89b",
+      "svgSha256": "512a0164e2464ec038f74e099b92180363eb829235eedcd6825431b4907f7a24",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -422,7 +422,7 @@
     },
     {
       "id": "fuzz-pinned-2",
-      "svgSha256": "4f1acb598691584df6cf444c1c2c27df4fcaeb92ba5878f10aea3798fafcd2f9",
+      "svgSha256": "fe02b1b0f718fe55e1d146c3356a2ee89888fd9a4dd92f4d31275a85b27a1312",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -430,7 +430,7 @@
     },
     {
       "id": "fuzz-pinned-3",
-      "svgSha256": "2bffb9972a008955802f0c1bc30685382ede86e68f2d2a71e95a29dcef9f258b",
+      "svgSha256": "1e5fdc8d1714254bc5ac3f87c20e5b3390171861eb6290644e5d84cecbd0b22f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -438,7 +438,7 @@
     },
     {
       "id": "fuzz-pinned-4",
-      "svgSha256": "8e7baa45f2140683dfd6eb64a29230a1cc78cca0042f079012ca0b7f5d0ca475",
+      "svgSha256": "c2389f16b4a746369c8db5e238443829ce2d074e29dcaec5c37a5b81ddc178a3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -446,7 +446,7 @@
     },
     {
       "id": "fuzz-pinned-5",
-      "svgSha256": "9e1a6d9816859390c28a33592ef53cec9fc07fcab5abcde633dc1bcef6cb4fc8",
+      "svgSha256": "fdda61120262a6aa62ddce9548b9d62fc86c4d76203477a13ea9187a21691412",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-09.png",
@@ -454,7 +454,7 @@
     },
     {
       "id": "fuzz-pinned-6",
-      "svgSha256": "5c563c659166eadd9d4b11978c4d9ebd5cf3dd8d5f19285bba2d4fd07b85e655",
+      "svgSha256": "f74aae9da200ffdd0ddd9eea41fea93461a5b6fdd9dc135ad152d730deaf8af7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -462,7 +462,7 @@
     },
     {
       "id": "fuzz-pinned-7",
-      "svgSha256": "20e66c6354f82d1b3c6a4216f9e193c365ab4c36ea8dd79f0a919087c9697dfe",
+      "svgSha256": "990083fef1a4b9871a86bdb60d9aa1db7be9f6b71c8f400b0a91e627edb9de6b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -470,7 +470,7 @@
     },
     {
       "id": "fuzz-tree-0",
-      "svgSha256": "af1d9a6e99fdc5ffaf81b6bd159e66a047af73474f82272896fa2869d7679056",
+      "svgSha256": "6aad59d575950dcf7b18123008c1abbf161ce8551cb82b2e914d9971a160abb7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -478,7 +478,7 @@
     },
     {
       "id": "fuzz-tree-1",
-      "svgSha256": "9ca921c10975e849e50f4b46390370d3b6c02d386ce61501b88065bb3a8c7f7d",
+      "svgSha256": "79b2f4a726b23a1b56dc0928c0c6c96ed5337437f2d2c1d85c94b039e15fab49",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -486,7 +486,7 @@
     },
     {
       "id": "fuzz-tree-2",
-      "svgSha256": "f685775dfb70a136f8fe42438bec6821406d0360434e7e42ed4eeb49a5b962d1",
+      "svgSha256": "822bbd25bca5ad6819c07c80a97ee920ece89ffc148c295b69408e270e86c869",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -494,7 +494,7 @@
     },
     {
       "id": "fuzz-tree-3",
-      "svgSha256": "7601aeb5b248b8d4e589df3a0861ff0c1913fafce002f25413a4d4e12415601e",
+      "svgSha256": "2ce4c92d18a4ad9fbe26309d2288b08df5a9638c939044f926f3ffbab7b9c93b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-10.png",
@@ -502,7 +502,7 @@
     },
     {
       "id": "fuzz-tree-4",
-      "svgSha256": "5ac35869e7e84d9f7d2a3def8ef996e0a101cac0c12086b492403b7ea0f5cc29",
+      "svgSha256": "81efc4f6e4f7a22ee1e0be66471061910afce833b2bacaefcb854c41f37aa1f9",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
@@ -510,7 +510,7 @@
     },
     {
       "id": "fuzz-tree-5",
-      "svgSha256": "619de4ef04eea1494bac91d40113e5e5ed27edf180a14edfe08c755ad1c8afd7",
+      "svgSha256": "67873b077b6a69e0da628fc5c9a2bd008e3603773afb4ea59c44e1849b6f5e00",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
@@ -518,7 +518,7 @@
     },
     {
       "id": "fuzz-tree-6",
-      "svgSha256": "6aaf4a69d7892225d735875481e3fcb16f87011e48958dab3b10d25b64f3453c",
+      "svgSha256": "01acedb0873c112fac6d20a4e22fba3c5def34fdc1d33d3e3e8eb178031f1b86",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
@@ -526,7 +526,7 @@
     },
     {
       "id": "fuzz-tree-7",
-      "svgSha256": "7e3056c504d62396b839c1bdc2626eb9cd39e363c61815274a68e4084275d6ad",
+      "svgSha256": "3f0d681a00ab9e133236f8abd93b9d32f2742522dfae75e8611bb406dae04b3b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
@@ -534,7 +534,7 @@
     },
     {
       "id": "01-dispatch-collect",
-      "svgSha256": "7bcb2206b8a5dc4999ecf7006405f6002e1bae7eae57be7fe7aba2e7417910e7",
+      "svgSha256": "4f28a1813239922a486bb5a022e8d01aa5cd590ab2660712ffc5adaae596dc23",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
@@ -542,7 +542,7 @@
     },
     {
       "id": "02-planar-mesh",
-      "svgSha256": "8ac90f6fed72a920966c1eab1d49bc62af4a4f9eae2e8a990ca957b0c992bee3",
+      "svgSha256": "31162835b8c6e31dfc84743817f1df6b7bc122d9ea3f567cd0a7eae80fde3167",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-11.png",
@@ -550,7 +550,7 @@
     },
     {
       "id": "03-dense-mesh",
-      "svgSha256": "8d46e0b72bb86e1ff140c11796523384f62c6b8311c8fa2ce2ef3ade6603a4b8",
+      "svgSha256": "3585a0220938b7a6535a35b2a9fac396a2cbc3fa9c1b4b6965352f0c91376b4b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
@@ -558,7 +558,7 @@
     },
     {
       "id": "04-sixteen-stages",
-      "svgSha256": "ba0bf2545fbabbb5c0c67d0c27df2845b9a8ea4bad0afde9d542c4c8f278c0cd",
+      "svgSha256": "3a89d262607280e04fc8e2cae1ed2999a6d31a659a378bc415652120af35a14a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
@@ -566,7 +566,7 @@
     },
     {
       "id": "05-balanced-tree",
-      "svgSha256": "4ea6cb411ea23b85398f0854b057849eeda62554a149d03e64fa9e4f788c62ff",
+      "svgSha256": "9c1a7a740c7b65abf1cac32c9d6f7b3e51416b50716c739fa209c217ebd31ef1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
@@ -574,7 +574,7 @@
     },
     {
       "id": "06-unbalanced-tree",
-      "svgSha256": "797faabe3bca84c908dcbea99beea8d5a76e700d7abaf90262c4f78a5dc4302c",
+      "svgSha256": "d8611a19d41fa1cfbac60f4c2d7bacd72801da1a7a0db3aebb3e47f16fbb68f5",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
@@ -582,7 +582,7 @@
     },
     {
       "id": "07-multiple-retries",
-      "svgSha256": "411bc8b47854e47c158a637e8489e4fc5a3159aa5ed5b9780507d3ef1879992b",
+      "svgSha256": "55e370a0dd995959df99569f34186142d5b1b67ceb218a7713e3419169e2f16c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
@@ -590,7 +590,7 @@
     },
     {
       "id": "08-cross-ownership",
-      "svgSha256": "e1ec5f1879bf81f13b54189550bf839ee94bc11bb35fa3f2943b16654535ab05",
+      "svgSha256": "9652a0da1c856ef2d525bc3edccf3ef03fe0d279c56bde6292771d0e469fcce0",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-12.png",
@@ -598,7 +598,7 @@
     },
     {
       "id": "09-many-record-slots",
-      "svgSha256": "4b3ca023ee069ab44e2c6a5f41e82e5173573e9b786ae003a6e68f83ac2d6575",
+      "svgSha256": "b39b4dc17d9a71e27ec979801e809a3fc7accebd7f5be55e28db6267f6b6cfcf",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
@@ -606,7 +606,7 @@
     },
     {
       "id": "10-many-named-ports",
-      "svgSha256": "ebba46a50f9491b081aa72069d7d6e484e6f11d23a5b6ea805119f5c98606b43",
+      "svgSha256": "cf057328f51c4d1aa19d09aa896eafa2f0481dea56fe7f74d08b69fda716f407",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
@@ -614,7 +614,7 @@
     },
     {
       "id": "11-mixed-typography",
-      "svgSha256": "972fb509545e01295b055ec5c59005b4fb12f1e449d63ee0f780a2cbf5142be0",
+      "svgSha256": "e7073a03b00699bf868f38ca796a4e599a6dd06905446b1ae0ce57b1fd876a12",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
@@ -622,7 +622,7 @@
     },
     {
       "id": "12-independent-systems",
-      "svgSha256": "b83529a49fb2d2b88a1dc65bf950c2bec11e893b17b5d2556c9a8f560d5c1d89",
+      "svgSha256": "d7bdc66f3fdcfbd14f3eaf847e6a691ef2717fa16432d2b745f924737106f911",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
@@ -630,7 +630,7 @@
     },
     {
       "id": "c0ffee01-dag",
-      "svgSha256": "3167a85b3c9399f55ebdfb4f741fc8352a82411b5266240f69e00cd005995f1b",
+      "svgSha256": "cb9d477475b37e9969d2e4c7906dbbc82d88f199bedc4135a4add59bab371d05",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
@@ -638,7 +638,7 @@
     },
     {
       "id": "c0ffee01-cycle",
-      "svgSha256": "c76a811749d677726e92ed847c67a89599a1aa63c3ec5301a5ebac4e91ade228",
+      "svgSha256": "855987c827b7f8815f8679adc2a5d26c84fecd2f4b127b8da8be7d5c46480680",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-13.png",
@@ -646,7 +646,7 @@
     },
     {
       "id": "c0ffee01-parallel",
-      "svgSha256": "12cf462ed7e0287a0c0462275f6656e83e62007a7eed313b2e55708bb390068a",
+      "svgSha256": "713de5ede7fa9d0ce64e089ca47dd10f6ad58a6639e59a5bc0a7f8a83aade88d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -654,7 +654,7 @@
     },
     {
       "id": "c0ffee01-tree",
-      "svgSha256": "dc942867a4ff543dadfb673573b394ec5c2558089054ba24e5e6e173052d20a9",
+      "svgSha256": "2ab1a9bfbb174db1fbe23e20490c8f7516af93c3aa46187d3c8107829502fe3e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -662,7 +662,7 @@
     },
     {
       "id": "c0ffee01-two-stage",
-      "svgSha256": "564311ed50457ca1491b8821be1ca79eac4de7008fe0a15b22f89e8f934a197b",
+      "svgSha256": "ffff98fa9e799bcf53619d5c29376fcc9fcb2093e74809ea317564cf2e075726",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -670,7 +670,7 @@
     },
     {
       "id": "c0ffee01-sparse-mesh",
-      "svgSha256": "863c35c944b9d85f8f349c4bed3c14ef963fa96fa64453d4300fc5a80ba6a5b8",
+      "svgSha256": "fbc6d4e1e3ce4dc27c428564426368c8cf01d072355a0d835266e953de4cb061",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -678,7 +678,7 @@
     },
     {
       "id": "c0ffee01-branch-join",
-      "svgSha256": "fb5cdfe3a546cfd7edfbbd8e01304a52db5ad4cba509186a498c8fab1f36bd03",
+      "svgSha256": "26039123b05458de1d9502112282c99f06f46b54138e19a5bbcb13a63b55a41d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -686,7 +686,7 @@
     },
     {
       "id": "c0ffee01-scoped",
-      "svgSha256": "49b14594f3350b5067ad7cc1628914b2bdb4e2a623c873bb6f270017002b8aaa",
+      "svgSha256": "44a70e44692c762cdfc740851573b87c22271120c9668618a053ebf335bc1df5",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-14.png",
@@ -694,7 +694,7 @@
     },
     {
       "id": "a11ce002-dag",
-      "svgSha256": "3118fc83ab9453106262507d0d891717e232dead3bc7fd4c65810801d1d75e07",
+      "svgSha256": "2ceae65cfe8dedf76b147a878d098722b9f34d93491089dc30e236ed5af0bd2c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -702,7 +702,7 @@
     },
     {
       "id": "a11ce002-cycle",
-      "svgSha256": "f34b032dde6fdaf79b0a38230e7a50fe2ffa2ec61614c0c84f44e21a2b0eb962",
+      "svgSha256": "b54ad1b727cbe16b0861700478e16da85cab9d22ea7532aa9fdb5931666cc924",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -710,7 +710,7 @@
     },
     {
       "id": "a11ce002-parallel",
-      "svgSha256": "3cdf661200503a412c5ca8697368ca0bda895b9d0ee7d5cc29e4f3f0f2b93416",
+      "svgSha256": "c6ff70a2cc1f3acb6321a4afd92b2cb9de93a01a75cfff956286f7d19c09e20e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -718,7 +718,7 @@
     },
     {
       "id": "a11ce002-tree",
-      "svgSha256": "1cb94aca62808fd17e80b9e727b264e7c79fc50cc3a7b2a210aba65849657f32",
+      "svgSha256": "027993609656d2da8361a022f9f2f3c0c1010be05851a0bd330c6a70f1f30774",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -726,7 +726,7 @@
     },
     {
       "id": "a11ce002-two-stage",
-      "svgSha256": "342814f2930ab223356b3b9b33984946e11952e12012b5954ee071ee64cc429d",
+      "svgSha256": "62d95b27be82dea3705241c1800ea1581b11ecd19d163adf0419f7fe9b657770",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -734,7 +734,7 @@
     },
     {
       "id": "a11ce002-sparse-mesh",
-      "svgSha256": "218729db4358fb032a24ded81b531f6a051f5310c83c76c873014c01890a9d8f",
+      "svgSha256": "438a0740e2003e152d770e57f97d22eecb840c49c13098dfb5b2302102d44f25",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-15.png",
@@ -742,7 +742,7 @@
     },
     {
       "id": "a11ce002-branch-join",
-      "svgSha256": "60b5469eb396a311079dd4650f569bed2655a9d527864d240026296dae925579",
+      "svgSha256": "6d63ed4aa68aee521852ba4bbac12746f662ce118064c491d7b36323246c1185",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -750,7 +750,7 @@
     },
     {
       "id": "a11ce002-scoped",
-      "svgSha256": "3dd320f0728e1fee92443a980666acdfc977a5269c99f8937e1fa784271e6b63",
+      "svgSha256": "f0e204981b4adde34bf2baf1279df72a9af4507830b5d2356ab460abb05fe702",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -758,7 +758,7 @@
     },
     {
       "id": "5eed1203-dag",
-      "svgSha256": "a09106f5aea900be50085c1fedcc6971d74aa2b33a574e9d822a7dd5a1312cf4",
+      "svgSha256": "01a1c408eccb9e7a7275cb7081189fba0542dccf747221620a7dfe445b70f59a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -766,7 +766,7 @@
     },
     {
       "id": "5eed1203-cycle",
-      "svgSha256": "ca0599f27c21550efe88b68e0132b915bfc987957b01b3b68fe10ddabcf5db4d",
+      "svgSha256": "a07d3b1add053386ef09964621adecb42dac41197bc1f60db04d78e6b4824b21",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -774,7 +774,7 @@
     },
     {
       "id": "5eed1203-parallel",
-      "svgSha256": "6911522ecbd05a51b7a9d4fd65c8ea5bf593fb10bfe1e5ac8ab25db48f05f407",
+      "svgSha256": "599708f268831e0091839260513375d95c497283716ef0fdfce8131109284ec6",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -782,7 +782,7 @@
     },
     {
       "id": "5eed1203-tree",
-      "svgSha256": "688024f534afd07e3351866e996cd1ac411f360ce98cf4a6c71d76438732e5fa",
+      "svgSha256": "bb976fd294ddd97e24d6fefb72d883982f0041d7ab7e59d5382dedd356212897",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-16.png",
@@ -790,7 +790,7 @@
     },
     {
       "id": "5eed1203-two-stage",
-      "svgSha256": "582d9757baab55be202ebc14f96dcaae3f68a72752bd669ad526dcba55868951",
+      "svgSha256": "23c74998feebbc037afbd16b38aba6e9e9c51000ff03e6a6831caf4521bd4c4b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
@@ -798,7 +798,7 @@
     },
     {
       "id": "5eed1203-sparse-mesh",
-      "svgSha256": "a06406e920fcf39810b8e053c7498803c42b28bf289a7cb0662372b82ec712ab",
+      "svgSha256": "71ace7a8b29b174a418379ab61ed9b6786b0c7f4e1520c820244029acad6c531",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
@@ -806,7 +806,7 @@
     },
     {
       "id": "5eed1203-branch-join",
-      "svgSha256": "e0d6733942283e68f06a35ed2e450de051dc346572cb8313cd551f181f662121",
+      "svgSha256": "2c1aa7d2a2ea6b948810b13f57ebc9cd1b2a8c170ca703e5a9ba3992adbf8cd6",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
@@ -814,7 +814,7 @@
     },
     {
       "id": "5eed1203-scoped",
-      "svgSha256": "caa0c91d1cd2ec714aabce4341ecd24d20dc03e207063a3197fc159892ec9300",
+      "svgSha256": "727dc00fc328f9ae1170de0cce9a07f54906179f3b8657af731bffec665b8c43",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/baseline/sheet-17.png",
@@ -822,7 +822,7 @@
     },
     {
       "id": "d1a60001-dag",
-      "svgSha256": "118ed522f8b550079b6a3945e7030fedce399bf5dee12a1dfe20f06852d3a9f6",
+      "svgSha256": "32cb111363acc0437b892aaaee04c224290229528a6ba6e3ebe6e441eaba6f12",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -830,7 +830,7 @@
     },
     {
       "id": "d1a60001-cycle",
-      "svgSha256": "2bc1f3865b5c8a6255fe787fb88e8a79640e648a71a504575d54f079c95bbddf",
+      "svgSha256": "b0ce6f7798030a076bb6653620e1a9d8e7167556cca4278acee4d03751f8531b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -838,7 +838,7 @@
     },
     {
       "id": "d1a60001-parallel",
-      "svgSha256": "8ebcee8c8b1f2ee75954bcfe754d76e204f5c49672754474088c07444592b314",
+      "svgSha256": "78e6b3a6161ee9fa98edae122ad641538fb1310f97d9ba72d723a875d8220238",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -846,7 +846,7 @@
     },
     {
       "id": "d1a60001-tree",
-      "svgSha256": "39cdd5837cc43933ebf7bab0d9c00ab8eaf9c86aa3f90cb6cfb99f6b5918849c",
+      "svgSha256": "6cc35ef5a55ba163ee66eff12e310704f01d13100022a08e17f9c9b9b3bc7c1a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -854,7 +854,7 @@
     },
     {
       "id": "d1a60001-two-stage",
-      "svgSha256": "cf0fc3d2eec3303ab990f7aae502146e62a87db23358fc123a3eb554abfccc36",
+      "svgSha256": "2f5bfbcdecd4628e0fc11e18c35397bb73316cd6c29dc3e65fb71e3a375db2c4",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -862,7 +862,7 @@
     },
     {
       "id": "d1a60001-sparse-mesh",
-      "svgSha256": "87f6e8849534ede735404d4ec1c51d71256aacf18ecc5f36be5cfd6d993c16e0",
+      "svgSha256": "43786a11225ce029da2f5643449e78c86ef47a6925e7a51c972a56933cb7157e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-03.png",
@@ -870,7 +870,7 @@
     },
     {
       "id": "d1a60001-branch-join",
-      "svgSha256": "c03c23c79a1163f80a7a55712d253b7ff98103ab0c45c2a8cf48995292efea11",
+      "svgSha256": "cfcb807cb1a51ddcec6d9b24c006ebaec2a5ab4ae7fd5a7a9bc6a467e3a0332b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -878,7 +878,7 @@
     },
     {
       "id": "d1a60001-scoped",
-      "svgSha256": "dfe0333fb3d0038ac846c2bbf3891f89320511dfe64ec160ba18f4fd2c35ee92",
+      "svgSha256": "ddd91f5d2c9e3658609c1133c5d3559ece471072ebe653e121e2d0c965a47787",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -886,7 +886,7 @@
     },
     {
       "id": "c0ffee77-dag",
-      "svgSha256": "f4f3c54f6b633a8c077229abbf63bd5cd95e273b1f980ff9d8a40e7c0ba2aa5d",
+      "svgSha256": "6ffb94dc420a9d7f674795f2a94b573d8c514404992b67593d7e5957d13e6ddf",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -894,7 +894,7 @@
     },
     {
       "id": "c0ffee77-cycle",
-      "svgSha256": "eb4d82b48cdaed50ee8a975b90d4b60b7b6cd54757d367760b18560c87618989",
+      "svgSha256": "400f51b6d77843c55f5f3ac445ce57eb38c25bba4db7baf0e48cefa723dab9e4",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -902,7 +902,7 @@
     },
     {
       "id": "c0ffee77-parallel",
-      "svgSha256": "958caf36354dfbb95ca728349ef5629a549e8dc4cceeabbe2f7f1560d4ede0b0",
+      "svgSha256": "94edb05f34ed8ec9e5a508f22c4e5c5b3cb7f183bf2bfaa918855b3cfb1fc85f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -910,7 +910,7 @@
     },
     {
       "id": "c0ffee77-tree",
-      "svgSha256": "a06623ec4df8ba139f593aa8fd529c099c5ceb97602a5140b70c11fadba90123",
+      "svgSha256": "6b5821ececccaa480b3e9267a906d1924bfd78b7b60bb0ecf2ca5c3fa420d4cc",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-04.png",
@@ -918,7 +918,7 @@
     },
     {
       "id": "c0ffee77-two-stage",
-      "svgSha256": "77e7d2a034ac66f66c2f5a28aa449a8b4fbdc5fb2802e872abd0cfc2f38416cd",
+      "svgSha256": "0f10a436f11fbb28bd64546c1acdaee10a4a22a44771bb261bfd55797881295f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -926,7 +926,7 @@
     },
     {
       "id": "c0ffee77-sparse-mesh",
-      "svgSha256": "7129fd1c129b3c398bc5fc7e01c984a1dd04378b903e347596de181b245abc2b",
+      "svgSha256": "ae3981de9dd87a36b688f4f6a8b405a2535bf080ad4a1aee2804f20393848217",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -934,7 +934,7 @@
     },
     {
       "id": "c0ffee77-branch-join",
-      "svgSha256": "b171f3df2f1ef126fc1a339a8707279fdd9c69ff6bacfcd29efb5e8afd18e044",
+      "svgSha256": "dfa6294663da9f8885ac10c5c1135cb0546f832c35a8182dd1f8824a87008bf8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -942,7 +942,7 @@
     },
     {
       "id": "c0ffee77-scoped",
-      "svgSha256": "4a2daadf60c1595e58cbfaecdac01a4d5751f63b68cc511208502acf5a75193b",
+      "svgSha256": "969ed2a5b0578694be08f72e52c7041afc955232003faca6296f6024c8c4fe11",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -950,7 +950,7 @@
     },
     {
       "id": "5eedf00d-dag",
-      "svgSha256": "905da6b9fe0de6b89ac05514e22b019db0128a4af0b6064b98d6810b47fca3ab",
+      "svgSha256": "d21ebdebd218e121294815e5a0c585838733370b49e1b0dddcd57766c08b3d10",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -958,7 +958,7 @@
     },
     {
       "id": "5eedf00d-cycle",
-      "svgSha256": "cf0b8e0f8441613389e4fcfa5d65998e20896638e9dd46781e6b315adb6c4ca7",
+      "svgSha256": "e1083ad7bc775ffa7643303b85e1133b4678589ceef141ac7c962ecfc4098228",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-05.png",
@@ -966,7 +966,7 @@
     },
     {
       "id": "5eedf00d-parallel",
-      "svgSha256": "dcb6427b7bbead0d27e2d3c7e58756646a8e672c118006c8c25912e709348d96",
+      "svgSha256": "862d364c4667480c135acdadce46266ff9a31d90791cd1ededf1baef1dfd59dd",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -974,7 +974,7 @@
     },
     {
       "id": "5eedf00d-tree",
-      "svgSha256": "d3e34ebd198157c07ddbedb57f29ad6aea7eaf5b0c7dca129d1768f2b1ffaae2",
+      "svgSha256": "4eb5a0eb537b262fa146c223b3937258f4b317d16c8dd00bf0ac17648b9a0f42",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -982,7 +982,7 @@
     },
     {
       "id": "5eedf00d-two-stage",
-      "svgSha256": "0794d2b05c3bb7d037ba92776893b0c91177ed7542425a64b243898d5a7ce7e1",
+      "svgSha256": "162d75a9bbc5a827d65d88eea7b9a0087398160c796136bab1e26696a074b7df",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -990,7 +990,7 @@
     },
     {
       "id": "5eedf00d-sparse-mesh",
-      "svgSha256": "0fa3fbc2fec5ecc520de4a993aab736b9046559f50e17b83d348b04b5050d493",
+      "svgSha256": "b7bc91d696a506291863e52376d037744269f2380353e2e6ff7fbfaba53a1c75",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -998,7 +998,7 @@
     },
     {
       "id": "5eedf00d-branch-join",
-      "svgSha256": "b9f4f00492190c9ea0713b435cab340e8a09371546608b804cdd2e559d40420d",
+      "svgSha256": "c3386e8f5d6428b022b85b03ca541d9e3d8839bb88e20294dd55a4dfdf377969",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -1006,7 +1006,7 @@
     },
     {
       "id": "5eedf00d-scoped",
-      "svgSha256": "b8d9461250215e768560c734564dd045a0e1f430927aa20048299ee23380686a",
+      "svgSha256": "6d93686c2e3a599be6e94ccabbb51186de1e0c777715d4123ada00b389e3ca19",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-01/exploration/sheet-06.png",
@@ -1014,7 +1014,7 @@
     },
     {
       "id": "10293847-dag",
-      "svgSha256": "0c4f338d6d5cbff3b0e43e7fbbfdecad1aedda31a8befdacbc4e0ec4e320dc2d",
+      "svgSha256": "9114734bce67b2b9b97c04843cd3b0a69bb7de6c099545462ba9ec4e392d3a87",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1022,7 +1022,7 @@
     },
     {
       "id": "10293847-cycle",
-      "svgSha256": "e550470d8b2f573eed5a562c55e2c1c5fea8f017818c8020006b4fe783b6c632",
+      "svgSha256": "84277c06682b5d119186ec21c6c97ed226b29bdb96ac19e79b119201b600cd7b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1030,7 +1030,7 @@
     },
     {
       "id": "10293847-parallel",
-      "svgSha256": "83960de8656e604aec054c54bbe30e662426cb310f663f992964808560980413",
+      "svgSha256": "2c305fff172a6c9e818ee5108523181eeb87c642230fda8f11bc261e837eea29",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1038,7 +1038,7 @@
     },
     {
       "id": "10293847-tree",
-      "svgSha256": "490882e324fc73c5a95864aba02035ecf787672620d8cd6e379b9c66c356f435",
+      "svgSha256": "6e7862b3da5e6c16d4bf28cbfe180602c4e39c6b05c2990c9cbaf8b943a46f86",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1046,7 +1046,7 @@
     },
     {
       "id": "10293847-two-stage",
-      "svgSha256": "505f522c89fc024490862cf34eeac63ffcf63b907abe3f83ec6aa3caeacce012",
+      "svgSha256": "b6b53d96ffab658b2ef306c0374af3d0b70bbe0d1abc6902c0feb455e1df40e7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1054,7 +1054,7 @@
     },
     {
       "id": "10293847-sparse-mesh",
-      "svgSha256": "87b6ec1cf2897808e0c6d769b5f4c5a5a1da34da148b3b95543156bfd8e16ccd",
+      "svgSha256": "299e1274b7c742e2e48d65bae3864b4b412a02476601f2f1c63948653bd28983",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-03.png",
@@ -1062,7 +1062,7 @@
     },
     {
       "id": "10293847-branch-join",
-      "svgSha256": "c046634a3f65f926ddc29bd1bbb4011e9c477d9622b34c7fd77e6b76eeac8cd9",
+      "svgSha256": "e5eb3b10c6cd480fa9ff8abfc45cef214bca69f338ad59b1598393e06f235135",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1070,7 +1070,7 @@
     },
     {
       "id": "10293847-scoped",
-      "svgSha256": "2514d0e9417eabc677e638c16f1703d327a50c34f6dde65cd52cdc69b67d8406",
+      "svgSha256": "0553ee81f1c042126f3b420bfe2fcce6d0d8519ac0046b14a9eff4708b1a97f8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1078,7 +1078,7 @@
     },
     {
       "id": "7f4a7c15-dag",
-      "svgSha256": "5c138200290e380093f4fa459bcbb9defa2aac4413b016231c941c291f9bc015",
+      "svgSha256": "e42d414121e77e4ca1ba82b9e06453dd7c48ad6c54abc30b6852263a47e571d3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1086,7 +1086,7 @@
     },
     {
       "id": "7f4a7c15-cycle",
-      "svgSha256": "2de6b3c80439ea13124ab38d5da7dd5ac1245d2b2b18c1328b6ff52cf4fedcbf",
+      "svgSha256": "4de638ee382299ad330a8fa6da02ead824d1900db435240862e99178178ba000",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1094,7 +1094,7 @@
     },
     {
       "id": "7f4a7c15-parallel",
-      "svgSha256": "b8095216467d6128db3af1c2fdbce60b3ee9cdab613ccb0c862e28786656c551",
+      "svgSha256": "c671a41e34abad4b20a6e7e4012b37522e795f2572c8e4872ca309b5fd038ba6",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1102,7 +1102,7 @@
     },
     {
       "id": "7f4a7c15-tree",
-      "svgSha256": "4192f363b55f44370d78cdb9e31c182e41145534dea9ee743d9835a7c610dca5",
+      "svgSha256": "49c78f3144edd4ef3879dee7270e6dff7107507b2baf6596cf14ccad29e544ed",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-04.png",
@@ -1110,7 +1110,7 @@
     },
     {
       "id": "7f4a7c15-two-stage",
-      "svgSha256": "05f040b57073d2995531b6af4c225b30d4b9458ae0d58eb72a5f352b607bfa0d",
+      "svgSha256": "8c7b7a911b220f29c20351c8e0508bca6537d09b5a51add3910b76a52f2c5d75",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1118,7 +1118,7 @@
     },
     {
       "id": "7f4a7c15-sparse-mesh",
-      "svgSha256": "f06e1862ac9568b4ef2fdce7d830327678ceae3d412b32ba8472ece942d2f4af",
+      "svgSha256": "0a5dffe31a095d713cdd4b53e1822904b0489df9f644e12ef72cab3043ab4342",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1126,7 +1126,7 @@
     },
     {
       "id": "7f4a7c15-branch-join",
-      "svgSha256": "01b2bdb2d032455985fe5ad3c0153f5e3e9d7aa8102a22cd55e952c863734b99",
+      "svgSha256": "c10207d355bd95b2f475687018bc28756bf5d42faa3d5d10f5ae3e4f7d6e42c1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1134,7 +1134,7 @@
     },
     {
       "id": "7f4a7c15-scoped",
-      "svgSha256": "965998c41dbfc55351ed4a0ab5ba87d1f1c8a09e9ac5e916b0472a38c70121cc",
+      "svgSha256": "2e3340591deba24f5ad21a32240bbfd2dd2f2c7c7ef2780145e1bfd270c5b2c1",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1142,7 +1142,7 @@
     },
     {
       "id": "91e10da5-dag",
-      "svgSha256": "51bfcfba595733f3f6698853aca465bf7bd746c6602d85a14a3f47b08e395952",
+      "svgSha256": "2feeed8fa81bfbfe178c2ef7e9bacbcb0bb12eaffc4a56adf8e6f8ec9e063fe9",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1150,7 +1150,7 @@
     },
     {
       "id": "91e10da5-cycle",
-      "svgSha256": "2710956c3690607b697a7204582ed6d0eccf13ea0614644e964fbaf158de09b4",
+      "svgSha256": "9c11d5a269434d561e6e728bd96849c903a24572ec6f24b2abd51a14783b63f0",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-05.png",
@@ -1158,7 +1158,7 @@
     },
     {
       "id": "91e10da5-parallel",
-      "svgSha256": "98553f34529d3eb2da1e8eb69aac4346210447bf327d910b12b35200f50b111b",
+      "svgSha256": "49dcacf4fbad18ccd0301030f13ee682f99c3d0fe16d173bb26289e48c9fdfae",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
@@ -1166,7 +1166,7 @@
     },
     {
       "id": "91e10da5-tree",
-      "svgSha256": "eb41707309849f9cdbe902f9b568ada9f619772798b43d047ee695190e3b31fd",
+      "svgSha256": "f0a783446498393233682f6598428137bf6ea63b08c3988624ee2a9afaa7aec8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
@@ -1174,7 +1174,7 @@
     },
     {
       "id": "91e10da5-two-stage",
-      "svgSha256": "be040d2f59b5468abc4cecd3ffb5d94c68b9aa5b7a0c52a127e1a7aa87656486",
+      "svgSha256": "91876c0a011770cbfaacd7428285372e50a9e348d33b21d90e18de6406710512",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
@@ -1182,7 +1182,7 @@
     },
     {
       "id": "91e10da5-sparse-mesh",
-      "svgSha256": "da1033192cc96280adfa46fd44813c0cfe1d8fc79042aabff7a60e13869f5aba",
+      "svgSha256": "d78274bee1d78351f6a212c58faccbe76f59655a8bda03c89a37ce4f3d67898e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
@@ -1190,7 +1190,7 @@
     },
     {
       "id": "91e10da5-branch-join",
-      "svgSha256": "ba80b5a7caf4b9a8077fedc80fe1a7396750a3af6655c1cbfa58ff302b6f0188",
+      "svgSha256": "4cf7861083bcde5f5fce28171e5e0e18276790d36d4f49429933a5e40f574bd0",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
@@ -1198,7 +1198,7 @@
     },
     {
       "id": "91e10da5-scoped",
-      "svgSha256": "379c224f7167a4e23175401c7ef15246393019abc1a11809c0eb2b593a228101",
+      "svgSha256": "867f5fab41354c7528309baa3fb8f5f2ff684861ebc55156c197b8627334fb27",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-02/exploration/sheet-06.png",
@@ -1206,7 +1206,7 @@
     },
     {
       "id": "abc12345-dag",
-      "svgSha256": "74ea6bb7129d5453af909610dd037d16208c108bb051a145431430c99ceac517",
+      "svgSha256": "958635701b33ab4be707ef22e4d5753340fb1931008687709004a0a7aa85b23e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1214,7 +1214,7 @@
     },
     {
       "id": "abc12345-cycle",
-      "svgSha256": "b4b40951a3b07087873efc4e11e86916ed250cc6eb564230ab9296a100394212",
+      "svgSha256": "8cd5486b12bbbeaa5831b1a976f759a2450ae03e71424acad3e05d58a77fdcf9",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1222,7 +1222,7 @@
     },
     {
       "id": "abc12345-parallel",
-      "svgSha256": "2e48e3fd345eb2be1f40e89d76f81d15a38638f00d115cfd3ec3537dc30e48bb",
+      "svgSha256": "39850ac356e1143847f3ae6b369ab61de9deb56831acffa1c1a18cbf4754cb23",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1230,7 +1230,7 @@
     },
     {
       "id": "abc12345-tree",
-      "svgSha256": "c94a427883f39292d736ea394494b6758298071c2902b43223a7be9de9438ed2",
+      "svgSha256": "fc497cc33f0b1517dd1732ff2aafbb7bbf499378080a4cb018313495a7d358c8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1238,7 +1238,7 @@
     },
     {
       "id": "abc12345-two-stage",
-      "svgSha256": "2f8409146aa92fddcb9dcb4a10451670b600c380a2743737ee368317f785034a",
+      "svgSha256": "c766ec99a126fb8864818bbc760c58c1c875b36fdf8f27d11b1a49aeddcff412",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1246,7 +1246,7 @@
     },
     {
       "id": "abc12345-sparse-mesh",
-      "svgSha256": "68388c0f371f2b4848e88196854bf04bd99728b4be9e62350163e3e9f276be36",
+      "svgSha256": "ae1dc8f2b3c6343d14708ae65fcccdb79334f08b53923c8cdc22dab4c4bee79b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-03.png",
@@ -1254,7 +1254,7 @@
     },
     {
       "id": "abc12345-branch-join",
-      "svgSha256": "86c645c060ca87e13b4f31ebd748482d8b995e8b653a87772105005251dd19c6",
+      "svgSha256": "06bececf431222c672a9c20fd20fd770269c7db89e0ccb9b8f74e2963dbed985",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1262,7 +1262,7 @@
     },
     {
       "id": "abc12345-scoped",
-      "svgSha256": "3798cd2ae978853b8af0aeb3e4837f315b901bdfab2314114300c2d4ac6b8078",
+      "svgSha256": "a9cb24727f9d55656db50f9f464143404d657ae3011b8545958a4a1a1c75d807",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1270,7 +1270,7 @@
     },
     {
       "id": "13579bdf-dag",
-      "svgSha256": "c6eff3e9a7637542abc99ef011d432b48a8ed876d07f1732bbe048e637e79bc0",
+      "svgSha256": "0ab0a08b379abd58280dd572d71c49a5d568587551ee7470fce28cd675fcc995",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1278,7 +1278,7 @@
     },
     {
       "id": "13579bdf-cycle",
-      "svgSha256": "cd91dfe043887c7f6ef091f1dc81df225617fe2f76ca36a2d7b08e2e522bcb7d",
+      "svgSha256": "c54af47309e06b7c1b3fa1826725a5b0fb46b57d84437af38a135230899dec04",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1286,7 +1286,7 @@
     },
     {
       "id": "13579bdf-parallel",
-      "svgSha256": "6b3a24cd450ae9c51abc634aba5cc5247cfa439a61580f79831de399fcf41245",
+      "svgSha256": "3bd4c74c67c907ae06c02fa7d1f11f71cecbbeb33280d3d993a921ea4f4666d3",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1294,7 +1294,7 @@
     },
     {
       "id": "13579bdf-tree",
-      "svgSha256": "6b5bd7ae859b2e705b496fd293133abf756acb27ebde0bb93ced779dc2782311",
+      "svgSha256": "693110119729cf3b90dd03d72597a7bc65b51bba8782f4c545ecf56257f6dc87",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-04.png",
@@ -1302,7 +1302,7 @@
     },
     {
       "id": "13579bdf-two-stage",
-      "svgSha256": "b5ce414d5600e4e9a6b3d73116fe4558dac82670e9bf78f3e9816cbd4f2b391e",
+      "svgSha256": "7d25f880988ad21c58fb4587888d755eaa20d2114b0f56908a9c206f3e980f46",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1310,7 +1310,7 @@
     },
     {
       "id": "13579bdf-sparse-mesh",
-      "svgSha256": "cdea5fdb803dc41b6bfd636da4367d3aed618d34555bbdcaf83af65c12e2f087",
+      "svgSha256": "ca859c1cd2fab11c141ddbda89ebcb4114678bef3e5b7a3d2163e0ff164c2d1e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1318,7 +1318,7 @@
     },
     {
       "id": "13579bdf-branch-join",
-      "svgSha256": "f552f2988dddf7d0f97446ca8d3a9b4fb00648d5740777aa68ee16a444485ce6",
+      "svgSha256": "5b809360669287dbfb1a3241b9098dec887a549db9479b0db75581ba0043d2e5",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1326,7 +1326,7 @@
     },
     {
       "id": "13579bdf-scoped",
-      "svgSha256": "8b82971c0d49b723af8b39e39158f55d5dae516a50e8db08178d6694312db2cd",
+      "svgSha256": "07a7b83d8abb6c9aa92351a7cf95cd9155950a45dfbf3cbe51537401ae730c18",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1334,7 +1334,7 @@
     },
     {
       "id": "2468ace1-dag",
-      "svgSha256": "2d1d971cff8710a8184650350297bb7b70b721d5406d6e6e317f1870c2145d59",
+      "svgSha256": "1551465cd626d4ff5815fc2803f11638d862ee72742e9a325a3c741f6e8b8db8",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1342,7 +1342,7 @@
     },
     {
       "id": "2468ace1-cycle",
-      "svgSha256": "4be76d8b86cdf578fd7fb1055ac4c2a1253ed9cc189dfb4f224d14f82239718a",
+      "svgSha256": "d7cc4072c6bb18a4df941facffb117144883cb1ab66c6ddf550c80731aeaf32e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-05.png",
@@ -1350,7 +1350,7 @@
     },
     {
       "id": "2468ace1-parallel",
-      "svgSha256": "4e741983a35bf552d74e949a5a3f46245cfc13054a8025b722c32e6f05cb92f8",
+      "svgSha256": "d2296ae5722ca4e72f696b4d58c8624c5d34ec7ac231fabba89b1efe68f40b30",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1358,7 +1358,7 @@
     },
     {
       "id": "2468ace1-tree",
-      "svgSha256": "ce4c9e4a5b070d017b17ac07a4659a546ee930afbf6e048ac92b51489bf0ea38",
+      "svgSha256": "f9288dedb36744186ebcedd087194f54d452480168dc892f546a6e8ab6e62bda",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1366,7 +1366,7 @@
     },
     {
       "id": "2468ace1-two-stage",
-      "svgSha256": "fb37339ccd6a7e6cbe51bfa8d24a1c264d6c50c0158cf3dada66dfe56f866c21",
+      "svgSha256": "3994371d6150767d101b6462424f6c7574d7b79eeee7c16cf67b2a5d6689da99",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1374,7 +1374,7 @@
     },
     {
       "id": "2468ace1-sparse-mesh",
-      "svgSha256": "96e7b0d06e2934ef185484b4b7fefb3c90b2ee13606351cf8b63df2f13d732a3",
+      "svgSha256": "2f3add63086f4eecfbc94a78100a516c92c6f709a030900f477cc054bc27fc02",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1382,7 +1382,7 @@
     },
     {
       "id": "2468ace1-branch-join",
-      "svgSha256": "30b25daa8610be4282f86930a0d2a30db83f762432160168233e45986bc29a25",
+      "svgSha256": "33d9fc8f2385196a479a05dce676a0986a23c0ec808e450e2f203e30baef1df5",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1390,7 +1390,7 @@
     },
     {
       "id": "2468ace1-scoped",
-      "svgSha256": "584f10fb4cffeba8a1af13e4705ce4cc2829b95b11ba6291839a0672569ad098",
+      "svgSha256": "54eddb62b109fca83ee83d8e68316d18ce15780e7aee5c22fc9783b26e147a38",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-03/exploration/sheet-06.png",
@@ -1398,7 +1398,7 @@
     },
     {
       "id": "8badf00d-dag",
-      "svgSha256": "5a243acc21860bc613c512ccdb8c41d93b84328ea8c0795d4a2cc73741e221d8",
+      "svgSha256": "aa45711d76052a596ffb247df4c15df9c27953816b038a603eb3f42e19521fe4",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1406,7 +1406,7 @@
     },
     {
       "id": "8badf00d-cycle",
-      "svgSha256": "0b009b91e30540c7f90c6768fa7dc759ba28f38af25818f0aa52b27d983a9bdb",
+      "svgSha256": "4461b22253392fac5cc8e6d29c478d659c6296b0b025cd5579b7cd13a84d2767",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1414,7 +1414,7 @@
     },
     {
       "id": "8badf00d-parallel",
-      "svgSha256": "a19053643dd7540c11ca566cc6ff1212e36f58799a36d6bfcfd550d635486078",
+      "svgSha256": "c0d2ad9bb336f529628d48fce4b5c5df29a06b0807d14af136b8bafb526f3877",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1422,7 +1422,7 @@
     },
     {
       "id": "8badf00d-tree",
-      "svgSha256": "853e19e7c340b08f0fa4fdf39a8f426382129bbd8b6c22871cf425431ff8314c",
+      "svgSha256": "5e0aa248bd7b9d1f86efd9d7497c9dba0784eb9c79d1f36ac7250e2089fd0b58",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1430,7 +1430,7 @@
     },
     {
       "id": "8badf00d-two-stage",
-      "svgSha256": "b8b1c7d0e3453584beb8ee53157d16e00af773e742a7c7b4fb3511a084362cc4",
+      "svgSha256": "99636849a179c117a29a53f8065f9268a7a8090fa2021f6baea029711a301383",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1438,7 +1438,7 @@
     },
     {
       "id": "8badf00d-sparse-mesh",
-      "svgSha256": "3b54b19699cc621acaeb479848b20cf95dd0caaaad6fef2818fbe5d4c02c1b9e",
+      "svgSha256": "58177f28e94f1904337402c30246218266a7c4a07555ea8f780b3c7a7fe3af0d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-03.png",
@@ -1446,7 +1446,7 @@
     },
     {
       "id": "8badf00d-branch-join",
-      "svgSha256": "0e1285fdbc50ffabfe72061f5828c037e3d356bc4aac7cf95afae9962a09048a",
+      "svgSha256": "5abf9d24510a21f734e159f67b40b97e48b810c0f35dd69fbec732115d27220d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1454,7 +1454,7 @@
     },
     {
       "id": "8badf00d-scoped",
-      "svgSha256": "9ed7123a58eddb8346cb6ad4b09695ed89f437b53bdd77356998dba262e5e062",
+      "svgSha256": "be07903d6545d780df00b88a623d9d422ca24c0b283cd44a80031c840f4b3434",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1462,7 +1462,7 @@
     },
     {
       "id": "6c8e9cf5-dag",
-      "svgSha256": "a580ccd24bf9372f4d848eed8c6912b315720f9036b4abb3f7bfe42b65ae3e15",
+      "svgSha256": "bdd0aa84b784a59ff02537bd19c41fa2ee1dc7a13f29789e39e3166c674faf32",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1470,7 +1470,7 @@
     },
     {
       "id": "6c8e9cf5-cycle",
-      "svgSha256": "d7188134d4b8d214add5de74f9e09b622728057655cea16731cb7e26dd6c43e1",
+      "svgSha256": "e2136737789f16d0fffb2ee29fd9c090d4bae60b689ad8184370c4a7d05eb994",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1478,7 +1478,7 @@
     },
     {
       "id": "6c8e9cf5-parallel",
-      "svgSha256": "e94a5cf3cea602e16a531b97f6c7af4ed8a8f9ca619e8517e6d6bc376a1d82aa",
+      "svgSha256": "5969ae807c12ad3b71fcd6037f675d6afca6e5d0ce68374db549417fa892ba85",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1486,7 +1486,7 @@
     },
     {
       "id": "6c8e9cf5-tree",
-      "svgSha256": "2341749d2415d14a54b596999df25be06807028c2cfffa99b321d8ff0b64fc89",
+      "svgSha256": "5b0d96687b5ba5a391b0c51a80e5b1c20982b2ae263c73dfcc11791901d31c36",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-04.png",
@@ -1494,7 +1494,7 @@
     },
     {
       "id": "6c8e9cf5-two-stage",
-      "svgSha256": "5296a18fcf7ea61e6c61cdfef1888bea02b8a33a52d788773fec657eb4c9e721",
+      "svgSha256": "7f123156db8e5d3251e57d78cae524a5053a04e0014d253ddc7bb14de8f6fa0a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1502,7 +1502,7 @@
     },
     {
       "id": "6c8e9cf5-sparse-mesh",
-      "svgSha256": "cdb593b1e8323d7818683442d9d3aa988a0c1c9e8adcb03e3316a52f9bbdb329",
+      "svgSha256": "8fa931fdd3feb0b6808cca3ada5aba980feff16c548f08d9855c01e84e679f0d",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1510,7 +1510,7 @@
     },
     {
       "id": "6c8e9cf5-branch-join",
-      "svgSha256": "1a7f4f823b787c466ff147bcadd9f12f243490aaf57d9590b6fd769c826a682e",
+      "svgSha256": "91eaa83c89049ee59d7f116e13f2eba64b641a0a3ab0781c0aef2a5d42976093",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1518,7 +1518,7 @@
     },
     {
       "id": "6c8e9cf5-scoped",
-      "svgSha256": "6bff9c0f8bb1ad3adb193c004f85d20a351e428db787c413cfe693d32950b790",
+      "svgSha256": "0d68bfed6931e253c9bd15a6ad5fdb0719f6dcf530b321ebdb58f431ffef1861",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1526,7 +1526,7 @@
     },
     {
       "id": "a341316c-dag",
-      "svgSha256": "fec74c1536662490f290d7dfd315a94f22032c640e4f217e98a73d95906f1d52",
+      "svgSha256": "bfbcc3e9405b5a63a095173b84ee0dfc810e3661dd30750bb0f90d60895fe47b",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1534,7 +1534,7 @@
     },
     {
       "id": "a341316c-cycle",
-      "svgSha256": "8fba548c45d604c6dea5d374c415ac88ce3d6851f769e769bdc0badd9ca173fb",
+      "svgSha256": "fd13d91d5769cb5fc7b4f47fda2111b970060bb4524e4e3ff19872438bf2774c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-05.png",
@@ -1542,7 +1542,7 @@
     },
     {
       "id": "a341316c-parallel",
-      "svgSha256": "b13a0bff407866bb3cc72a1927e8bf21a483552a764dddaa097ec6f130b119dc",
+      "svgSha256": "07f3ba10b6944a96f8b61090fce666a82c4abe1fe9538229d05ab18e573d2b78",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1550,7 +1550,7 @@
     },
     {
       "id": "a341316c-tree",
-      "svgSha256": "5935a65a30280b26a303b7582d0f3d58735f600fda0e04912ac51314bc135549",
+      "svgSha256": "f21ba38771d88b365ef0e421495011515dc409c704cc7f3ea90f713a885b567a",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1558,7 +1558,7 @@
     },
     {
       "id": "a341316c-two-stage",
-      "svgSha256": "1bcf82e6425cd39c4f1b2bc078ce988e8007b1e2b0d9f108b19c008d3731d78b",
+      "svgSha256": "4d5e0e036161eee98ee77fb65b7c50b544d6f90027dfe527b707601c927a48a7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1566,7 +1566,7 @@
     },
     {
       "id": "a341316c-sparse-mesh",
-      "svgSha256": "fcf04d47175c9880d89d79d7aff7786ecccd4f94f6c5552c166581e41b2271b3",
+      "svgSha256": "ca2986a8914995cc998dd87a01248b523475abef5280c39f7303aacb23c1f1a0",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1574,7 +1574,7 @@
     },
     {
       "id": "a341316c-branch-join",
-      "svgSha256": "4d690cbbe4f6046a0e9aa04179d2e9fa00b2a8357861151bae9668d2b5ec4123",
+      "svgSha256": "4463640bb0a7e6582f222413c6a9150f7757b3d88c3ec1a2d67cf143b4f26ca6",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1582,7 +1582,7 @@
     },
     {
       "id": "a341316c-scoped",
-      "svgSha256": "727b2ef8e077a76be35089b6bbe1c87bb8499d80c51be29b73a49511b27e76be",
+      "svgSha256": "edbaf2d7c62ad910410cda91f8c9e9955ca4544b2b4f9990bccd4ce79a076fec",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-04/exploration/sheet-06.png",
@@ -1590,7 +1590,7 @@
     },
     {
       "id": "deadbeef-dag",
-      "svgSha256": "69570c7b14b103003e61515be95aacac06a9294a744eccc5bf2007644e10e436",
+      "svgSha256": "4ebee2738c60c9832615c0ce40c31b960f8085d01199a66729e9ba0bba5fad97",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1598,7 +1598,7 @@
     },
     {
       "id": "deadbeef-cycle",
-      "svgSha256": "c7c846d46adb7a8451c5bc5a5ad6141ac78703e4605ab086e9d992225554120a",
+      "svgSha256": "805e37297166888a906dadcbdddfef2d8776ca9934a04f9f7317be08690546b7",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1606,7 +1606,7 @@
     },
     {
       "id": "deadbeef-parallel",
-      "svgSha256": "b3bacdb743042a26831ff6f98fb4c1afbc96585e30b13ee0ab3857793110374f",
+      "svgSha256": "a2d0fd2b0a679b761784e46785fc97276647ce760fb2b1781b597b264596f433",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1614,7 +1614,7 @@
     },
     {
       "id": "deadbeef-tree",
-      "svgSha256": "ab9f524fd8958ed29f2d37d05d4a2694f578ef6aba00c69f4684a0bf156d52c2",
+      "svgSha256": "f4d8341fdc220a38f3b64630e1738a8d77cfbff6b59809f637110ab2f561dd02",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1622,7 +1622,7 @@
     },
     {
       "id": "deadbeef-two-stage",
-      "svgSha256": "5240b103a05b1dfb432785b7f04f8d354b8ec19f27fbac7e77fde45e3cf70f76",
+      "svgSha256": "96059ac11756f8d97e23197e7a2e0db67f48a56145b48c16fe487b0969bac021",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1630,7 +1630,7 @@
     },
     {
       "id": "deadbeef-sparse-mesh",
-      "svgSha256": "9167e5b2beb5373ff8f7393ddf74a3406f068620de22da67906b61d7782b77ef",
+      "svgSha256": "18844074a6123c26fe885ad2949d455942e034181b9f9ed1dd3bfe88389e0001",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-03.png",
@@ -1638,7 +1638,7 @@
     },
     {
       "id": "deadbeef-branch-join",
-      "svgSha256": "94068123327ab1facdc4972f4431886597ad49afdfcec7b0b5988d1cb601e7d3",
+      "svgSha256": "7a2a6ab32ea1028f10d579dbed4d0572c5c469275c2af3ac570b76ae77aeebcf",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1646,7 +1646,7 @@
     },
     {
       "id": "deadbeef-scoped",
-      "svgSha256": "6050d3ce4a93238f5bc80a7d6d81826668b25764d00999479e563032c6ee41d3",
+      "svgSha256": "5043d337a54f618551da200a57992997293b81dccf51287aebda4ed6fc5e35e6",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1654,7 +1654,7 @@
     },
     {
       "id": "41c64e6d-dag",
-      "svgSha256": "15817f980456ffa06a3c51efa7b3c5097f1b598d67d425d3eda1e2edf3a69a40",
+      "svgSha256": "2459f36e27e69d0fd6e41514b46597d73c28e01c242d10070ad9b577b3362820",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1662,7 +1662,7 @@
     },
     {
       "id": "41c64e6d-cycle",
-      "svgSha256": "a34df4014c12ce51462bb26dabafc2ed555aa606b1233a627dbe2fdf8d3e3204",
+      "svgSha256": "7a4d27a196d60950f1d2b477f122d1d73cd90ce2d447356970ac4fc8f55cdfe2",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1670,7 +1670,7 @@
     },
     {
       "id": "41c64e6d-parallel",
-      "svgSha256": "5f4c16098d3f895f97c3261963081e6b61f6ea3b7d735732367675d52d635fc2",
+      "svgSha256": "6388b5d1b4d7e74eda20be3f1fda7b73a33dc80c72b44eb2f5ae0656d9eb28d5",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1678,7 +1678,7 @@
     },
     {
       "id": "41c64e6d-tree",
-      "svgSha256": "b57e1efd1e6e7c413301324471e9d1510f9e26898e8407f469bb3671a1845454",
+      "svgSha256": "d9db0333466e1d1129d3d29cea868f86df49d615317fb0e7ad074405b6880870",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-04.png",
@@ -1686,7 +1686,7 @@
     },
     {
       "id": "41c64e6d-two-stage",
-      "svgSha256": "a34424872a7714daf818d31ef2511baea7b946be2799552dea78551cdd52de56",
+      "svgSha256": "1b82279b46e1509efc5f17ae56fbcfac468d69f5e3406dbad8cf695c919e819e",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1694,7 +1694,7 @@
     },
     {
       "id": "41c64e6d-sparse-mesh",
-      "svgSha256": "92fe5e4ea06c45957fb08d99059dcb9f1bff748cc88f3d8f50e947db9c6b3494",
+      "svgSha256": "e894c8c8ebdaaeafa85864909b33964c22dd757e8c7653dc322a94ac6df8c8dc",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1702,7 +1702,7 @@
     },
     {
       "id": "41c64e6d-branch-join",
-      "svgSha256": "12b6dd8f1fdeacd289ce3a9c10d723be84b03d46a5fb8f7a7f463eeafc737e16",
+      "svgSha256": "c180c1ace52c483d53a38e44e71435dd47a8da20fa8134e24c7a6897d1986187",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1710,7 +1710,7 @@
     },
     {
       "id": "41c64e6d-scoped",
-      "svgSha256": "d95ecd76624bcd02ee3771c0d7a85d79008864b9be33027e65baf3d5b7c38f1f",
+      "svgSha256": "c389fe91ef58be2a453140927a081054864494803524997d9956480ae9baa77c",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1718,7 +1718,7 @@
     },
     {
       "id": "9e3779b9-dag",
-      "svgSha256": "da4adecc78581f7ba3c14167c49ae815457c8dc3bec89eb591cf0e961e0495b4",
+      "svgSha256": "162b7f91900a7e83a17a81150643a65299085ab9e79b5d8697dccc24e705d519",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1726,7 +1726,7 @@
     },
     {
       "id": "9e3779b9-cycle",
-      "svgSha256": "8fe73acdb50f77e8416cb9a74876d30f55796be6e645b51da5cbeb32e38dc4e2",
+      "svgSha256": "a7dcdbfb245818055e674c91eb2c916bbbdbbafd2b24ace91a915444496e6330",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-05.png",
@@ -1734,7 +1734,7 @@
     },
     {
       "id": "9e3779b9-parallel",
-      "svgSha256": "7042cd97765573df939b63f1bcd46466a9e7a3dbcc0c2ac4e049254390aa70c7",
+      "svgSha256": "a761e403f505447bbc95d78c2a061bf21b2c3d0ce44ec56beed2051c44d9a92f",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
@@ -1742,7 +1742,7 @@
     },
     {
       "id": "9e3779b9-tree",
-      "svgSha256": "be4b34393d3bf093374eda0b947a0dcfdc4c0765bce1c5635595688ce9e26d09",
+      "svgSha256": "716fdf72f3f2474f296456ca7f722e0d459fec14ec88b41aa996ce5a67af91cc",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
@@ -1750,7 +1750,7 @@
     },
     {
       "id": "9e3779b9-two-stage",
-      "svgSha256": "4f373c9b9e7d5e6fb41bb0b43eddd079ef98c84b9fc64bee40dfeba2be4e81c2",
+      "svgSha256": "5a0465ea8d3a1af6c9d964725aee3381d80dab1c998718bcc86ae84417b59b24",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
@@ -1758,7 +1758,7 @@
     },
     {
       "id": "9e3779b9-sparse-mesh",
-      "svgSha256": "27aa94c8bf26c59c95a6e7248912bb393e49058d0ea7440815cd4972ccbb3b9b",
+      "svgSha256": "56a971d5e2d3ae2a882f1c7f36420d83f39c7372907180edd9ba4093ba239333",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
@@ -1766,7 +1766,7 @@
     },
     {
       "id": "9e3779b9-branch-join",
-      "svgSha256": "16b75c4ad33232ecdbf72b1dc71d912cb4282c7e20b22535bfadf67f80f584a6",
+      "svgSha256": "bfc99dd51c0c27273621b888b91972b9b2400191516d7902badd94cfd2279039",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
@@ -1774,7 +1774,7 @@
     },
     {
       "id": "9e3779b9-scoped",
-      "svgSha256": "1a9a46508dd48dd30495c1309429816f09f655c6f0528938e66cdfda3ba69538",
+      "svgSha256": "e4793c037e715a619ac4787acbc15c63019f27bf1fa9bed3a804cd757a182780",
       "beauty": 5,
       "clarity": 5,
       "evidence": "artifacts/layout-quality/final/round-05/exploration/sheet-06.png",
@@ -1789,7 +1789,7 @@
         "0xc0ffee77",
         "0x5eedf00d"
       ],
-      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
       "distinctExampleImages": 124
     },
     {
@@ -1799,7 +1799,7 @@
         "0x7f4a7c15",
         "0x91e10da5"
       ],
-      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
       "distinctExampleImages": 124
     },
     {
@@ -1809,7 +1809,7 @@
         "0x13579bdf",
         "0x2468ace1"
       ],
-      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
       "distinctExampleImages": 124
     },
     {
@@ -1819,7 +1819,7 @@
         "0x6c8e9cf5",
         "0xa341316c"
       ],
-      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
       "distinctExampleImages": 124
     },
     {
@@ -1829,43 +1829,43 @@
         "0x41c64e6d",
         "0x9e3779b9"
       ],
-      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
       "distinctExampleImages": 124
     }
   ],
-  "completedAt": "2026-11-12T11:06:23.796Z",
+  "completedAt": "2026-11-14T07:04:04.867Z",
   "distinctImages": 220,
   "consecutiveVisualPasses": 5,
   "confirmationPasses": [
     {
       "pass": 1,
-      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
       "images": 220,
-      "elapsedMs": 11298
+      "elapsedMs": 62771
     },
     {
       "pass": 2,
-      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
       "images": 220,
-      "elapsedMs": 11964
+      "elapsedMs": 63534
     },
     {
       "pass": 3,
-      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
       "images": 220,
-      "elapsedMs": 11230
+      "elapsedMs": 62746
     },
     {
       "pass": 4,
-      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
       "images": 220,
-      "elapsedMs": 11560
+      "elapsedMs": 63468
     },
     {
       "pass": 5,
-      "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
+      "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
       "images": 220,
-      "elapsedMs": 11649
+      "elapsedMs": 63296
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
-  "engineFingerprint": "3f2a74d52c0e7b1a04e4d330302b1e05c239f8298c6c579c2604da1c921b78da",
-  "baseRevision": "97b8421ea06b4be7b8ccdd736b4923018e4ec4d6",
+  "engineFingerprint": "815f3d1752268d8a849540a7cef0a510eab8fc8d61a6bc25eb01bbd97022dac4",
+  "baseRevision": "e53f434c2b0e7df13226f4116882869228eff00d",
   "method": "Current semantic, native geometry, Chromium paint and repeated-compilation checks, followed by individual visual inspection. Earlier findings and scores are preserved under historicalAudits.",
   "knownDiagnostics": {},
   "counts": {
@@ -16,7 +16,7 @@
   },
   "currentReview": {
     "coverage": "39 unchanged authored/seeded cases individually inspected; diagnostic controls are unscored. Dense examples use native/readable zoom in addition to the contact sheet overview.",
-    "minimumFittedTextBelow8px": 10,
+    "minimumFittedTextBelow8px": 7,
     "remainingPriorities": [],
     "resolvedPriorities": [
       {
@@ -139,11 +139,11 @@
     "cases": [
       {
         "id": "01-dispatch-collect",
-        "svgSha256": "7bcb2206b8a5dc4999ecf7006405f6002e1bae7eae57be7fe7aba2e7417910e7",
+        "svgSha256": "4f28a1813239922a486bb5a022e8d01aa5cd590ab2660712ffc5adaae596dc23",
         "beauty": 5,
         "clarity": 5,
         "review": "A single aligned worker column separates ordered dispatch and result tracks; all five branches remain visible.",
-        "minFitTextPx": 10.096446056030738,
+        "minFitTextPx": 11.402027027027026,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -155,11 +155,11 @@
       },
       {
         "id": "02-planar-mesh",
-        "svgSha256": "8ac90f6fed72a920966c1eab1d49bc62af4a4f9eae2e8a990ca957b0c992bee3",
+        "svgSha256": "31162835b8c6e31dfc84743817f1df6b7bc122d9ea3f567cd0a7eae80fde3167",
         "beauty": 5,
         "clarity": 5,
         "review": "Two services surround four stores in a balanced arrangement with zero crossings or shared shafts.",
-        "minFitTextPx": 12.362637362637361,
+        "minFitTextPx": 11.402027027027026,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -171,11 +171,11 @@
       },
       {
         "id": "03-dense-mesh",
-        "svgSha256": "7b44789fe17c44ef608694daad5c14f31887ea31b3c096424b257e1cb8a84b32",
+        "svgSha256": "3585a0220938b7a6535a35b2a9fac396a2cbc3fa9c1b4b6965352f0c91376b4b",
         "beauty": 5,
         "clarity": 5,
         "review": "The balanced four-quadrant K4,4 arrangement retains every access caption and only the four necessary crossings.",
-        "minFitTextPx": 10.738557771266578,
+        "minFitTextPx": 10.997398761814301,
         "routeMetrics": {
           "properCrossings": 4,
           "overlappingRoutePairs": 0,
@@ -187,11 +187,11 @@
       },
       {
         "id": "04-sixteen-stages",
-        "svgSha256": "ba0bf2545fbabbb5c0c67d0c27df2845b9a8ea4bad0afde9d542c4c8f278c0cd",
+        "svgSha256": "3a89d262607280e04fc8e2cae1ed2999a6d31a659a378bc415652120af35a14a",
         "beauty": 5,
         "clarity": 5,
         "review": "Sixteen numbered stages fold in four consistent rows; each turn continues the reading direction.",
-        "minFitTextPx": 12.284323116984847,
+        "minFitTextPx": 12.983471195195694,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -203,11 +203,11 @@
       },
       {
         "id": "05-balanced-tree",
-        "svgSha256": "ba438db204d79967a6b19b1126821c7bcf130a82f2869bbc835a94242fed9ee6",
+        "svgSha256": "9c1a7a740c7b65abf1cac32c9d6f7b3e51416b50716c739fa209c217ebd31ef1",
         "beauty": 5,
         "clarity": 5,
         "review": "A four-level hierarchy retains separate branch channels and comparable sibling geometry.",
-        "minFitTextPx": 9.146341463414634,
+        "minFitTextPx": 7.274635864341484,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -219,11 +219,11 @@
       },
       {
         "id": "06-unbalanced-tree",
-        "svgSha256": "b22b63c022dd5a34a757f0d46c62cf48f2e3e2e68c554429eb0d7eac1fc24b20",
+        "svgSha256": "d8611a19d41fa1cfbac60f4c2d7bacd72801da1a7a0db3aebb3e47f16fbb68f5",
         "beauty": 5,
         "clarity": 5,
         "review": "The three branches remain aligned by depth while their differing lengths stay visible.",
-        "minFitTextPx": 8.4375,
+        "minFitTextPx": 9.480337078651687,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -235,27 +235,31 @@
       },
       {
         "id": "07-multiple-retries",
-        "svgSha256": "ee6859f9205a19570962d00ee63a57fb08f7409b0fdd49f96a43ce64df5ca0a1",
+        "svgSha256": "55e370a0dd995959df99569f34186142d5b1b67ceb218a7713e3419169e2f16c",
         "beauty": 5,
         "clarity": 5,
         "review": "The main progression begins at Stage 1 and the three returns use separate outside channels or a true local loop.",
-        "minFitTextPx": 11.678200692041523,
+        "minFitTextPx": 15,
         "routeMetrics": {
-          "properCrossings": 1,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 2.2,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
+          "maxDetourRatio": 3.0668435823108786,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "s4->s4",
+            "text": "retry locally",
+            "centerToAnchorPx": 84.25
+          }
         },
         "paintFailures": []
       },
       {
         "id": "08-cross-ownership",
-        "svgSha256": "a2bb85c38f1d8049c8f99ee4fb7a83b2b87f610a3a638a7dcd6bc26e030abd76",
+        "svgSha256": "9652a0da1c856ef2d525bc3edccf3ef03fe0d279c56bde6292771d0e469fcce0",
         "beauty": 5,
         "clarity": 5,
         "review": "West, East and Shared services retain their ownership; every disjoint trusted island carries the same scope title.",
-        "minFitTextPx": 8.136122300877362,
+        "minFitTextPx": 9.655062997869592,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -267,15 +271,15 @@
       },
       {
         "id": "09-many-record-slots",
-        "svgSha256": "4b3ca023ee069ab44e2c6a5f41e82e5173573e9b786ae003a6e68f83ac2d6575",
+        "svgSha256": "b39b4dc17d9a71e27ec979801e809a3fc7accebd7f5be55e28db6267f6b6cfcf",
         "beauty": 5,
         "clarity": 5,
         "review": "All six operations follow distinct ordered tracks to their correct rows; Reporting fits inside the Audit branch region.",
-        "minFitTextPx": 10.040734015621744,
+        "minFitTextPx": 13,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.18734335839599,
+          "maxDetourRatio": 2.0437693573433293,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -283,15 +287,15 @@
       },
       {
         "id": "10-many-named-ports",
-        "svgSha256": "6448418ae046ccf5af709b8e19d0adb765ec545208ad3d7dd6fc4f85f3424ab1",
+        "svgSha256": "cf057328f51c4d1aa19d09aa896eafa2f0481dea56fe7f74d08b69fda716f407",
         "beauty": 5,
         "clarity": 5,
         "review": "Four comparable publishers use nested noncrossing publish/acceptance rails and all eight complete port captions remain visible.",
-        "minFitTextPx": 8.928571428571429,
+        "minFitTextPx": 8.34869070075796,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 3.2935064935064937,
+          "maxDetourRatio": 3.082342280364246,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -299,11 +303,11 @@
       },
       {
         "id": "11-mixed-typography",
-        "svgSha256": "972fb509545e01295b055ec5c59005b4fb12f1e449d63ee0f780a2cbf5142be0",
+        "svgSha256": "e7073a03b00699bf868f38ca796a4e599a6dd06905446b1ae0ce57b1fd876a12",
         "beauty": 5,
         "clarity": 5,
         "review": "Wrapped multilingual titles have enough vertical room and the two long operation captions remain associated with separate branches.",
-        "minFitTextPx": 9.868421052631579,
+        "minFitTextPx": 11.678200692041523,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -315,11 +319,11 @@
       },
       {
         "id": "12-independent-systems",
-        "svgSha256": "03501e365b26991e07e1f00b979e0e6cb80c55f2b0ee13fb4128637cdcc0c7de",
+        "svgSha256": "d7bdc66f3fdcfbd14f3eaf847e6a691ef2717fa16432d2b745f924737106f911",
         "beauty": 5,
         "clarity": 5,
         "review": "Checkout forms one folded component, Search stays in its own row, and Observer is placed separately below.",
-        "minFitTextPx": 9.897360703812316,
+        "minFitTextPx": 7.896046096887264,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -331,31 +335,35 @@
       },
       {
         "id": "c0ffee01-dag",
-        "svgSha256": "d1e85569a19a221112b1ad6d9be5a1046fad0eed82159a49debdb0c08a87ab0f",
+        "svgSha256": "cb9d477475b37e9969d2e4c7906dbbc82d88f199bedc4135a4add59bab371d05",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text. Also inspected at native size.",
-        "minFitTextPx": 7.094496320846774,
+        "minFitTextPx": 8.508438927800674,
         "routeMetrics": {
-          "properCrossings": 17,
+          "properCrossings": 12,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 2.430309305034295,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
+          "maxDetourRatio": 1.9990647867979652,
+          "calloutCount": 2,
+          "mostRemoteCallout": {
+            "feature": "n6->n11",
+            "text": "validate\norganization\naccess",
+            "centerToAnchorPx": 134.84615384615384
+          }
         },
         "paintFailures": []
       },
       {
         "id": "c0ffee01-cycle",
-        "svgSha256": "3eb87c3cda73a4de43669a9fdd8ec349299ee036a4ec4fa31ea2122f608ee530",
+        "svgSha256": "855987c827b7f8815f8679adc2a5d26c84fecd2f4b127b8da8be7d5c46480680",
         "beauty": 5,
         "clarity": 5,
         "review": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths.",
-        "minFitTextPx": 7.424534358824188,
+        "minFitTextPx": 6.790950607717039,
         "routeMetrics": {
           "properCrossings": 1,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 2.011049245593284,
+          "maxDetourRatio": 1.2984597290980127,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -363,15 +371,15 @@
       },
       {
         "id": "c0ffee01-parallel",
-        "svgSha256": "e6a54704abbd48f73a7543f61a37b54cb4b6339ed334a41a8d7db39e4c220fc6",
+        "svgSha256": "713de5ede7fa9d0ce64e089ca47dd10f6ad58a6639e59a5bc0a7f8a83aade88d",
         "beauty": 5,
         "clarity": 5,
         "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded.",
-        "minFitTextPx": 6.712314672674913,
+        "minFitTextPx": 8.515370211715679,
         "routeMetrics": {
-          "properCrossings": 1,
+          "properCrossings": 4,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 2.98357808982742,
+          "maxDetourRatio": 2.8024475524475534,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -379,11 +387,11 @@
       },
       {
         "id": "c0ffee01-tree",
-        "svgSha256": "8a843b980f3bdac272fb0d1632f3a26e8415aa9d3ca4f92bc2a613d4a668d336",
+        "svgSha256": "2ab1a9bfbb174db1fbe23e20490c8f7516af93c3aa46187d3c8107829502fe3e",
         "beauty": 5,
         "clarity": 5,
         "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
-        "minFitTextPx": 8.396079949883202,
+        "minFitTextPx": 8.543207760110858,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -395,11 +403,11 @@
       },
       {
         "id": "c0ffee01-two-stage",
-        "svgSha256": "10ed96b453d82b348d285645c3c12940deedc89f88a9d92cd3bcdf0209186b6c",
+        "svgSha256": "ffff98fa9e799bcf53619d5c29376fcc9fcb2093e74809ea317564cf2e075726",
         "beauty": 5,
         "clarity": 5,
         "review": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks.",
-        "minFitTextPx": 12.01067615658363,
+        "minFitTextPx": 10.591478704435868,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -411,27 +419,31 @@
       },
       {
         "id": "c0ffee01-sparse-mesh",
-        "svgSha256": "80d537d7e600a3a86372ecafcfb57ec05c45e7252c832df89d4ca6d0279c5497",
+        "svgSha256": "fbc6d4e1e3ce4dc27c428564426368c8cf01d072355a0d835266e953de4cb061",
         "beauty": 5,
         "clarity": 5,
         "review": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks.",
-        "minFitTextPx": 7.723832750861137,
+        "minFitTextPx": 7.955121238775345,
         "routeMetrics": {
-          "properCrossings": 3,
+          "properCrossings": 10,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
+          "maxDetourRatio": 2.127633066187406,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "a3->b3",
+            "text": "validate\norganization\naccess",
+            "centerToAnchorPx": 94
+          }
         },
         "paintFailures": []
       },
       {
         "id": "c0ffee01-branch-join",
-        "svgSha256": "fb5cdfe3a546cfd7edfbbd8e01304a52db5ad4cba509186a498c8fab1f36bd03",
+        "svgSha256": "26039123b05458de1d9502112282c99f06f46b54138e19a5bbcb13a63b55a41d",
         "beauty": 5,
         "clarity": 5,
         "review": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present.",
-        "minFitTextPx": 9.233883058933758,
+        "minFitTextPx": 9.376524820471008,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -443,47 +455,55 @@
       },
       {
         "id": "c0ffee01-scoped",
-        "svgSha256": "c1f28c65bde1062f2fef8ec2f01b7a5c8810cdef208135bf109671217305e26d",
+        "svgSha256": "44a70e44692c762cdfc740851573b87c22271120c9668618a053ebf335bc1df5",
         "beauty": 5,
         "clarity": 5,
         "review": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs.",
-        "minFitTextPx": 9.633572132851246,
+        "minFitTextPx": 11.195403043383273,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.6522829904666332,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
+          "maxDetourRatio": 1.9971417921494097,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "left.queue->left.worker",
+            "text": "jobs",
+            "centerToAnchorPx": 58.08945674739182
+          }
         },
         "paintFailures": []
       },
       {
         "id": "a11ce002-dag",
-        "svgSha256": "af4e6cd8caae2f9e1871ffade02009c8dd97dc156d6b1a624ed59ab255fadf67",
+        "svgSha256": "2ceae65cfe8dedf76b147a878d098722b9f34d93491089dc30e236ed5af0bd2c",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text.",
-        "minFitTextPx": 7.776497695852535,
+        "minFitTextPx": 9.427374301675979,
         "routeMetrics": {
-          "properCrossings": 12,
+          "properCrossings": 14,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 2.0793174258162908,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
+          "maxDetourRatio": 3.2654718402000444,
+          "calloutCount": 2,
+          "mostRemoteCallout": {
+            "feature": "n3->n6",
+            "text": "validate\norganization\naccess",
+            "centerToAnchorPx": 126
+          }
         },
         "paintFailures": []
       },
       {
         "id": "a11ce002-cycle",
-        "svgSha256": "628262165a740c8bfa39ed54b1b9e27832b176cb79dd3ca05d00d98031fc1a08",
+        "svgSha256": "b54ad1b727cbe16b0861700478e16da85cab9d22ea7532aa9fdb5931666cc924",
         "beauty": 5,
         "clarity": 5,
         "review": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths.",
-        "minFitTextPx": 9.414225941422593,
+        "minFitTextPx": 9.400594516676177,
         "routeMetrics": {
-          "properCrossings": 3,
+          "properCrossings": 2,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.5963008631319358,
+          "maxDetourRatio": 1.31874634275248,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -491,31 +511,27 @@
       },
       {
         "id": "a11ce002-parallel",
-        "svgSha256": "74883004e2d44da9d29bd1880f824a7710ce3e8f288b95def46c8848e8cbd029",
+        "svgSha256": "c6ff70a2cc1f3acb6321a4afd92b2cb9de93a01a75cfff956286f7d19c09e20e",
         "beauty": 5,
         "clarity": 5,
         "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded. Also inspected at native size.",
-        "minFitTextPx": 8.287292817679559,
+        "minFitTextPx": 7.86255096097845,
         "routeMetrics": {
-          "properCrossings": 2,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.1048180705463448,
-          "calloutCount": 3,
-          "mostRemoteCallout": {
-            "feature": "n10->n11",
-            "text": "validate\norganization\naccess",
-            "centerToAnchorPx": 64
-          }
+          "maxDetourRatio": 1.1976532804495126,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
         },
         "paintFailures": []
       },
       {
         "id": "a11ce002-tree",
-        "svgSha256": "14760d164814e13ce5397e04d1c8f9a113543203f843d4b7cf9e87a50bb25a46",
+        "svgSha256": "027993609656d2da8361a022f9f2f3c0c1010be05851a0bd330c6a70f1f30774",
         "beauty": 5,
         "clarity": 5,
         "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
-        "minFitTextPx": 7.812500000000001,
+        "minFitTextPx": 9.323204419889503,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -527,11 +543,11 @@
       },
       {
         "id": "a11ce002-two-stage",
-        "svgSha256": "10224c7ec110593799f6e94cb2a701a3eab6baf85ca3e91e8d625c7026913527",
+        "svgSha256": "62d95b27be82dea3705241c1800ea1581b11ecd19d163adf0419f7fe9b657770",
         "beauty": 5,
         "clarity": 5,
         "review": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks.",
-        "minFitTextPx": 12.01067615658363,
+        "minFitTextPx": 10.591478704435868,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -543,15 +559,15 @@
       },
       {
         "id": "a11ce002-sparse-mesh",
-        "svgSha256": "0b383b78261a677d403e475612c6b9405dcd884f4f8420bb2aa35dfd651d5171",
+        "svgSha256": "438a0740e2003e152d770e57f97d22eecb840c49c13098dfb5b2302102d44f25",
         "beauty": 5,
         "clarity": 5,
         "review": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks.",
-        "minFitTextPx": 8.003984043272697,
+        "minFitTextPx": 8.479899497487436,
         "routeMetrics": {
-          "properCrossings": 2,
+          "properCrossings": 1,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.1753794266441822,
+          "maxDetourRatio": 2.2278227919014375,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -559,11 +575,11 @@
       },
       {
         "id": "a11ce002-branch-join",
-        "svgSha256": "60b5469eb396a311079dd4650f569bed2655a9d527864d240026296dae925579",
+        "svgSha256": "6d63ed4aa68aee521852ba4bbac12746f662ce118064c491d7b36323246c1185",
         "beauty": 5,
         "clarity": 5,
         "review": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present.",
-        "minFitTextPx": 8.44106300722656,
+        "minFitTextPx": 9.07258064516129,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -575,31 +591,35 @@
       },
       {
         "id": "a11ce002-scoped",
-        "svgSha256": "6a27a846dd0d97cabc35e20fb2a87c045c72fe34086609d9c28cd83e55865676",
+        "svgSha256": "f0e204981b4adde34bf2baf1279df72a9af4507830b5d2356ab460abb05fe702",
         "beauty": 5,
         "clarity": 5,
         "review": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs.",
-        "minFitTextPx": 9.64332892998679,
+        "minFitTextPx": 11.208696916385046,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.6929637526652452,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
+          "maxDetourRatio": 2.123113545078529,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "left.queue->left.worker",
+            "text": "jobs",
+            "centerToAnchorPx": 58.08945674739182
+          }
         },
         "paintFailures": []
       },
       {
         "id": "5eed1203-dag",
-        "svgSha256": "7236931094d49ebff4f48f274a220241ee3c5c17d36f0335d926e60efc28a286",
+        "svgSha256": "01a1c408eccb9e7a7275cb7081189fba0542dccf747221620a7dfe445b70f59a",
         "beauty": 5,
         "clarity": 5,
         "review": "The folded main progression remains traceable; bypasses use distinct attachments and outside rails. Dense details are judged at readable zoom rather than as tiny thumbnail text.",
-        "minFitTextPx": 7.223113964686998,
+        "minFitTextPx": 8.353960396039605,
         "routeMetrics": {
-          "properCrossings": 1,
+          "properCrossings": 2,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.1344563789506221,
+          "maxDetourRatio": 2.238653747115897,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -607,49 +627,13 @@
       },
       {
         "id": "5eed1203-cycle",
-        "svgSha256": "c5d6f3eb4cf234319aa4d17d93e5f9b39553cb811f646613ce3614d42a228f30",
+        "svgSha256": "a07d3b1add053386ef09964621adecb42dac41197bc1f60db04d78e6b4824b21",
         "beauty": 5,
         "clarity": 5,
         "review": "The directed progression and return connections remain distinguishable, including bridge gaps at crossings; loop captions identify their own paths.",
-        "minFitTextPx": 6.863243518047788,
+        "minFitTextPx": 6.040346007619925,
         "routeMetrics": {
-          "properCrossings": 2,
-          "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.385591128347135,
-          "calloutCount": 1,
-          "mostRemoteCallout": {
-            "feature": "n11->n10",
-            "text": "validate\norganization\naccess",
-            "centerToAnchorPx": 64
-          }
-        },
-        "paintFailures": []
-      },
-      {
-        "id": "5eed1203-parallel",
-        "svgSha256": "7b3539bc454d3c4ebb2c49dbc4b354f375a2a8eb48bc07bea55360ce35524dec",
-        "beauty": 5,
-        "clarity": 5,
-        "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded.",
-        "minFitTextPx": 8.470708751773891,
-        "routeMetrics": {
-          "properCrossings": 2,
-          "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.472898843191314,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
-        },
-        "paintFailures": []
-      },
-      {
-        "id": "5eed1203-tree",
-        "svgSha256": "99507c0648e7d1597952f18af263b6a323455f3d14f8760fbc181364df131f35",
-        "beauty": 5,
-        "clarity": 5,
-        "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
-        "minFitTextPx": 6.8680458589433,
-        "routeMetrics": {
-          "properCrossings": 0,
+          "properCrossings": 1,
           "overlappingRoutePairs": 0,
           "maxDetourRatio": 1,
           "calloutCount": 0,
@@ -658,12 +642,48 @@
         "paintFailures": []
       },
       {
+        "id": "5eed1203-parallel",
+        "svgSha256": "599708f268831e0091839260513375d95c497283716ef0fdfce8131109284ec6",
+        "beauty": 5,
+        "clarity": 5,
+        "review": "Multiple sends remain separate through their endpoint legs and captions identify individual tracks, using local leaders when the channel is crowded.",
+        "minFitTextPx": 9.777483722342152,
+        "routeMetrics": {
+          "properCrossings": 2,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1.8362779676204775,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "n3->n8",
+            "text": "read through",
+            "centerToAnchorPx": 92.01293483806927
+          }
+        },
+        "paintFailures": []
+      },
+      {
+        "id": "5eed1203-tree",
+        "svgSha256": "bb976fd294ddd97e24d6fefb72d883982f0041d7ab7e59d5382dedd356212897",
+        "beauty": 5,
+        "clarity": 5,
+        "review": "Parent/child levels and sibling subtrees are ordered, with separate branch channels and wrapped titles fitted inside their shapes.",
+        "minFitTextPx": 8.40516732488204,
+        "routeMetrics": {
+          "properCrossings": 0,
+          "overlappingRoutePairs": 0,
+          "maxDetourRatio": 1.3360217736955924,
+          "calloutCount": 0,
+          "mostRemoteCallout": null
+        },
+        "paintFailures": []
+      },
+      {
         "id": "5eed1203-two-stage",
-        "svgSha256": "cef196da17d40416e65db7af4d6b2ab75c8447176068266e7db98160908c6a6a",
+        "svgSha256": "23c74998feebbc037afbd16b38aba6e9e9c51000ff03e6a6831caf4521bd4c4b",
         "beauty": 5,
         "clarity": 5,
         "review": "Both region rows lead to aligned worker groups, with local captions beside ordered branch tracks.",
-        "minFitTextPx": 12.01067615658363,
+        "minFitTextPx": 10.591478704435868,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -675,15 +695,15 @@
       },
       {
         "id": "5eed1203-sparse-mesh",
-        "svgSha256": "af8df84de475ca1e2c5e5e2fc43b70ee7a2258376a6aeac82df83bd95a0844bb",
+        "svgSha256": "71ace7a8b29b174a418379ab61ed9b6786b0c7f4e1520c820244029acad6c531",
         "beauty": 5,
         "clarity": 5,
         "review": "Services and stores use a balanced radial arrangement with separate shafts; captions remain local to the access tracks.",
-        "minFitTextPx": 7.533482142857143,
+        "minFitTextPx": 8.273680841594457,
         "routeMetrics": {
-          "properCrossings": 2,
+          "properCrossings": 4,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1,
+          "maxDetourRatio": 2.068628785487319,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -691,11 +711,11 @@
       },
       {
         "id": "5eed1203-branch-join",
-        "svgSha256": "e0d6733942283e68f06a35ed2e450de051dc346572cb8313cd551f181f662121",
+        "svgSha256": "2c1aa7d2a2ea6b948810b13f57ebc9cd1b2a8c170ca703e5a9ba3992adbf8cd6",
         "beauty": 5,
         "clarity": 5,
         "review": "Each decision, alternate branch and merge reads as one region; the repeated regions fold together and all transition captions remain present.",
-        "minFitTextPx": 9.283279615249919,
+        "minFitTextPx": 8.805506582848079,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
@@ -707,31 +727,35 @@
       },
       {
         "id": "5eed1203-scoped",
-        "svgSha256": "634caf4ec6219ac2d8fb705cb195eaef14eb315ae472c11403d549b950f651bb",
+        "svgSha256": "727dc00fc328f9ae1170de0cce9a07f54906179f3b8657af731bffec665b8c43",
         "beauty": 5,
         "clarity": 5,
         "review": "The peer regions remain compact and distinct; the inner send and outer feedback use separate channels and the client connects to both APIs.",
-        "minFitTextPx": 10.319674721511413,
+        "minFitTextPx": 12.132963988919668,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.6929637526652452,
-          "calloutCount": 0,
-          "mostRemoteCallout": null
+          "maxDetourRatio": 2.123113545078529,
+          "calloutCount": 1,
+          "mostRemoteCallout": {
+            "feature": "left.queue->left.worker",
+            "text": "jobs",
+            "centerToAnchorPx": 58.08945674739182
+          }
         },
         "paintFailures": []
       },
       {
         "id": "control-scoped-no-captions",
-        "svgSha256": "98d931a94d2c9ff29238c1f1cf0f29ee2881fd9659caedc51c37f7a692e5e26c",
-        "beauty": null,
-        "clarity": null,
+        "svgSha256": "783187c720fe0cb317c95ac9000eced5197cf9a0e1f1bd2fe229a4cc52665c0e",
+        "beauty": 5,
+        "clarity": 5,
         "review": "Diagnostic feasibility control; not rated for presentation.",
-        "minFitTextPx": 11.462667570988797,
+        "minFitTextPx": 13.733743736605096,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.6929637526652452,
+          "maxDetourRatio": 2.142857142857143,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -739,15 +763,15 @@
       },
       {
         "id": "control-scoped-flat",
-        "svgSha256": "078b68511ce09f9cc12e296584d47f9b6aab8a8e47f015d2ee6c7a6362d9d850",
-        "beauty": null,
-        "clarity": null,
+        "svgSha256": "2906daad4d40e88fc1108c26eaeaf2653797430a4cf7e64c97b0e2e5d3023750",
+        "beauty": 5,
+        "clarity": 5,
         "review": "Diagnostic feasibility control; not rated for presentation.",
-        "minFitTextPx": 9.07380844964424,
+        "minFitTextPx": 9.051906298626205,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1,
+          "maxDetourRatio": 1.043817147672214,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
@@ -755,15 +779,15 @@
       },
       {
         "id": "control-scoped-pinned",
-        "svgSha256": "001ba11334c926d2422bae921575119e65d45b85be8e161f8723b354744fa680",
-        "beauty": null,
-        "clarity": null,
+        "svgSha256": "2d9192b9b99b0f7644a96da54aa3f8a933983b8c7f5feef885e1ec6d427368b3",
+        "beauty": 5,
+        "clarity": 5,
         "review": "Diagnostic feasibility control; not rated for presentation.",
-        "minFitTextPx": 3.564453125,
+        "minFitTextPx": 3.554606206533025,
         "routeMetrics": {
-          "properCrossings": 1,
+          "properCrossings": 0,
           "overlappingRoutePairs": 0,
-          "maxDetourRatio": 1.2380952380952381,
+          "maxDetourRatio": 1.3809633342443746,
           "calloutCount": 0,
           "mostRemoteCallout": null
         },
