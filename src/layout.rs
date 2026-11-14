@@ -607,6 +607,80 @@ fn candidate_compatible_with_relations(scene: &SceneGraph, plan: &TopologyPlan) 
     true
 }
 
+fn has_named_multiport(scene: &SceneGraph, node_idx: usize) -> bool {
+    if scene.nodes[node_idx].shape == "sql_table" {
+        return false;
+    }
+    let mut count = 0usize;
+    for e in &scene.edges {
+        if (scene.index(&e.source.node) == Some(node_idx) && e.source.port.is_some())
+            || (scene.index(&e.target.node) == Some(node_idx) && e.target.port.is_some())
+        {
+            count += 1;
+            if count >= 3 {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn named_port_corridor_width(
+    scene: &SceneGraph,
+    edge: &Edge,
+    a: usize,
+    b: usize,
+    lanes: usize,
+    o: &LayoutOptions,
+) -> f64 {
+    let port_w = [
+        (a, edge.source.port.as_deref()),
+        (b, edge.target.port.as_deref()),
+    ]
+    .into_iter()
+    .filter_map(|(idx, p)| {
+        (scene.nodes[idx].shape != "sql_table")
+            .then_some(p)
+            .flatten()
+    })
+    .map(|name| crate::labels::text_width(name) + 16.)
+    .fold(0., f64::max);
+    let text = crate::labels::connection_text(scene, edge);
+    let edge_w = if text.trim().is_empty() {
+        0.
+    } else {
+        crate::labels::text_width(&text) + 16.
+    };
+    let lanes_w = lanes.max(1) as f64 * o.port_spacing;
+    (port_w + edge_w + lanes_w + 2. * o.stub + 2. * o.margin).min(280.)
+}
+
+fn guide_corridor_gaps(plan: &TopologyPlan, members: &[usize], step: f64) -> Vec<f64> {
+    let mut gaps = vec![0.; members.len().saturating_sub(1)];
+    if plan.edge_guides.is_empty() || members.len() < 2 {
+        return gaps;
+    }
+    for k in 1..members.len() {
+        let (u, v) = (members[k - 1], members[k]);
+        let rank = plan.ranks[u];
+        if plan.ranks[v] != rank {
+            continue;
+        }
+        let lo = plan.order[u].min(plan.order[v]) as f64;
+        let hi = plan.order[u].max(plan.order[v]) as f64;
+        let count = plan
+            .edge_guides
+            .values()
+            .filter(|pts| {
+                pts.iter()
+                    .any(|&(r, pos)| r == rank && pos > lo + 1e-6 && pos < hi - 1e-6)
+            })
+            .count();
+        gaps[k - 1] = count as f64 * step;
+    }
+    gaps
+}
+
 #[allow(clippy::needless_range_loop)]
 fn build_plan_rects(
     scene: &SceneGraph,
@@ -731,9 +805,12 @@ fn build_plan_rects(
             } else {
                 cross_gap
             };
+            let named_port_corridors = (0..n).any(|i| has_named_multiport(scene, i));
             let is_default_lr = single_fold
                 && plan.search_states == 0
-                && plan.side_hints.is_empty();
+                && plan.side_hints.is_empty()
+                && plan.edge_guides.is_empty()
+                && !named_port_corridors;
             if is_default_lr {
                 let mut rows = BTreeMap::new();
                 for i in 0..n {
@@ -745,7 +822,24 @@ fn build_plan_rects(
                 return rects;
             }
             let mut gap_after = vec![min_gap.max(72. * spacing); cols.len().saturating_sub(1)];
-            if !single_fold || spacing > 1. {
+            if !single_fold || spacing > 1. || named_port_corridors {
+                let mut corridor_edge_counts = vec![0usize; cols.len().saturating_sub(1)];
+                for e in &scene.edges {
+                    let (Some(a), Some(b)) =
+                        (scene.index(&e.source.node), scene.index(&e.target.node))
+                    else {
+                        continue;
+                    };
+                    if plan.fold_row[a] != plan.fold_row[b] || col_idx[a] == col_idx[b] {
+                        continue;
+                    }
+                    let ca = cols.binary_search(&col_idx[a]).unwrap();
+                    let cb = cols.binary_search(&col_idx[b]).unwrap();
+                    let (lo, hi) = (ca.min(cb), ca.max(cb));
+                    for c in lo..hi {
+                        corridor_edge_counts[c] += 1;
+                    }
+                }
                 for e in &scene.edges {
                     let (Some(a), Some(b)) =
                         (scene.index(&e.source.node), scene.index(&e.target.node))
@@ -765,6 +859,19 @@ fn build_plan_rects(
                         let per_hop = (lw.min(180.) / span).max(min_gap);
                         for g in &mut gap_after[lo..hi] {
                             *g = g.max(per_hop * spacing);
+                        }
+                    }
+                    if named_port_corridors
+                        && (has_named_multiport(scene, a) || has_named_multiport(scene, b))
+                    {
+                        let lanes = corridor_edge_counts[lo..hi]
+                            .iter()
+                            .copied()
+                            .max()
+                            .unwrap_or(1);
+                        let corridor_w = named_port_corridor_width(scene, e, a, b, lanes, o) / span;
+                        for g in &mut gap_after[lo..hi] {
+                            *g = g.max(corridor_w * spacing);
                         }
                     }
                 }
@@ -796,19 +903,22 @@ fn build_plan_rects(
                 {
                     let _ = ff;
                     members.sort_by_key(|&i| (plan.order[i], i));
+                    let extra_gaps = guide_corridor_gaps(plan, &members, 24. * spacing);
                     let total: f64 = members
                         .iter()
                         .map(|&i| top_extra(&scene.nodes[i]) + rects[i].h)
                         .sum::<f64>()
-                        + (members.len().saturating_sub(1)) as f64 * row_cross_gap;
+                        + (members.len().saturating_sub(1)) as f64 * row_cross_gap
+                        + extra_gaps.iter().sum::<f64>();
                     let mut cursor = -total * 0.5;
-                    for i in members {
+                    for (idx, i) in members.into_iter().enumerate() {
                         let extra = top_extra(&scene.nodes[i]);
                         let y = cursor + extra + rects[i].h * 0.5;
                         col_max_half_up = col_max_half_up.max(-(y - extra - rects[i].h * 0.5));
                         col_max_half_down = col_max_half_down.max(y + rects[i].h * 0.5);
                         fold_rel_y.push((i, y));
-                        cursor += extra + rects[i].h + row_cross_gap;
+                        let guide_pad = extra_gaps.get(idx).copied().unwrap_or(0.);
+                        cursor += extra + rects[i].h + row_cross_gap + guide_pad;
                     }
                 }
                 if fi > 0 {
@@ -845,7 +955,8 @@ fn build_plan_rects(
                 let (lo, hi) = (ra.min(rb), ra.max(rb));
                 let text = crate::labels::connection_text(scene, e);
                 if !text.trim().is_empty() {
-                    let lh = crate::labels::text_height(&text) + 2. * o.stub + 2. * o.margin;
+                    let lh = (crate::labels::text_height(&text) + 2. * o.stub - 4.)
+                        .max(2. * o.stub + 2. * o.margin + 24.);
                     let per_hop = lh.max(min_gap) * spacing;
                     for g in &mut gap_after[lo..hi] {
                         *g = g.max(per_hop);
@@ -868,13 +979,16 @@ fn build_plan_rects(
             for (ri, mut members) in by_row {
                 members.sort_by_key(|&i| (plan.order[i], i));
                 let x_gap = 48. * spacing;
+                let extra_gaps = guide_corridor_gaps(plan, &members, 24. * spacing);
                 let total: f64 = members.iter().map(|&i| rects[i].w).sum::<f64>()
-                    + (members.len().saturating_sub(1)) as f64 * x_gap;
+                    + (members.len().saturating_sub(1)) as f64 * x_gap
+                    + extra_gaps.iter().sum::<f64>();
                 let mut cursor = -total * 0.5;
-                for i in members {
+                for (idx, i) in members.into_iter().enumerate() {
                     rects[i].x = cursor + rects[i].w * 0.5;
                     rects[i].y = row_y[ri] + top_extra(&scene.nodes[i]) * 0.5;
-                    cursor += rects[i].w + x_gap;
+                    let guide_pad = extra_gaps.get(idx).copied().unwrap_or(0.);
+                    cursor += rects[i].w + x_gap + guide_pad;
                 }
             }
         }
@@ -993,6 +1107,7 @@ struct Stage1bEnv<'a> {
     scene: &'a SceneGraph,
     o: &'a LayoutOptions,
     requests: &'a [PortRequest],
+    plan_hints: &'a [Option<(Side, Side)>],
     pins: &'a [(Option<f64>, Option<f64>)],
     relatives: &'a [(Option<RelativePin>, Option<RelativePin>)],
     w_locked: &'a [bool],
@@ -1611,7 +1726,39 @@ fn solve_stage1b(
     let mut l1_y = Vec::new();
     let mut face_peers_map: BTreeMap<(usize, Side), Vec<usize>> = BTreeMap::new();
     if env.previous.is_none() {
-        for e in &env.scene.edges {
+        let mut side_counts: BTreeMap<(usize, Side), usize> = BTreeMap::new();
+        for req in env.requests {
+            *side_counts.entry((req.node, req.side)).or_default() += 1;
+        }
+        let push_diff = |out: &mut Vec<L1Term>,
+                         ta: &[(usize, f64)],
+                         ca: f64,
+                         tb: &[(usize, f64)],
+                         cb: f64,
+                         gap: f64,
+                         weight: f64| {
+            let mut coeffs: Vec<(usize, f64)> = Vec::new();
+            for &(idx, c) in tb {
+                if let Some(entry) = coeffs.iter_mut().find(|e| e.0 == idx) {
+                    entry.1 += c;
+                } else {
+                    coeffs.push((idx, c));
+                }
+            }
+            for &(idx, c) in ta {
+                if let Some(entry) = coeffs.iter_mut().find(|e| e.0 == idx) {
+                    entry.1 -= c;
+                } else {
+                    coeffs.push((idx, -c));
+                }
+            }
+            coeffs.retain(|(_, c)| c.abs() > 1e-12);
+            if !coeffs.is_empty() && weight > 0. {
+                out.push(L1Term::new(coeffs, gap + ca - cb, weight));
+            }
+        };
+
+        for (edge_idx, e) in env.scene.edges.iter().enumerate() {
             let (a, b) = (
                 env.scene.index(&e.source.node).unwrap(),
                 env.scene.index(&e.target.node).unwrap(),
@@ -1637,8 +1784,25 @@ fn solve_stage1b(
                 && anchored_face_counts.get(&(a, sa)).copied().unwrap_or(0) > 2)
                 || (dst_anchor
                     && anchored_face_counts.get(&(b, sb)).copied().unwrap_or(0) > 2);
+            let hinted_facing = matches!(
+                env.plan_hints.get(edge_idx).and_then(|h| *h),
+                Some((h_sa, h_sb))
+                    if h_sa == sa
+                        && h_sb == sb
+                        && matches!(
+                            (h_sa, h_sb),
+                            (Side::N, Side::S)
+                                | (Side::S, Side::N)
+                                | (Side::E, Side::W)
+                                | (Side::W, Side::E)
+                        )
+                        && side_counts.get(&(a, sa)).copied().unwrap_or(0) == 1
+                        && side_counts.get(&(b, sb)).copied().unwrap_or(0) == 1
+            );
             let ortho_w = if has_anchor && !dense_anchored_face {
                 env.o.weights.length.max(1.5) * 4.0
+            } else if hinted_facing && !dense_anchored_face {
+                env.o.weights.length.max(1.5) * 2.0
             } else if !has_anchor && node_deg[a] <= 2 && node_deg[b] <= 2 {
                 0.02
             } else {
@@ -1657,34 +1821,6 @@ fn solve_stage1b(
             let (by, by_c) =
                 endpoint_axis_expr(env, b, sb, &e.target.constraint, y_vars[b], rects, false);
 
-            let push_diff = |out: &mut Vec<L1Term>,
-                             ta: &[(usize, f64)],
-                             ca: f64,
-                             tb: &[(usize, f64)],
-                             cb: f64,
-                             gap: f64,
-                             weight: f64| {
-                let mut coeffs: Vec<(usize, f64)> = Vec::new();
-                for &(idx, c) in tb {
-                    if let Some(entry) = coeffs.iter_mut().find(|e| e.0 == idx) {
-                        entry.1 += c;
-                    } else {
-                        coeffs.push((idx, c));
-                    }
-                }
-                for &(idx, c) in ta {
-                    if let Some(entry) = coeffs.iter_mut().find(|e| e.0 == idx) {
-                        entry.1 -= c;
-                    } else {
-                        coeffs.push((idx, -c));
-                    }
-                }
-                coeffs.retain(|(_, c)| c.abs() > 1e-12);
-                if !coeffs.is_empty() && weight > 0. {
-                    out.push(L1Term::new(coeffs, gap + ca - cb, weight));
-                }
-            };
-
             match (sa, sb) {
                 (Side::E, Side::W) | (Side::W, Side::E) if !(pin_fixed_y[a] && pin_fixed_y[b]) => {
                     push_diff(&mut l1_y, &ay, ay_c, &by, by_c, 0., ortho_w);
@@ -1698,6 +1834,7 @@ fn solve_stage1b(
 
         // Preserve tangential straightening on 1-to-1 / parallel bundles,
         // and center 1-to-many (deg >= 3) fan hubs on the median of their leaves.
+        let mut aligned_bundles: BTreeSet<(usize, usize)> = BTreeSet::new();
         for e in &env.scene.edges {
             let (a, b) = (
                 env.scene.index(&e.source.node).unwrap(),
@@ -1743,25 +1880,59 @@ fn solve_stage1b(
             }
             let sa = sides[&port_key(e, true)];
             let sb = sides[&port_key(e, false)];
-            if matches!((sa, sb), (Side::E, Side::W) | (Side::W, Side::E))
-                && env.pins[a].1.is_none()
-                && env.pins[b].1.is_none()
-                && let (AxisVar::Leaf(va), AxisVar::Leaf(vb)) = (y_vars[a], y_vars[b])
-            {
-                let y = (desired_y[va] * weights_y[va] + desired_y[vb] * weights_y[vb])
-                    / (weights_y[va] + weights_y[vb]);
-                desired_y[va] = y;
-                desired_y[vb] = y;
+            if matches!((sa, sb), (Side::E, Side::W) | (Side::W, Side::E)) {
+                if env.pins[a].1.is_none()
+                    && env.pins[b].1.is_none()
+                    && let (AxisVar::Leaf(va), AxisVar::Leaf(vb)) = (y_vars[a], y_vars[b])
+                {
+                    let y = (desired_y[va] * weights_y[va] + desired_y[vb] * weights_y[vb])
+                        / (weights_y[va] + weights_y[vb]);
+                    desired_y[va] = y;
+                    desired_y[vb] = y;
+                }
+                if pair_bundle
+                    && !(pin_fixed_y[a] && pin_fixed_y[b])
+                    && aligned_bundles.insert((a.min(b), a.max(b)))
+                {
+                    let ay = y_vars[a].center_terms();
+                    let by = y_vars[b].center_terms();
+                    push_diff(
+                        &mut l1_y,
+                        &ay,
+                        0.,
+                        &by,
+                        0.,
+                        0.,
+                        env.o.weights.length.max(1.5) * 4.0,
+                    );
+                }
             }
-            if matches!((sa, sb), (Side::N, Side::S) | (Side::S, Side::N))
-                && env.pins[a].0.is_none()
-                && env.pins[b].0.is_none()
-                && let (AxisVar::Leaf(va), AxisVar::Leaf(vb)) = (x_vars[a], x_vars[b])
-            {
-                let x = (desired_x[va] * weights_x[va] + desired_x[vb] * weights_x[vb])
-                    / (weights_x[va] + weights_x[vb]);
-                desired_x[va] = x;
-                desired_x[vb] = x;
+            if matches!((sa, sb), (Side::N, Side::S) | (Side::S, Side::N)) {
+                if env.pins[a].0.is_none()
+                    && env.pins[b].0.is_none()
+                    && let (AxisVar::Leaf(va), AxisVar::Leaf(vb)) = (x_vars[a], x_vars[b])
+                {
+                    let x = (desired_x[va] * weights_x[va] + desired_x[vb] * weights_x[vb])
+                        / (weights_x[va] + weights_x[vb]);
+                    desired_x[va] = x;
+                    desired_x[vb] = x;
+                }
+                if pair_bundle
+                    && !(pin_fixed_x[a] && pin_fixed_x[b])
+                    && aligned_bundles.insert((a.min(b), a.max(b)))
+                {
+                    let ax = x_vars[a].center_terms();
+                    let bx = x_vars[b].center_terms();
+                    push_diff(
+                        &mut l1_x,
+                        &ax,
+                        0.,
+                        &bx,
+                        0.,
+                        0.,
+                        env.o.weights.length.max(1.5) * 4.0,
+                    );
+                }
             }
         }
         for ((hub, side), peers) in &face_peers_map {
@@ -2430,6 +2601,126 @@ struct CandidateInput<'a> {
     spacing: f64,
 }
 
+fn widen_named_port_corridors(
+    scene: &SceneGraph,
+    rects: &mut [Rect],
+    o: &LayoutOptions,
+    spacing: f64,
+) {
+    let n = rects.len();
+    if n < 2 || !(0..n).any(|i| has_named_multiport(scene, i)) {
+        return;
+    }
+    let mut xs: Vec<f64> = rects.iter().map(|r| r.x).collect();
+    xs.sort_by(f64::total_cmp);
+    xs.dedup_by(|a, b| (*a - *b).abs() < 1.);
+    if xs.len() < 2 {
+        return;
+    }
+    let col_of = |x: f64| -> usize {
+        xs.iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| (*a - x).abs().total_cmp(&(*b - x).abs()))
+            .map_or(0, |(c, _)| c)
+    };
+    let mut extra_after: Vec<f64> = vec![0.; xs.len() - 1];
+    for e in &scene.edges {
+        let (Some(a), Some(b)) = (scene.index(&e.source.node), scene.index(&e.target.node))
+        else {
+            continue;
+        };
+        if !(has_named_multiport(scene, a) || has_named_multiport(scene, b)) {
+            continue;
+        }
+        let ca = col_of(rects[a].x);
+        let cb = col_of(rects[b].x);
+        if ca == cb {
+            continue;
+        }
+        let (left_idx, right_idx, lo_c, hi_c) = if ca < cb {
+            (a, b, ca, cb)
+        } else {
+            (b, a, cb, ca)
+        };
+        let cur_gap = rects[right_idx].left() - rects[left_idx].right();
+        let face_edges = scene
+            .edges
+            .iter()
+            .filter(|x| {
+                (scene.index(&x.source.node) == Some(a)
+                    || scene.index(&x.target.node) == Some(a))
+                    || (scene.index(&x.source.node) == Some(b)
+                        || scene.index(&x.target.node) == Some(b))
+            })
+            .count();
+        let req_gap = named_port_corridor_width(scene, e, a, b, face_edges, o) * spacing;
+        if cur_gap < req_gap && hi_c == lo_c + 1 {
+            extra_after[lo_c] = extra_after[lo_c].max(req_gap - cur_gap);
+        }
+    }
+    if extra_after.iter().all(|&d| d <= 1e-6) {
+        return;
+    }
+    let mut cum_shift = vec![0.; xs.len()];
+    for c in 1..xs.len() {
+        cum_shift[c] = cum_shift[c - 1] + extra_after[c - 1];
+    }
+    for r in rects.iter_mut() {
+        let c = col_of(r.x);
+        r.x += cum_shift[c];
+    }
+}
+
+fn compact_unlabeled_fan_column(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions) {
+    let n = scene.nodes.len();
+    if n < 4 || scene.edges.is_empty() {
+        return;
+    }
+    let mut deg = vec![0usize; n];
+    for e in &scene.edges {
+        if let (Some(a), Some(b)) = (scene.index(&e.source.node), scene.index(&e.target.node))
+            && a != b
+        {
+            deg[a] += 1;
+            deg[b] += 1;
+        }
+    }
+    let Some((hub, _)) = deg
+        .iter()
+        .enumerate()
+        .max_by_key(|&(i, &d)| (d, std::cmp::Reverse(i)))
+        .filter(|&(_, &d)| d >= 3)
+    else {
+        return;
+    };
+    let is_star = scene.edges.iter().all(|e| {
+        let (Some(a), Some(b)) = (scene.index(&e.source.node), scene.index(&e.target.node))
+        else {
+            return false;
+        };
+        (a == hub && b != hub && deg[b] == 1) || (b == hub && a != hub && deg[a] == 1)
+    });
+    if !is_star {
+        return;
+    }
+    let mut leaves: Vec<usize> = (0..n).filter(|&i| i != hub && deg[i] == 1).collect();
+    if leaves.len() < 3 {
+        return;
+    }
+    let x0 = rects[leaves[0]].x;
+    if !leaves.iter().all(|&i| (rects[i].x - x0).abs() < 1.0) {
+        return;
+    }
+    leaves.sort_by(|&a, &b| rects[a].y.total_cmp(&rects[b].y).then(a.cmp(&b)));
+    let max_h = leaves.iter().map(|&i| rects[i].h).fold(0.0f64, f64::max);
+    let step = max_h + o.margin * 2.;
+    let mid_y = rects[hub].y;
+    let top = mid_y - ((leaves.len() - 1) as f64 * step) * 0.5;
+    for (k, &leaf) in leaves.iter().enumerate() {
+        rects[leaf].y = top + k as f64 * step;
+    }
+}
+
 fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, bool), Error> {
     let scene = input.scene;
     let o = input.options;
@@ -2546,11 +2837,23 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
     }
     check_pin_cycles(scene, annotations)?;
 
+    let has_containers = scene.nodes.iter().any(|nd| nd.container);
     let plan_hints: &[Option<(Side, Side)>] = plan.map(|p| p.side_hints.as_slice()).unwrap_or(&[]);
     let init_requests = choose_port_sides(scene, &rects, plan_hints, o, previous);
+    let fixed_init: Vec<PortRequest>;
+    let pre_pack_requests = if previous.is_none() && !locks.has_pos_pin && has_containers {
+        fixed_init = init_requests
+            .iter()
+            .filter(|p| !matches!(p.spec, PortConstraint::Free))
+            .cloned()
+            .collect();
+        &fixed_init[..]
+    } else {
+        &init_requests[..]
+    };
     grow_port_perimeters(
         scene,
-        &init_requests,
+        pre_pack_requests,
         &mut rects,
         &locks.w_locked,
         &locks.h_locked,
@@ -2560,6 +2863,7 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
         p.axis != FlowAxis::LeftToRight
             || p.fold_row.iter().any(|&f| f > 0)
             || !p.side_hints.is_empty()
+            || !p.edge_guides.is_empty()
             || p.search_states > 0
     });
     if previous.is_none()
@@ -2597,6 +2901,19 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
             shape_stats = crate::topology::optimize(scene, &mut rects, o);
         }
         concept_sides = crate::topology::readable_concept(scene, &mut rects, o, true);
+        if concept_sides.is_some()
+            && !locks.has_pos_pin
+            && !has_containers
+            && scene
+                .edges
+                .iter()
+                .all(|e| crate::labels::connection_text(scene, e).trim().is_empty())
+        {
+            compact_unlabeled_fan_column(scene, &mut rects, o);
+        }
+        if !locks.has_pos_pin && !has_containers {
+            widen_named_port_corridors(scene, &mut rects, o, spacing);
+        }
         if !has_custom_plan && spacing > 1. {
             for r in &mut rects {
                 r.x *= spacing;
@@ -2857,6 +3174,7 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
             scene,
             o,
             requests: &requests,
+            plan_hints,
             pins: &pins,
             relatives: &relatives,
             w_locked: &locks.w_locked,
@@ -2900,6 +3218,7 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
                     scene,
                     o,
                     requests: &requests,
+                    plan_hints,
                     pins: &pins,
                     relatives: &relatives,
                     w_locked: &locks.w_locked,
@@ -4453,18 +4772,52 @@ fn assign_ports<'a>(
                         .insert(ai);
                 }
             }
-            for sweep in 0..4 {
-                let idxs: Vec<usize> = if sweep % 2 == 0 {
-                    (0..side_orders.len()).collect()
-                } else {
-                    (0..side_orders.len()).rev().collect()
-                };
-                for idx in idxs {
-                    let (i, side, ref ps, used_hdr_lo) = side_orders[idx];
+            let mut node_port_count = vec![0usize; scene.nodes.len()];
+            for req in requests {
+                node_port_count[req.node] += 1;
+            }
+            let mut port_meta: BTreeMap<&str, (usize, usize, Side, bool, bool)> = BTreeMap::new();
+            for (face_idx, &(_i, side, ref ps, _)) in side_orders.iter().enumerate() {
+                for (j, p) in ps.iter().enumerate() {
+                    port_meta.insert(
+                        p.key.as_str(),
+                        (face_idx, j, side, is_fixed_spec(&p.spec), ps.len() == 1),
+                    );
+                }
+            }
+            for horiz_axis in [true, false] {
+                let axis_faces: Vec<usize> = side_orders
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, (_, side, _, _))| matches!(side, Side::N | Side::S) == horiz_axis)
+                    .map(|(idx, _)| idx)
+                    .collect();
+                if axis_faces.is_empty() {
+                    continue;
+                }
+                let mut total_vars = 0usize;
+                let mut face_base = BTreeMap::new();
+                for &face_idx in &axis_faces {
+                    let (_, _, ref ps, _) = side_orders[face_idx];
+                    face_base.insert(face_idx, total_vars);
+                    total_vars += ps.len();
+                }
+                let mut desired = vec![0.; total_vars];
+                let mut weights = vec![1.; total_vars];
+                let mut cs = Vec::new();
+                let mut l1_terms = Vec::new();
+                let mut mutual_seen: BTreeSet<(usize, usize)> = BTreeSet::new();
+                let mut any_axis_facing = false;
+
+                for &face_idx in &axis_faces {
+                    let (i, side, ref ps, used_hdr_lo) = side_orders[face_idx];
+                    let base = face_base[&face_idx];
                     let r = rects[i];
-                    let horiz_side = matches!(side, Side::N | Side::S);
-                    let len = if horiz_side { r.w } else { r.h };
+                    let len = if horiz_axis { r.w } else { r.h };
                     let corner = o.corner.min(len / 4.);
+                    if len < 2. * corner - 1e-6 {
+                        continue;
+                    }
                     let hdr_lo = if used_hdr_lo {
                         container_header_rect(&scene.nodes[i], r)
                             .map(|h| (h.right() - r.left() + 12.).min(len - corner))
@@ -4475,24 +4828,24 @@ fn assign_ports<'a>(
                     };
                     let reverse = matches!(side, Side::S | Side::W);
                     let count = ps.len();
-                    if len < 2. * corner - 1e-6 {
-                        continue;
-                    }
-                    let mut desired = Vec::with_capacity(count);
-                    let mut weights = Vec::with_capacity(count);
-                    let mut cs = Vec::new();
+                    let face_origin = if horiz_axis { r.left() } else { r.top() };
+                    let (aff_s, aff_c) = if reverse {
+                        (-1., face_origin + len)
+                    } else {
+                        (1., face_origin)
+                    };
+
                     let first_fixed = is_fixed_spec(&ps[0].spec);
                     cs.push(Constraint {
-                        coefficients: vec![(0, 1.)],
+                        coefficients: vec![(base, 1.)],
                         rhs: if first_fixed { corner } else { hdr_lo },
                         equality: false,
                     });
                     cs.push(Constraint {
-                        coefficients: vec![(count - 1, -1.)],
+                        coefficients: vec![(base + count - 1, -1.)],
                         rhs: -(len - corner),
                         equality: false,
                     });
-                    let mut fo_pairs = Vec::new();
                     let mut order_items: Vec<(usize, u32)> = ps
                         .iter()
                         .enumerate()
@@ -4503,10 +4856,15 @@ fn assign_ports<'a>(
                         .collect();
                     order_items.sort_by_key(|&(j, order)| (order, j));
                     for pair in order_items.windows(2) {
-                        fo_pairs.push((pair[0].0, pair[1].0));
+                        cs.push(Constraint::separation(
+                            base + pair[0].0,
+                            base + pair[1].0,
+                            o.port_spacing,
+                        ));
                     }
-                    let mut any_facing = false;
+
                     for (j, p) in ps.iter().enumerate() {
+                        let v = base + j;
                         let base_t = (j + 1) as f64 * len / (count + 1) as f64;
                         let fixed = match p.spec {
                             PortConstraint::FixedRatio { ratio, .. } => Some(if reverse {
@@ -4521,105 +4879,153 @@ fn assign_ports<'a>(
                             }),
                             _ => None,
                         };
-                        if let Some(v) = fixed {
-                            desired.push(v);
-                            weights.push(1.);
-                            cs.push(Constraint::fixed(j, v));
-                        } else if let Some(peers) = facing_peers.get(&p.key) {
-                            let mut targets = Vec::new();
-                            for (peer_idx, peer_key) in peers {
-                                let peer_side = out.ports[peer_key].side;
-                                if count == 1
-                                    && side_distinct_peers
-                                        .get(&(*peer_idx, peer_side))
-                                        .is_some_and(|s| s.len() >= 3)
-                                {
-                                    continue;
-                                }
-                                let pr = rects[*peer_idx];
-                                let peer_len = if horiz_side { pr.w } else { pr.h };
-                                let peer_corner = o.corner.min(peer_len / 4.);
-                                let (ov_lo, ov_hi) = if horiz_side {
-                                    (
-                                        (r.left() + hdr_lo).max(pr.left() + peer_corner),
-                                        (r.right() - corner).min(pr.right() - peer_corner),
-                                    )
-                                } else {
-                                    (
-                                        (r.top() + hdr_lo).max(pr.top() + peer_corner),
-                                        (r.bottom() - corner).min(pr.bottom() - peer_corner),
-                                    )
-                                };
-                                if ov_lo > ov_hi + 1e-6 {
-                                    continue;
-                                }
-                                let peer_pt = out.ports[peer_key].point;
-                                let coord = if horiz_side {
-                                    peer_pt.x.clamp(ov_lo, ov_hi)
-                                } else {
-                                    peer_pt.y.clamp(ov_lo, ov_hi)
-                                };
-                                let (p0, p1) = if horiz_side {
-                                    (
-                                        Point::new(coord, r.bottom().min(pr.bottom())),
-                                        Point::new(coord, r.top().max(pr.top())),
-                                    )
-                                } else {
-                                    (
-                                        Point::new(r.right().min(pr.right()), coord),
-                                        Point::new(r.left().max(pr.left()), coord),
-                                    )
-                                };
-                                let blocked = rects.iter().enumerate().any(|(k, rk)| {
-                                    k != i
-                                        && k != *peer_idx
-                                        && !scene.nodes[k].container
-                                        && rk.inflate(o.margin).blocks(p0, p1)
-                                });
-                                if !blocked {
-                                    let t_raw = if horiz_side {
-                                        coord - r.left()
-                                    } else {
-                                        coord - r.top()
-                                    };
-                                    let param = if reverse { len - t_raw } else { t_raw };
-                                    targets.push(param.clamp(hdr_lo, len - corner));
-                                }
-                            }
-                            if targets.is_empty() {
-                                desired.push(base_t);
-                                weights.push(1.);
-                            } else {
-                                any_facing = true;
-                                desired.push(targets.iter().sum::<f64>() / targets.len() as f64);
-                                weights.push(12.);
-                            }
+                        if let Some(fv) = fixed {
+                            desired[v] = fv;
+                            weights[v] = 1.;
+                            cs.push(Constraint::fixed(v, fv));
                         } else {
-                            desired.push(base_t);
-                            weights.push(1.);
+                            desired[v] = base_t;
+                            weights[v] = if node_port_count[i] >= 3 && count == 1 {
+                                0.1
+                            } else {
+                                1.
+                            };
+                            if let Some(peers) = facing_peers.get(&p.key) {
+                                let mut uni_targets = Vec::new();
+                                for (peer_idx, peer_key) in peers {
+                                    let peer_side = out.ports[peer_key].side;
+                                    if count == 1
+                                        && side_distinct_peers
+                                            .get(&(*peer_idx, peer_side))
+                                            .is_some_and(|s| s.len() >= 3)
+                                    {
+                                        continue;
+                                    }
+                                    let pr = rects[*peer_idx];
+                                    let peer_len = if horiz_axis { pr.w } else { pr.h };
+                                    let peer_corner = o.corner.min(peer_len / 4.);
+                                    let (ov_lo, ov_hi) = if horiz_axis {
+                                        (
+                                            (r.left() + hdr_lo).max(pr.left() + peer_corner),
+                                            (r.right() - corner).min(pr.right() - peer_corner),
+                                        )
+                                    } else {
+                                        (
+                                            (r.top() + hdr_lo).max(pr.top() + peer_corner),
+                                            (r.bottom() - corner).min(pr.bottom() - peer_corner),
+                                        )
+                                    };
+                                    if ov_lo > ov_hi + 1e-6 {
+                                        continue;
+                                    }
+                                    let peer_pt = out.ports[peer_key].point;
+                                    let coord = if horiz_axis {
+                                        peer_pt.x.clamp(ov_lo, ov_hi)
+                                    } else {
+                                        peer_pt.y.clamp(ov_lo, ov_hi)
+                                    };
+                                    let (p0, p1) = if horiz_axis {
+                                        (
+                                            Point::new(coord, r.bottom().min(pr.bottom())),
+                                            Point::new(coord, r.top().max(pr.top())),
+                                        )
+                                    } else {
+                                        (
+                                            Point::new(r.right().min(pr.right()), coord),
+                                            Point::new(r.left().max(pr.left()), coord),
+                                        )
+                                    };
+                                    let blocked = rects.iter().enumerate().any(|(k, rk)| {
+                                        k != i
+                                            && k != *peer_idx
+                                            && !scene.nodes[k].container
+                                            && rk.inflate(o.margin).blocks(p0, p1)
+                                    });
+                                    if blocked {
+                                        continue;
+                                    }
+                                    any_axis_facing = true;
+                                    let peer_yields = peers.len() == 1
+                                        && facing_peers
+                                            .get(peer_key.as_str())
+                                            .is_some_and(|back| back.len() == 1)
+                                        && port_meta.get(peer_key.as_str()).is_some_and(
+                                            |&(p_face, _p_j, _, p_fixed, p_single)| {
+                                                let peer_fan_skip = p_single
+                                                    && side_distinct_peers
+                                                        .get(&(i, side))
+                                                        .is_some_and(|s| s.len() >= 3);
+                                                !p_fixed && !peer_fan_skip && face_base.contains_key(&p_face)
+                                            },
+                                        );
+                                    if peer_yields
+                                        && let Some(&(p_face, p_j, p_side, _, _)) =
+                                            port_meta.get(peer_key.as_str())
+                                    {
+                                        let pv = face_base[&p_face] + p_j;
+                                        let pair_id = (v.min(pv), v.max(pv));
+                                        if mutual_seen.insert(pair_id) {
+                                            let p_len = if horiz_axis { pr.w } else { pr.h };
+                                            let p_orig =
+                                                if horiz_axis { pr.left() } else { pr.top() };
+                                            let (ps_aff, pc_aff) =
+                                                if matches!(p_side, Side::S | Side::W) {
+                                                    (-1., p_orig + p_len)
+                                                } else {
+                                                    (1., p_orig)
+                                                };
+                                            l1_terms.push(L1Term::new(
+                                                vec![(v, aff_s), (pv, -ps_aff)],
+                                                pc_aff - aff_c,
+                                                500.,
+                                            ));
+                                        }
+                                    } else {
+                                        let t_raw = if horiz_axis {
+                                            coord - r.left()
+                                        } else {
+                                            coord - r.top()
+                                        };
+                                        let param = if reverse { len - t_raw } else { t_raw };
+                                        uni_targets.push(param.clamp(hdr_lo, len - corner));
+                                    }
+                                }
+                                if !uni_targets.is_empty() {
+                                    desired[v] =
+                                        uni_targets.iter().sum::<f64>() / uni_targets.len() as f64;
+                                    weights[v] = 12.;
+                                }
+                            }
                         }
                         if j > 0 {
-                            cs.push(Constraint::separation(j - 1, j, o.port_spacing));
+                            cs.push(Constraint::separation(v - 1, v, o.port_spacing));
                         }
                     }
-                    for (a, b) in fo_pairs {
-                        cs.push(Constraint::separation(a, b, o.port_spacing));
-                    }
-                    if !any_facing {
-                        continue;
-                    }
-                    if let Ok(positions) = solver::project(&desired, &weights, &cs)
-                        && positions
+                }
+                if !any_axis_facing {
+                    continue;
+                }
+                let linear = vec![0.; total_vars];
+                if let Ok(solved) =
+                    solver::project_compacted(&desired, &weights, &cs, &linear, &l1_terms)
+                {
+                    for &face_idx in &axis_faces {
+                        let (i, side, ref ps, _) = side_orders[face_idx];
+                        let r = rects[i];
+                        let len = if horiz_axis { r.w } else { r.h };
+                        let corner = o.corner.min(len / 4.);
+                        let reverse = matches!(side, Side::S | Side::W);
+                        let base = face_base[&face_idx];
+                        let slice = &solved[base..base + ps.len()];
+                        if slice
                             .iter()
                             .all(|&pos| pos >= corner - 1e-5 && pos <= len - corner + 1e-5)
-                    {
-                        let node = &scene.nodes[i];
-                        for (j, p) in ps.iter().enumerate() {
-                            let mut t = positions[j];
-                            if reverse {
-                                t = len - t;
+                        {
+                            let node = &scene.nodes[i];
+                            for (j, p) in ps.iter().enumerate() {
+                                let t = if reverse { len - slice[j] } else { slice[j] };
+                                write_port(node, r, side, t, &p.key, out);
                             }
-                            write_port(node, r, side, t, &p.key, out);
                         }
                     }
                 }
@@ -5803,5 +6209,115 @@ mod tests {
         let shifted = container_header_rect_with_ports(grp, r, &ports).unwrap();
         assert!(shifted.left() >= base.x + 12. - 1e-6);
         assert!(shifted.right() <= r.right() - 12. + 1e-6);
+    }
+
+    #[test]
+    fn named_duplex_ports_keep_leaf_proportions_and_wide_corridor() {
+        let src = include_str!("../tests/fixtures/quality/10-many-named-ports.diagram");
+        let scene = lower(&parse(src));
+        let opts = LayoutOptions::default();
+        let l = layout(&scene, &opts, None).unwrap();
+        let widths: Vec<f64> = (0..4).map(|i| l.nodes[&format!("p{i}")].w).collect();
+        let max_w = widths.iter().copied().fold(0., f64::max);
+        let min_w = widths.iter().copied().fold(f64::INFINITY, f64::min);
+        assert!(max_w / min_w < 1.15, "leaf width ratio: {:?}", widths);
+        for i in 0..4 {
+            let r = l.nodes[&format!("p{i}")];
+            assert!(r.w > r.h, "expected leaf-proportioned rect for p{i}: {r:?}");
+        }
+        let q = l.nodes["queue"];
+        let p0 = l.nodes["p0"];
+        let corridor = q.left() - p0.right();
+        assert!(
+            corridor >= 180.,
+            "expected widened named-port corridor >= 180px, got {corridor} (p0={p0:?}, q={q:?})"
+        );
+    }
+
+    #[test]
+    fn pair_bundle_and_hinted_facing_align_in_stage1b() {
+        let opts = LayoutOptions::default();
+        // Parallel bundle (a <-> b with >= 2 edges) aligns rows even when b also has
+        // an external incoming edge from a lower rank/row.
+        let bundle_src = "u -> v -> y;\nroot -> a;\na -> b: m1;\na -> b: m2;\na -> b: m3;\ny -> b;";
+        let bundle_scene = lower(&parse(bundle_src));
+        let bundle_layout = layout(&bundle_scene, &opts, None).unwrap();
+        let ra = bundle_layout.nodes["a"];
+        let rb = bundle_layout.nodes["b"];
+        assert!(
+            (ra.y - rb.y).abs() < 1e-2,
+            "pair_bundle should align rows: a={ra:?}, b={rb:?}"
+        );
+
+        // Hinted facing S -> N on a folded bypass aligns x even when deg >= 3 and desired x differs.
+        let hint_src = "n0; n1; n2; n3; n4; s0; s1;\nn0 -> n1; n1 -> n2; n2 -> n3; n3 -> n4; n1 -> n4;\ns0 -> n1; n4 -> s1;";
+        let scene = lower(&parse(hint_src));
+        let annotations: Vec<Vec<Annotation>> = scene
+            .nodes
+            .iter()
+            .map(|nd| effective_annotations(&scene, &nd.id, &nd.annotations, opts.variant.as_deref()))
+            .collect();
+        let locks = parse_pin_locks(&annotations, &opts).unwrap();
+        let base_sizes = compute_base_sizes(&scene, &locks, &opts).unwrap();
+        let mut side_hints = vec![None; scene.edges.len()];
+        let bypass_idx = scene
+            .edges
+            .iter()
+            .position(|e| e.source.node == "n1" && e.target.node == "n4")
+            .unwrap();
+        side_hints[bypass_idx] = Some((Side::S, Side::N));
+        let plan = crate::topology::TopologyPlan {
+            axis: crate::topology::FlowAxis::LeftToRight,
+            ranks: vec![0, 1, 2, 2, 1, 0, 2],
+            order: vec![0, 0, 0, 1, 1, 1, 2],
+            fold_row: vec![0, 0, 0, 1, 1, 0, 1],
+            edge_guides: BTreeMap::new(),
+            side_hints,
+            search_states: 1,
+        };
+        let input = CandidateInput {
+            scene: &scene,
+            options: &opts,
+            annotations: &annotations,
+            locks: &locks,
+            base_sizes: &base_sizes,
+            plan: Some(&plan),
+            previous: None,
+            spacing: 1.,
+        };
+        let (hinted_layout, _, _) = solve_candidate_layout(&input).unwrap();
+        let n1 = hinted_layout.nodes["n1"];
+        let n4 = hinted_layout.nodes["n4"];
+        assert!(
+            (n1.x - n4.x).abs() < 1e-2,
+            "hinted_facing (S, N) should align n1.x == n4.x: n1={n1:?}, n4={n4:?}"
+        );
+    }
+
+    #[test]
+    fn edge_guides_widen_rank_corridor_gaps_in_build_plan_rects() {
+        let opts = LayoutOptions::default();
+        let scene = lower(&parse("a -> b -> c; d -> b;"));
+        let sizes = vec![Point::new(100., 40.); scene.nodes.len()];
+        let mut plain = crate::topology::TopologyPlan {
+            axis: crate::topology::FlowAxis::LeftToRight,
+            ranks: vec![0, 1, 2, 0],
+            order: vec![0, 0, 0, 2],
+            fold_row: vec![0; scene.nodes.len()],
+            edge_guides: BTreeMap::new(),
+            side_hints: Vec::new(),
+            search_states: 0,
+        };
+        let rects_plain = build_plan_rects(&scene, &sizes, &plain, &opts, 1.);
+        plain.edge_guides.insert("g0".into(), vec![(0, 1.0)]);
+        plain.edge_guides.insert("g1".into(), vec![(0, 1.25)]);
+        plain.edge_guides.insert("g2".into(), vec![(0, 1.5)]);
+        let rects_guided = build_plan_rects(&scene, &sizes, &plain, &opts, 1.);
+        let gap_plain = rects_plain[3].top() - rects_plain[0].bottom();
+        let gap_guided = rects_guided[3].top() - rects_guided[0].bottom();
+        assert!(
+            gap_guided >= gap_plain + 2. * opts.lane_spacing - 1e-6,
+            "expected guided gap >= plain + 2*lane_spacing, got plain={gap_plain}, guided={gap_guided}"
+        );
     }
 }
