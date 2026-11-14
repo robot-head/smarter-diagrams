@@ -56,11 +56,14 @@ view control_loop {
 ```
 ````
 
-### Supported fence attributes
+### Supported fence & shortcode attributes
+
+Both fenced blocks (` ```diagram ` / ` ```smarter-diagrams `) and Hugo shortcodes (`{{< diagram ... >}}...{{< /diagram >}}` / `{{< smarter-diagrams ... >}}...{{< /smarter-diagrams >}}`) accept the same named attributes:
 
 | Attribute | Values | Description |
 | --- | --- | --- |
 | `view` | `<view_id>` | Project a declared `view <view_id> { ... }` (static pre-render mode). |
+| `step` | `<step_id>` | Project a progressive `step <step_id>` or `scenario <step_id>` (`--step` / `step_svg`). |
 | `focus` | `<node_id>` | Dim nodes outside `hops` steps from `<node_id>` (`WasmDocument.focus_svg`). |
 | `hops` | `1`, `2`, ... | Hop radius when `focus` is set (defaults to `1`). |
 | `caption` | Markdown text | Renders a `<figcaption class="smarter-diagram-caption">` under the diagram. |

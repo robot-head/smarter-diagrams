@@ -9,6 +9,7 @@ process.env.VITE_EXTRA_EXTENSIONS = 'diagram,wasm'
 const guide = [
   ['Getting started', 'getting-started'], ['Core concepts', 'concepts'],
   ['Domain demonstrations', 'demonstrations'], ['Hugo fenced blocks', 'hugo'],
+  ['Kroki service', 'kroki'], ['Language server (LSP)', 'lsp'],
   ['Using Rust', 'rust'], ['Structured editing', 'editing'],
   ['CLI and export', 'cli'], ['WebAssembly', 'wasm'],
   ['Editor previews', 'editors'], ['MCP tools', 'mcp'],

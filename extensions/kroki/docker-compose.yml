@@ -1,0 +1,16 @@
+services:
+  kroki:
+    image: yuzutech/kroki:latest
+    ports:
+      - "8000:8000"
+    environment:
+      KROKI_SAFE_MODE: "secure"
+    depends_on:
+      - smarterdiagrams
+
+  smarterdiagrams:
+    build:
+      context: ../..
+      dockerfile: extensions/kroki/Dockerfile
+    ports:
+      - "8008:8008"

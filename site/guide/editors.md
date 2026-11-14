@@ -30,7 +30,9 @@ require('smarter_diagrams').setup({
 
 Run `:DiagramPreview` in a `.diagram` buffer. A loopback-only server opens the browser and refreshes the SVG after buffer changes. Compiler errors become Neovim diagnostics. The server exits when Neovim closes its input stream.
 
-Options `node` and `server` override transport paths. `on_open = function(url) ... end` overrides browser launch and supports headless integration tests. For scripted source edits, invoke `smarter-diagrams edit --operations JSON`; interactive canvas editing is provided by the [Wasm playground](/playground).
+On Neovim 0.13+, run `:DiagramPreviewInline [theme]` to render PNG previews directly in an adjacent split buffer via Neovim's `vim.ui.img` API (`set`/`del`), updating on buffer changes and cleaning up with `:DiagramPreviewStop`. On Neovim 0.11 and 0.12 (where `vim.ui.img` is not yet present), `:DiagramPreviewInline` falls back cleanly to `:DiagramPreview`. The plugin also attaches `smarter-diagrams lsp` automatically for `.diagram` buffers (pass `lsp = false` to `setup()` to opt out).
+
+Options `node` and `server` override transport paths. `on_open = function(url) ... end` overrides browser launch and supports headless integration tests. For scripted source edits, invoke `smarter-diagrams edit --operations JSON`; interactive canvas editing is provided by the [Wasm playground](/playground). See [Language server (LSP)](/guide/lsp) for LSP capabilities and configuration.
 
 ## Hugo and static site publishing
 

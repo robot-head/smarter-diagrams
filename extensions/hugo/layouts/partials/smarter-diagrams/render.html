@@ -3,6 +3,7 @@
 
 {{- $mode := default (default "auto" (index $cfg "mode")) (index $attrs "mode") -}}
 {{- $view := default "" (index $attrs "view") -}}
+{{- $step := default "" (index $attrs "step") -}}
 {{- $focus := default "" (index $attrs "focus") -}}
 {{- $hopsRaw := default "" (index $attrs "hops") -}}
 {{- $hops := cond (ne (printf "%v" $hopsRaw) "") (printf "%v" $hopsRaw) (cond (ne $focus "") "1" "") -}}
@@ -15,7 +16,8 @@
 
 {{- $normalized := replaceRE "\r\n" "\n" .Inner -}}
 {{- $source := strings.TrimSpace $normalized -}}
-{{- $keyInput := printf "smarter-diagrams:v1\nview=%s\nfocus=%s\nhops=%s\n---\n%s" $view $focus $hops $source -}}
+{{- $stepLine := cond (ne $step "") (printf "\nstep=%s" $step) "" -}}
+{{- $keyInput := printf "smarter-diagrams:v1\nview=%s%s\nfocus=%s\nhops=%s\n---\n%s" $view $stepLine $focus $hops $source -}}
 {{- $hash := sha256 $keyInput -}}
 
 {{- partial "smarter-diagrams/head.html" . -}}
@@ -32,7 +34,7 @@
   {{- if $useStatic }}
   <div class="smarter-diagram-canvas">{{ $staticSvg.Content | safeHTML }}</div>
   {{- else }}
-  {{- $payload := dict "source" $source "view" $view "focus" $focus "hops" $hops -}}
+  {{- $payload := dict "source" $source "view" $view "step" $step "focus" $focus "hops" $hops -}}
   <div class="smarter-diagram-canvas" data-sd-wasm="pending" data-sd-payload="{{ $payload | jsonify }}">
     <noscript><pre class="smarter-diagram-error">JavaScript and WebAssembly are required to render this diagram in browser mode, or pre-render SVGs at build time with prerender.mjs.</pre></noscript>
   </div>
@@ -52,6 +54,10 @@
             if (payload.focus) {
               const doc = new WasmDocument(payload.source);
               svg = doc.focus_svg(payload.focus, Math.max(1, Number.parseInt(payload.hops || '1', 10) || 1));
+              doc.free();
+            } else if (payload.step || payload.view) {
+              const doc = new WasmDocument(payload.source);
+              svg = doc.step_svg(payload.step || payload.view, 'auto');
               doc.free();
             } else {
               svg = render_svg(payload.source);

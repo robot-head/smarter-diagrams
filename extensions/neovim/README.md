@@ -1,14 +1,15 @@
-# Neovim preview
+# Neovim adapter
 
-Neovim 0.11+, Node, and the Rust CLI are required. Keep this directory inside the repository so the preview server can be found.
+Live preview (`:DiagramPreview` and `:DiagramPreviewInline`), LSP integration (`smarter-diagrams lsp`), and diagnostics for `.diagram` buffers.
 
 ```lua
-vim.opt.runtimepath:append('/absolute/path/to/smarter-diagrams/extensions/neovim')
+vim.opt.runtimepath:append('/path/to/smarter-diagrams/extensions/neovim')
 require('smarter_diagrams').setup({
-  binary = '/absolute/path/to/smarter-diagrams',
+  binary = '/path/to/smarter-diagrams', -- omit if on PATH
 })
 ```
 
-Open a `.diagram` buffer and run `:DiagramPreview`. A loopback HTTP server opens a browser preview and refreshes it as the buffer changes. Errors become Neovim diagnostics. The child server exits when Neovim closes its input stream.
-
-For custom installations, `node` and `server` override executable/server paths. `on_open = function(url) ... end` overrides browser launch, which also supports headless integration checks. Structured source edits are available through `smarter-diagrams edit --operations JSON`; the browser Wasm demo supplies interactive canvas gestures.
+- **`:DiagramPreviewInline [theme]`**: Renders PNG bytes via `smarter-diagrams - --format png` into an inline side split using Neovim 0.13+'s `vim.ui.img` (`set`/`del`), automatically updating as you edit. On Neovim 0.11/0.12 (where `vim.ui.img` is absent), it falls back cleanly to `:DiagramPreview`.
+- **`:DiagramPreviewStop`**: Clears active `vim.ui.img` handles and closes the inline preview window.
+- **`:DiagramPreview`**: Starts the local HTTP + WebSocket preview server (`scripts/preview-server.cjs`) and opens a browser tab.
+- **LSP**: Automatically attaches `smarter-diagrams lsp` on `.diagram` files for diagnostics, hover, go-to-definition, references, rename, and formatting (pass `lsp = false` to `setup()` to disable).

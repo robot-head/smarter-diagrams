@@ -15,6 +15,8 @@
     "test:layout-quality": "node scripts/layout-quality-rounds.cjs",
     "test:layout-review": "node scripts/check-layout-review.cjs",
     "test:hugo": "node scripts/hugo-plugin-test.cjs",
+    "test:neovim": "node scripts/neovim-plugin-test.cjs",
+    "test:kroki": "node scripts/kroki-test.cjs",
     "test:licenses": "node scripts/license-check.cjs"
   },
   "devDependencies": {

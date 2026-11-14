@@ -83,11 +83,14 @@ view control_loop {
 }
 ```
 
-### Fence attributes
+### Fence & shortcode attributes
+
+Both fenced `diagram` / `smarter-diagrams` code blocks and Hugo shortcodes (<code v-pre>{{&lt; diagram view="..." &gt;}}...{{&lt; /diagram &gt;}}</code> or <code v-pre>{{&lt; smarter-diagrams step="..." &gt;}}...{{&lt; /smarter-diagrams &gt;}}</code>) share the same attributes and pre-rendering cache:
 
 | Attribute | Example | Effect |
 | --- | --- | --- |
 | `view` | `view="control_loop"` | Projects `view control_loop { ... }` via `smarter-diagrams --view` during pre-rendering. |
+| `step` | `step="s2"` | Projects cumulative progressive disclosure `step` or `scenario` via `smarter-diagrams --step`. |
 | `focus` | `focus="checkout"` | Highlights nodes within `hops` steps of `checkout` and dims distant context (`0.35` opacity). |
 | `hops` | `hops="2"` | Sets the hop radius for `focus` (defaults to `1`). |
 | `caption` | `caption="Figure 1: Ka-band bearer"` | Renders a `<figcaption class="smarter-diagram-caption">` beneath the canvas. |

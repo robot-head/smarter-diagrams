@@ -1,0 +1,6 @@
+{{- $attrs := dict -}}
+{{- if .IsNamedParams -}}
+  {{- $attrs = .Params -}}
+{{- end -}}
+{{- $ctx := dict "Attributes" $attrs "Inner" .Inner "Page" .Page "Position" .Position -}}
+{{- partial "smarter-diagrams/render.html" $ctx -}}

@@ -31,6 +31,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             std::io::stdout().lock(),
         )?);
     }
+    if args.peek().is_some_and(|a| a == "lsp") {
+        return Ok(smarter_diagrams::lsp::serve(
+            std::io::stdin().lock(),
+            std::io::stdout().lock(),
+        )?);
+    }
     let (
         mut input,
         mut output,
@@ -56,7 +62,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             "-h" | "--help" => {
                 println!(
-                    "smarter-diagrams [INPUT|-] [-o OUTPUT] [--view NAME] [--step NAME] [--theme NAME] [--theme-file PATH] [--format svg|json|check|lint|png|pdf|gif|apng] [--frames N] [--fps N] [--events E1,E2,...] [--no-explore-candidates]\nsmarter-diagrams mcp\nPNG/PDF/GIF/APNG require cargo install --features export. Omit INPUT to read stdin."
+                    "smarter-diagrams [INPUT|-] [-o OUTPUT] [--view NAME] [--step NAME] [--theme NAME] [--theme-file PATH] [--format svg|json|check|lint|png|pdf|gif|apng] [--frames N] [--fps N] [--events E1,E2,...] [--no-explore-candidates]\nsmarter-diagrams mcp\nsmarter-diagrams lsp\nPNG/PDF/GIF/APNG require cargo install --features export. Omit INPUT to read stdin."
                 );
                 return Ok(());
             }

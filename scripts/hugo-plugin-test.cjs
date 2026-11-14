@@ -117,6 +117,18 @@ edge_gw -> checkout: gRPC
 checkout -> postgres: SQL
 postgres -> replica: WAL
 \`\`\`
+
+{{< diagram id="fig-shortcode-step" step="s2" caption="Shortcode progressive step 2" >}}
+client -> api: HTTPS
+api -> cache: Redis
+api -> db: SQL
+step s1 {
+  include client -> api
+}
+step s2 {
+  include api -> cache
+}
+{{< /diagram >}}
 `
     );
 
@@ -135,7 +147,7 @@ postgres -> replica: WAL
       { encoding: 'utf8' }
     );
     assert.equal(prerender.status, 0, prerender.stderr || prerender.stdout);
-    assert.match(prerender.stdout, /2 diagram block\(s\) across 1 file\(s\) \(2 rendered, 0 cached\)/);
+    assert.match(prerender.stdout, /3 diagram block\(s\) across 1 file\(s\) \(3 rendered, 0 cached\)/);
 
     const cachedRun = spawnSync(
       process.execPath,
@@ -143,7 +155,7 @@ postgres -> replica: WAL
       { encoding: 'utf8' }
     );
     assert.equal(cachedRun.status, 0, cachedRun.stderr || cachedRun.stdout);
-    assert.match(cachedRun.stdout, /\(0 rendered, 2 cached\)/);
+    assert.match(cachedRun.stdout, /\(0 rendered, 3 cached\)/);
 
     const hugoRes = spawnSync(
       hugoBin,
@@ -194,6 +206,10 @@ postgres -> replica: WAL
         '0.35'
       );
 
+      assert.equal(await page.locator('#fig-shortcode-step').getAttribute('data-sd-mode'), 'static');
+      assert.equal(await page.locator('#fig-shortcode-step [data-node="cache"]').count(), 1);
+      assert.equal(await page.locator('#fig-shortcode-step [data-node="db"]').count(), 0, 'step s2 must omit db');
+
       for (const theme of ['light', 'dark']) {
         await page.evaluate(t => {
           document.documentElement.dataset.theme = t;
@@ -214,7 +230,7 @@ postgres -> replica: WAL
             el.outerHTML.replace('<svg ', `<svg style="${vars}" `)
           );
         });
-        assert.equal(svgs.length, 3);
+        assert.equal(svgs.length, 4);
         for (const markup of svgs) {
           assert.deepEqual(await page.evaluate(checkSvg, markup), [], `SVG check failed in ${theme} theme`);
         }

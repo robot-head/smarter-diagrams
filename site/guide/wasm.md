@@ -41,9 +41,30 @@ document.free();
 | `edit_source(source, operations_json)` | New source after a typed operation batch |
 | `WasmDocument` | Stateful source, revision, SVG, edits and undo/redo |
 
-`WasmDocument` also exposes `drag(drags_json)`, `focus_svg(node, hops)`, `flows_json()` and `flow_frame_svg(id, step)`. For continuous dragging, call `const preview = document.begin_drag()`, `preview.update(drags_json)` and display `preview.svg()`. Commit with `document.commit_drag(preview)`, then `preview.free()`. Failed updates retain the last valid preview and prevent commit until a valid update succeeds. Dropping commits the displayed layout; it does not rerun layout or snap coordinates. `preview.settle()` validates without changing the image. `drag(drags_json)` remains the explicit semantic snapping helper. Drag coordinates are pixels; flow steps are zero-based. JSON payloads use the Rust types' Serde representation. Errors cross the boundary as JavaScript exceptions.
+`WasmDocument` also exposes `drag(drags_json)`, `focus_svg(node, hops)`, `step_svg(name, theme_or_base16)`, `svg_themed(theme_or_base16)`, `flows_json()` and `flow_frame_svg(id, step)`. For continuous dragging, call `const preview = document.begin_drag()`, `preview.update(drags_json)` and display `preview.svg()`. Commit with `document.commit_drag(preview)`, then `preview.free()`. Failed updates retain the last valid preview and prevent commit until a valid update succeeds. Dropping commits the displayed layout; it does not rerun layout or snap coordinates. `preview.settle()` validates without changing the image. `drag(drags_json)` remains the explicit semantic snapping helper. Drag coordinates are pixels; flow steps are zero-based. JSON payloads use the Rust types' Serde representation. Errors cross the boundary as JavaScript exceptions.
 
 For direct caption editing, use `preview.update_label(edge_id, x, y)` with a pixel-coordinate center, then commit with `document.commit_drag(preview)`. `preview.reset_label(edge_id)` restores automatic placement. Both operations preserve node and route geometry and use the same cancellation/history rules. The Playground updates SVG objects in place and reuses valid caption solutions during node motion to avoid rebuilding the canvas each frame.
+
+## Drop-in `<smarter-diagram>` embed plugin
+
+`web/embed.js` registers a zero-dependency `<smarter-diagram>` Custom Element that lazy-initializes the core Wasm bundle once per page and renders inside an isolated shadow root:
+
+```html
+<script type="module" src="/demo/embed.js"></script>
+
+<smarter-diagram theme="catppuccin-mocha" step="step2">
+  client -> api: HTTPS
+  api -> cache: Redis
+  api -> db: SQL
+  step step1 { include client -> api }
+  step step2 { include api -> cache }
+</smarter-diagram>
+
+<!-- Or load an external .diagram file -->
+<smarter-diagram src="/examples/architecture.diagram" theme="solarized-dark"></smarter-diagram>
+```
+
+Supported attributes: `src`, `theme` (built-in or Base16 YAML/JSON), `view`, `step`, `focus`, `hops`, and `wasm-url`.
 
 ## Lazy runtime exports
 

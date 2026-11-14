@@ -55,11 +55,8 @@ function walkMarkdown(dir, out = []) {
   return out;
 }
 
-export function parseHugoAttrs(infoRest) {
+function parseAttrPairs(body) {
   const attrs = {};
-  const braceMatch = infoRest.match(/\{([\s\S]*)\}/);
-  if (!braceMatch) return attrs;
-  const body = braceMatch[1];
   const re = /([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^\s}]+))/g;
   for (const m of body.matchAll(re)) {
     const rawVal = m[2] ?? m[3] ?? m[4] ?? '';
@@ -68,36 +65,78 @@ export function parseHugoAttrs(infoRest) {
   return attrs;
 }
 
+export function parseHugoAttrs(infoRest) {
+  const braceMatch = infoRest.match(/\{([\s\S]*)\}/);
+  return braceMatch ? parseAttrPairs(braceMatch[1]) : {};
+}
+
 export function extractFences(markdown) {
   const normalized = markdown.replace(/\r\n/g, '\n');
   const lines = normalized.split('\n');
-  const blocks = [];
+  const entries = [];
+  const outsideLines = [];
   let i = 0;
+  let offset = 0;
+
+  const lineLengthWithNl = idx => lines[idx].length + (idx + 1 < lines.length ? 1 : 0);
+
   while (i < lines.length) {
-    const open = lines[i].match(/^\s*(`{3,}|~{3,})\s*(diagram|smarter-diagrams)(?=\s|\{|$)(.*)$/);
-    if (!open) {
+    const line = lines[i];
+    const diagOpen = line.match(/^\s*(`{3,}|~{3,})\s*(diagram|smarter-diagrams)(?=\s|\{|$)(.*)$/);
+    const otherOpen = !diagOpen ? line.match(/^\s*(`{3,}|~{3,})(.*)$/) : null;
+    if (!diagOpen && !otherOpen) {
+      outsideLines.push(line);
+      offset += lineLengthWithNl(i);
       i++;
       continue;
     }
-    const fence = open[1];
+
+    const startOffset = offset;
+    const fence = (diagOpen || otherOpen)[1];
     const fenceChar = fence[0];
-    const attrs = parseHugoAttrs(open[3] || '');
+    const attrs = diagOpen ? parseHugoAttrs(diagOpen[3] || '') : null;
     const body = [];
+    outsideLines.push(' '.repeat(line.length));
+    offset += lineLengthWithNl(i);
     i++;
     const closeRe = new RegExp(`^\\s*${fenceChar}{${fence.length},}\\s*$`);
     while (i < lines.length && !closeRe.test(lines[i])) {
       body.push(lines[i]);
+      outsideLines.push(' '.repeat(lines[i].length));
+      offset += lineLengthWithNl(i);
       i++;
     }
-    if (i < lines.length) i++;
-    blocks.push({ source: body.join('\n').trim(), attrs });
+    if (i < lines.length) {
+      outsideLines.push(' '.repeat(lines[i].length));
+      offset += lineLengthWithNl(i);
+      i++;
+    }
+    if (diagOpen) {
+      entries.push({ offset: startOffset, source: body.join('\n').trim(), attrs });
+    }
   }
-  return blocks;
+
+  const outsideText = outsideLines.join('\n');
+  const shortcodeRe =
+    /\{\{<\s*(diagram|smarter-diagrams)(?:\s+([^>]*?))?\s*>\}\}([\s\S]*?)\{\{<\s*\/\1\s*>\}\}|\{\{%\s*(diagram|smarter-diagrams)(?:\s+([^%]*?))?\s*%\}\}([\s\S]*?)\{\{%\s*\/\4\s*%\}\}/g;
+  for (const m of outsideText.matchAll(shortcodeRe)) {
+    const rawAttrs = m[2] ?? m[5] ?? '';
+    const inner = m[3] ?? m[6] ?? '';
+    entries.push({
+      offset: m.index,
+      source: inner.trim(),
+      attrs: parseAttrPairs(rawAttrs),
+    });
+  }
+
+  entries.sort((a, b) => a.offset - b.offset);
+  return entries.map(({ source, attrs }) => ({ source, attrs }));
 }
 
-export function computeHash({ source, view = '', focus = '', hops = '' }) {
+export function computeHash({ source, view = '', step = '', focus = '', hops = '' }) {
   const effectiveHops = String(hops) !== '' ? String(hops) : focus ? '1' : '';
-  const keyInput = `smarter-diagrams:v1\nview=${view}\nfocus=${focus}\nhops=${effectiveHops}\n---\n${source}`;
+  const stepLine = step ? `\nstep=${step}` : '';
+  const keyInput = `smarter-diagrams:v1\nview=${view}${stepLine}\nfocus=${focus}\nhops=${effectiveHops}\n---\n${source}`;
   return createHash('sha256').update(keyInput, 'utf8').digest('hex');
 }
 
@@ -140,9 +179,10 @@ async function main() {
     for (const block of blocks) {
       if ((block.attrs.mode || 'auto') === 'wasm') continue;
       const view = block.attrs.view || '';
+      const step = block.attrs.step || '';
       const focus = block.attrs.focus || '';
       const hops = block.attrs.hops || (focus ? '1' : '');
-      const hash = computeHash({ source: block.source, view, focus, hops });
+      const hash = computeHash({ source: block.source, view, step, focus, hops });
       const target = path.join(opts.out, `${hash}.svg`);
       total++;
       if (!opts.force && fs.existsSync(target)) {
@@ -157,8 +197,8 @@ async function main() {
             `${file}: focus="${focus}" static pre-rendering requires --wasm-src pointing to web/pkg (or set mode="wasm")`
           );
         }
-        if (view) {
-          throw new Error(`${file}: cannot combine view and focus in the same Hugo codeblock`);
+        if (view || step) {
+          throw new Error(`${file}: cannot combine view/step and focus in the same Hugo block`);
         }
         const doc = new wasm.WasmDocument(block.source);
         svg = doc.focus_svg(focus, Math.max(1, Number.parseInt(hops || '1', 10) || 1));
@@ -166,14 +206,16 @@ async function main() {
       } else {
         const cliArgs = ['-'];
         if (view) cliArgs.push('--view', view);
+        if (step) cliArgs.push('--step', step);
         const res = spawnSync(opts.bin, cliArgs, { input: block.source, encoding: 'utf8' });
         if (res.status === 0) {
           svg = res.stdout;
-        } else if (res.error && wasm && !view) {
+        } else if (res.error && wasm && !view && !step) {
           svg = wasm.render_svg(block.source);
         } else {
+          const modeLabel = step ? `step=${step}` : view ? `view=${view}` : '';
           throw new Error(
-            `Failed to compile diagram in ${file}${view ? ` (view=${view})` : ''}:\n${res.stderr || res.error}`
+            `Failed to compile diagram in ${file}${modeLabel ? ` (${modeLabel})` : ''}:\n${res.stderr || res.error}`
           );
         }
       }

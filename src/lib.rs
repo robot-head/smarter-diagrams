@@ -22,6 +22,7 @@ pub mod highlight;
 pub mod labels;
 pub mod layout;
 pub mod lint;
+pub mod lsp;
 pub mod mcp;
 pub mod model;
 mod ownership;
