@@ -1131,20 +1131,27 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
             }
             let low = ((along / 2. + 4.) / len).min(0.5);
             let high = 1. - low;
-            let mut samples = if let Some(t) = f.slide {
+            let samples = if let Some(t) = f.slide {
                 vec![((t * total - arc) / len).clamp(low, high)]
             } else {
-                vec![
+                let mut s = Vec::new();
+                for cand in [
                     0.5,
                     0.35_f64.clamp(low, high),
                     0.65_f64.clamp(low, high),
-                    0.2_f64.clamp(low, high),
-                    0.8_f64.clamp(low, high),
+                    0.25_f64.clamp(low, high),
+                    0.75_f64.clamp(low, high),
+                    0.15_f64.clamp(low, high),
+                    0.85_f64.clamp(low, high),
                     low,
                     high,
-                ]
+                ] {
+                    if s.iter().all(|prev: &f64| (*prev - cand).abs() >= 1e-4) {
+                        s.push(cand);
+                    }
+                }
+                s
             };
-            samples.dedup_by(|a, b| (*a - *b).abs() < 1e-4);
             let has_start_arrow = i == 0 && edge_kind == Some(EdgeKind::Bidirectional);
             let has_end_arrow =
                 i + 1 == seg_count && edge_kind.is_some_and(|k| k != EdgeKind::Undirected);
@@ -1154,7 +1161,7 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
             for t in samples {
                 let anchor = Point::new(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
                 for (side, extra) in [-1., 1., 0.].into_iter().flat_map(|side| {
-                    [0., 8.]
+                    [0., 4., 8., 14.]
                         .into_iter()
                         .filter(move |extra| side != 0. || *extra == 0.)
                         .map(move |extra| (side, extra))
@@ -1350,7 +1357,10 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
     if f.slot.as_deref() != Some("inline") {
         for arc in [0.5, 0.35, 0.65] {
             let anchor = crate::render::at_arc(&f.route, arc);
-            for radius in [36., 64., 96., 128., 160.] {
+            if !is_port && is_vertical_at_arc(&f.route, arc) {
+                push_vertical_edge_callouts(f, anchor, (w, h), arc, 180., false, &mut out);
+            }
+            for radius in [28., 36., 44., 56., 80., 96., 128., 160.] {
                 for (dx, dy) in [(0., -1.), (0., 1.), (-1., 0.), (1., 0.)] {
                     if let Some(slot) = f.slot.as_deref()
                         && ((slot == "above" && dy >= 0.) || (slot == "below" && dy <= 0.))
@@ -1386,6 +1396,77 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
     let _ = l;
     out
 }
+fn is_vertical_at_arc(route: &[Point], arc: f64) -> bool {
+    if route.len() < 2 {
+        return false;
+    }
+    let total: f64 = route.windows(2).map(|p| p[0].distance(p[1])).sum();
+    if total < 1e-6 {
+        return false;
+    }
+    let target = arc.clamp(0., 1.) * total;
+    let mut seen = 0.;
+    for pair in route.windows(2) {
+        let len = pair[0].distance(pair[1]);
+        if seen + len + 1e-6 >= target {
+            return (pair[0].y - pair[1].y).abs() > (pair[0].x - pair[1].x).abs();
+        }
+        seen += len;
+    }
+    let last = &route[route.len() - 2..];
+    (last[0].y - last[1].y).abs() > (last[0].x - last[1].x).abs()
+}
+fn push_vertical_edge_callouts(
+    f: &Feature,
+    anchor: Point,
+    (w, h): (f64, f64),
+    arc: f64,
+    base_cost: f64,
+    with_ortho_variants: bool,
+    out: &mut Vec<Candidate>,
+) {
+    let variants: &[(bool, f64)] = if with_ortho_variants {
+        &[(false, 0.), (true, 2.)]
+    } else {
+        &[(false, 0.)]
+    };
+    for side in [-1., 1.] {
+        for gap in [8., 14., 22., 32.] {
+            for dy_off in [0., -16., 16.] {
+                if let Some(slot) = f.slot.as_deref()
+                    && ((slot == "above" && dy_off >= 0.) || (slot == "below" && dy_off <= 0.))
+                {
+                    continue;
+                }
+                let bounds = Rect::new(anchor.x + side * (w * 0.5 + gap), anchor.y + dy_off, w, h);
+                let dist = bounds.center().distance(anchor);
+                if dist > 160. + 1e-6 {
+                    continue;
+                }
+                for &(orthogonal_leader, extra_cost) in variants {
+                    out.push(Candidate {
+                        label: LabelPlacement {
+                            feature: f.id.clone(),
+                            text: f.text.clone(),
+                            bounds,
+                            anchor,
+                            knockout: false,
+                            callout: true,
+                            orthogonal_leader,
+                            horizontal: true,
+                            slide: arc,
+                        },
+                        cost: base_cost
+                            + extra_cost
+                            + 4. * dist
+                            + if dist > 96. { 40. } else { 0. }
+                            + (arc - 0.5).abs() * 12.,
+                    });
+                }
+            }
+        }
+    }
+}
 // A tightly packed parallel bundle may need a diagonal, local leader. Only
 // search this larger neighborhood when ordinary automatic slots are all blocked.
 fn nearby_callouts(f: &Feature, scene: &SceneGraph) -> Vec<Candidate> {
@@ -1394,7 +1475,7 @@ fn nearby_callouts(f: &Feature, scene: &SceneGraph) -> Vec<Candidate> {
     let mut out = Vec::new();
     for arc in [0.15, 0.35, 0.5, 0.65, 0.85] {
         let anchor = crate::render::at_arc(&f.route, arc);
-        for radius in [48., 80., 96., 128., 160.] {
+        for radius in [32., 40., 46., 56., 80., 96., 128., 160.] {
             for (dx, dy) in [
                 (0.0_f64, -1.),
                 (1., -1.),
@@ -1536,6 +1617,9 @@ fn dense_callout_ring(f: &Feature, scene: &SceneGraph, radii: &[f64]) -> Vec<Can
             .collect()
     };
     for (arc, anchor) in anchors {
+        if !is_port && is_vertical_at_arc(&f.route, arc) {
+            push_vertical_edge_callouts(f, anchor, (w, h), arc, 200., true, &mut out);
+        }
         for &radius in radii {
             for k in 0..12 {
                 let angle = (k as f64) * std::f64::consts::TAU / 12.;
