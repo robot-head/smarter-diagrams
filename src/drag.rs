@@ -5,7 +5,10 @@ use crate::{
     layout::*,
     model::*,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 /// A gesture owns its original snapshot and prepares complete, valid candidates.
 /// Source and history change only when `Document::commit_drag` accepts a candidate.
@@ -117,31 +120,66 @@ impl DragSession {
             return Ok(self.baseline.clone());
         }
         let mut ops = Vec::new();
-        for (id, position) in &moved {
-            for axis in [Axis::Row, Axis::Col] {
-                let displacement = |node: &str| {
-                    let old = self.baseline.layout.nodes[node].center();
-                    let new = moved.get(node).copied().unwrap_or(old);
-                    if axis == Axis::Row {
-                        new.y - old.y
-                    } else {
-                        new.x - old.x
-                    }
+        let mut broken: BTreeSet<(NodeId, bool)> = BTreeSet::new();
+        for r in &self.baseline.scene.relations {
+            let is_x = edit::relation_constrains_x(r);
+            let is_row = r.axis == Axis::Row;
+            let disp = |node: &str| {
+                let Some(rect) = self.baseline.layout.nodes.get(node) else {
+                    return 0.;
                 };
-                if self.baseline.scene.relations.iter().any(|r| {
-                    !r.distribute
-                        && r.axis == axis
-                        && r.members.contains(id)
-                        && r.members
-                            .iter()
-                            .any(|peer| (displacement(peer) - displacement(id)).abs() > 1e-7)
-                }) {
-                    ops.push(DiagramEditOp::BreakAlignment {
-                        node: id.clone(),
-                        axis,
-                    });
+                let old = rect.center();
+                let new = moved.get(node).copied().unwrap_or(old);
+                if is_x { new.x - old.x } else { new.y - old.y }
+            };
+            for id in moved.keys() {
+                if r.members.contains(id)
+                    && r.members
+                        .iter()
+                        .any(|peer| (disp(peer) - disp(id)).abs() > 1e-7)
+                {
+                    broken.insert((id.clone(), is_row));
                 }
             }
+        }
+        loop {
+            let mut changed = false;
+            for r in &self.baseline.scene.relations {
+                if !r.distribute {
+                    continue;
+                }
+                let is_row = r.axis == Axis::Row;
+                let remaining: Vec<&str> = r
+                    .members
+                    .iter()
+                    .filter(|m| !broken.contains(&(m.to_string(), is_row)))
+                    .map(String::as_str)
+                    .collect();
+                let min_remaining = if r.gap_grid.is_some() { 2 } else { 3 };
+                if remaining.len() >= min_remaining
+                    && remaining.len() < r.members.len()
+                    && !edit::distribute_subset_valid(
+                        r,
+                        &remaining,
+                        &self.baseline.layout.nodes,
+                        &moved,
+                        self.options.grid,
+                    )
+                {
+                    for m in remaining {
+                        changed |= broken.insert((m.to_string(), is_row));
+                    }
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        for (node, is_row) in broken {
+            let axis = if is_row { Axis::Row } else { Axis::Col };
+            ops.push(DiagramEditOp::BreakAlignment { node, axis });
+        }
+        for (id, position) in &moved {
             ops.push(DiagramEditOp::PinNode {
                 node: id.clone(),
                 pin: PinExpr::Relative {

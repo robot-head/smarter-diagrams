@@ -656,3 +656,140 @@ fn a_manual_caption_can_move_onto_its_own_connection_and_back() {
         old.layout.labels[0].bounds
     );
 }
+
+#[test]
+fn dragging_middle_node_out_of_distribute_row_and_col_commits_and_reopens() {
+    for (axis_kw, is_row, offset) in [
+        ("row", true, Point::new(72.5, 48.25)),
+        ("col", false, Point::new(64.25, 72.75)),
+    ] {
+        let source = format!("a -> b -> c\ndistribute {axis_kw} [a, b, c]\n");
+        let mut doc = Document::new(&source).unwrap();
+        let original = doc.snapshot();
+        let (ac, bc, cc) = (
+            original.layout.nodes["a"].center(),
+            original.layout.nodes["b"].center(),
+            original.layout.nodes["c"].center(),
+        );
+        if is_row {
+            assert!((ac.x - 2. * bc.x + cc.x).abs() < 1e-6);
+        } else {
+            assert!((ac.y - 2. * bc.y + cc.y).abs() < 1e-6);
+        }
+
+        let target = bc.offset(offset.x, offset.y);
+        let mut drag = doc.begin_drag().unwrap();
+        drag.update(&[at("b", target.x, target.y)]).unwrap();
+        drag.settle().unwrap();
+        let shown = drag.snapshot();
+        assert_eq!(shown.layout.nodes["b"].center(), target);
+        assert_eq!(shown.layout.nodes["a"], original.layout.nodes["a"]);
+        assert_eq!(shown.layout.nodes["c"], original.layout.nodes["c"]);
+        assert!(
+            shown.scene.relations.is_empty(),
+            "distribute {axis_kw} should relax when middle node breaks away"
+        );
+
+        doc.commit_drag(&drag).unwrap();
+        assert_eq!(doc.snapshot().to_svg(), shown.to_svg());
+        let reopened = compile(doc.source()).unwrap();
+        assert_eq!(reopened.layout.nodes, shown.layout.nodes);
+        layout::validate(&reopened.scene, &reopened.layout, &LayoutOptions::default()).unwrap();
+        assert!(doc.undo());
+        assert_eq!(doc.snapshot().to_svg(), original.to_svg());
+        assert!(doc.redo());
+        assert_eq!(doc.snapshot().to_svg(), shown.to_svg());
+    }
+}
+
+#[test]
+fn distribute_perpendicular_gap_and_scoped_container_drags_behave_cleanly() {
+    // Perpendicular drag leaves distribute intact.
+    for (axis_kw, nodes_src, delta) in [
+        (
+            "row",
+            "a @pin(grid: 0, 0)\nb @pin(grid: 14, 0)\nc @pin(grid: 28, 0)\n",
+            Point::new(0., 84.),
+        ),
+        (
+            "col",
+            "a @pin(grid: 0, 0)\nb @pin(grid: 0, 10)\nc @pin(grid: 0, 20)\n",
+            Point::new(84., 0.),
+        ),
+    ] {
+        let source = format!("{nodes_src}distribute {axis_kw} [a, b, c]\n");
+        let mut doc = Document::new(&source).unwrap();
+        let original = doc.snapshot();
+        let target = original.layout.nodes["b"]
+            .center()
+            .offset(delta.x, delta.y);
+        let mut drag = doc.begin_drag().unwrap();
+        drag.update(&[at("b", target.x, target.y)]).unwrap();
+        let shown = drag.snapshot();
+        assert_eq!(shown.scene.relations.len(), 1);
+        assert_eq!(shown.layout.nodes["a"], original.layout.nodes["a"]);
+        assert_eq!(shown.layout.nodes["c"], original.layout.nodes["c"]);
+        doc.commit_drag(&drag).unwrap();
+        let reopened = compile(doc.source()).unwrap();
+        assert_eq!(reopened.layout.nodes, shown.layout.nodes);
+    }
+
+    // Dragging middle node out of gap-constrained distribute keeps bystanders stable.
+    let gap_src = "a -> b -> c\ndistribute row [a, b, c] [gap: 4g]\n";
+    let mut gap_doc = Document::new(gap_src).unwrap();
+    let gap_orig = gap_doc.snapshot();
+    let target = gap_orig.layout.nodes["b"].center().offset(48., 64.);
+    let mut drag = gap_doc.begin_drag().unwrap();
+    drag.update(&[at("b", target.x, target.y)]).unwrap();
+    let shown = drag.snapshot();
+    assert_eq!(shown.layout.nodes["b"].center(), target);
+    assert_eq!(shown.layout.nodes["a"], gap_orig.layout.nodes["a"]);
+    assert_eq!(shown.layout.nodes["c"], gap_orig.layout.nodes["c"]);
+    gap_doc.commit_drag(&drag).unwrap();
+    let reopened = compile(gap_doc.source()).unwrap();
+    assert_eq!(reopened.layout.nodes, shown.layout.nodes);
+
+    // 4-member distribute: dragging an end keeps 3 remaining, dragging interior dissolves safely.
+    let four_src = "a -> b -> c -> d\ndistribute row [a, b, c, d]\n";
+    let four_doc = Document::new(four_src).unwrap();
+    let four_orig = four_doc.snapshot();
+    let mut end_drag = four_doc.begin_drag().unwrap();
+    let a_target = four_orig.layout.nodes["a"].center().offset(-40., 64.);
+    end_drag.update(&[at("a", a_target.x, a_target.y)]).unwrap();
+    let end_shown = end_drag.snapshot();
+    assert_eq!(end_shown.scene.relations.len(), 1);
+    assert_eq!(
+        end_shown.scene.relations[0].members,
+        vec!["b", "c", "d"]
+    );
+    let mut mid_drag = four_doc.begin_drag().unwrap();
+    let b_target = four_orig.layout.nodes["b"].center().offset(40., 64.);
+    mid_drag.update(&[at("b", b_target.x, b_target.y)]).unwrap();
+    let mid_shown = mid_drag.snapshot();
+    assert_eq!(mid_shown.layout.nodes["b"].center(), b_target);
+    for id in ["a", "c", "d"] {
+        assert_eq!(mid_shown.layout.nodes[id], four_orig.layout.nodes[id]);
+    }
+
+    // Scoped container distribute: moving the container preserves it; dragging one child breaks it and keeps comments.
+    let scoped_src = "prod {\n  a -> b -> c\n  distribute row [a, b, c] # keep\n}\n";
+    let mut scoped_doc = Document::new(scoped_src).unwrap();
+    let scoped_orig = scoped_doc.snapshot();
+    let mut box_drag = scoped_doc.begin_drag().unwrap();
+    let prod_target = scoped_orig.layout.nodes["prod"].center().offset(96., 48.);
+    box_drag
+        .update(&[at("prod", prod_target.x, prod_target.y)])
+        .unwrap();
+    assert_eq!(box_drag.snapshot().scene.relations.len(), 1);
+
+    let mut child_drag = scoped_doc.begin_drag().unwrap();
+    let pb_target = scoped_orig.layout.nodes["prod.b"]
+        .center()
+        .offset(96., 32.);
+    child_drag
+        .update(&[at("prod.b", pb_target.x, pb_target.y)])
+        .unwrap();
+    scoped_doc.commit_drag(&child_drag).unwrap();
+    assert!(scoped_doc.source().contains("# keep"));
+    assert!(scoped_doc.snapshot().scene.relations.is_empty());
+}

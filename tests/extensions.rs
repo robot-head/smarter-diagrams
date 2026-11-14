@@ -1,6 +1,8 @@
-use smarter_diagrams::layout::Point;
-use smarter_diagrams::{drift::*, formal::*, simulation::*, spatial::*, views::*, *};
+use smarter_diagrams::layout::{GRID, Point};
+use smarter_diagrams::{drift::*, edit::*, formal::*, simulation::*, spatial::*, views::*, *};
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::Write;
+use std::process::{Command, Stdio};
 #[test]
 fn views_focus_story_and_zoom() {
     let p = syntax::parse(
@@ -308,4 +310,254 @@ fn optical_tints_and_trace_playback_frames() {
     assert_eq!(first.matches("class=\"flow\"").count(), 1);
     let second = render::flow_frame_svg(&d.scene, &d.layout, "request", 1).unwrap();
     assert_eq!(second.matches("class=\"flow\"").count(), 2);
+}
+
+#[test]
+fn synthesize_drag_attaches_all_four_container_borders() {
+    let source = "box: Cluster {\n  a -> b\n}\nsat: Satellite\n";
+    let d = compile(source).unwrap();
+    let box_r = d.layout.nodes["box"];
+    let sat_r = d.layout.nodes["sat"];
+    let hw = sat_r.w * 0.5;
+    let hh = sat_r.h * 0.5;
+    let gap = 2. * GRID;
+
+    let cases = [
+        ("N", Point::new(box_r.x, box_r.top() - hh - gap), "box.N - "),
+        (
+            "E",
+            Point::new(box_r.right() + hw + gap, box_r.y),
+            "box.E + ",
+        ),
+        (
+            "S",
+            Point::new(box_r.x, box_r.bottom() + hh + gap),
+            "box.S + ",
+        ),
+        ("W", Point::new(box_r.left() - hw - gap, box_r.y), "box.W - "),
+    ];
+    for (side, pos, expected_prefix) in cases {
+        let ops = synthesize_drag(
+            &d.scene,
+            &d.layout,
+            &[Drag {
+                node: "sat".into(),
+                position: pos,
+            }],
+        )
+        .unwrap();
+        let pin = ops.iter().find_map(|op| match op {
+            DiagramEditOp::PinNode {
+                node,
+                pin: PinExpr::Relative { x, y },
+                ..
+            } if node == "sat" => Some((x.as_str(), y.as_str())),
+            _ => None,
+        });
+        let (x_expr, y_expr) = pin.unwrap_or_else(|| {
+            panic!("expected relative border pin on side {side}, got ops={ops:?}")
+        });
+        let expr = if matches!(side, "N" | "S") {
+            y_expr
+        } else {
+            x_expr
+        };
+        assert!(
+            expr.starts_with(expected_prefix),
+            "side {side}: expected prefix {expected_prefix:?}, got {expr:?}"
+        );
+        let edited = apply_ops(source, &ops, Placement::Auto).unwrap();
+        let recompiled = compile(&edited.source).unwrap();
+        layout::validate(
+            &recompiled.scene,
+            &recompiled.layout,
+            &LayoutOptions::default(),
+        )
+        .unwrap();
+    }
+
+    // Wide target node within 6*GRID edge-to-wall still attaches using actual half-width.
+    let wide_source = "box: Cluster {\n  a -> b\n}\nsat: Very Wide Satellite Service Name\n";
+    let wide_d = compile(wide_source).unwrap();
+    let wide_box = wide_d.layout.nodes["box"];
+    let wide_sat = wide_d.layout.nodes["sat"];
+    assert!(wide_sat.w * 0.5 + 2. * GRID > 6. * GRID);
+    let wide_ops = synthesize_drag(
+        &wide_d.scene,
+        &wide_d.layout,
+        &[Drag {
+            node: "sat".into(),
+            position: Point::new(wide_box.right() + wide_sat.w * 0.5 + 2. * GRID, wide_box.y),
+        }],
+    )
+    .unwrap();
+    assert!(wide_ops.iter().any(|op| matches!(
+        op,
+        DiagramEditOp::PinNode {
+            pin: PinExpr::Relative { x, .. },
+            ..
+        } if x.starts_with("box.E + ")
+    )));
+
+    // Far away or lacking orthogonal overlap falls back to AbsoluteGrid.
+    for outside in [
+        Point::new(box_r.right() + hw + 8. * GRID, box_r.y),
+        Point::new(box_r.right() + hw + 2. * GRID, box_r.top() - hh - 2. * GRID),
+    ] {
+        let ops = synthesize_drag(
+            &d.scene,
+            &d.layout,
+            &[Drag {
+                node: "sat".into(),
+                position: outside,
+            }],
+        )
+        .unwrap();
+        assert!(ops.iter().any(|op| matches!(
+            op,
+            DiagramEditOp::PinNode {
+                pin: PinExpr::AbsoluteGrid { .. },
+                ..
+            }
+        )));
+    }
+
+    // Closest border wins when adjacent to multiple containers.
+    let two_src = "left_box {\n  a @pin(grid: 0, 0)\n}\nright_box {\n  b @pin(grid: 40, 0)\n}\nsat\n";
+    let two = compile(two_src).unwrap();
+    let lr = two.layout.nodes["left_box"];
+    let rr = two.layout.nodes["right_box"];
+    let sr = two.layout.nodes["sat"];
+    let near_left = synthesize_drag(
+        &two.scene,
+        &two.layout,
+        &[Drag {
+            node: "sat".into(),
+            position: Point::new(lr.right() + sr.w * 0.5 + GRID, lr.y),
+        }],
+    )
+    .unwrap();
+    assert!(
+        near_left.iter().any(|op| matches!(
+            op,
+            DiagramEditOp::PinNode {
+                pin: PinExpr::Relative { x, .. },
+                ..
+            } if x.starts_with("left_box.E + ")
+        )),
+        "expected left_box.E + ..., got {near_left:?}, lr={lr:?}, rr={rr:?}, sr={sr:?}"
+    );
+    let near_right = synthesize_drag(
+        &two.scene,
+        &two.layout,
+        &[Drag {
+            node: "sat".into(),
+            position: Point::new(rr.left() - sr.w * 0.5 - GRID, rr.y),
+        }],
+    )
+    .unwrap();
+    assert!(
+        near_right.iter().any(|op| matches!(
+            op,
+            DiagramEditOp::PinNode {
+                pin: PinExpr::Relative { x, .. },
+                ..
+            } if x.starts_with("right_box.W - ")
+        )),
+        "expected right_box.W - ..., got {near_right:?}, lr={lr:?}, rr={rr:?}, sr={sr:?}"
+    );
+
+    // synthesize_drag relaxes distribute row/col along the constrained axis only.
+    let dist_row = compile("a -> b -> c\ndistribute row [a, b, c]\n").unwrap();
+    let bc = dist_row.layout.nodes["b"].center();
+    let keep_row = synthesize_drag(
+        &dist_row.scene,
+        &dist_row.layout,
+        &[Drag {
+            node: "b".into(),
+            position: Point::new(bc.x, bc.y + 48.),
+        }],
+    )
+    .unwrap();
+    assert!(
+        !keep_row
+            .iter()
+            .any(|o| matches!(o, DiagramEditOp::BreakAlignment { .. }))
+    );
+    let break_row = synthesize_drag(
+        &dist_row.scene,
+        &dist_row.layout,
+        &[Drag {
+            node: "b".into(),
+            position: Point::new(bc.x + 48., bc.y),
+        }],
+    )
+    .unwrap();
+    assert!(break_row.iter().any(|o| matches!(
+        o,
+        DiagramEditOp::BreakAlignment {
+            node,
+            axis: model::Axis::Row
+        } if node == "b"
+    )));
+}
+
+#[test]
+fn candidate_exploration_toggle_is_deterministic_and_cli_accepts_no_explore_candidates() {
+    let source = "u0 -> v0\nu0 -> v1\nu0 -> v2\nu1 -> v0\nu1 -> v1\nu1 -> v2\nu2 -> v0\nu2 -> v1\nu2 -> v2\n";
+    let explore_opts = LayoutOptions {
+        explore_candidates: true,
+        ..LayoutOptions::default()
+    };
+    let no_explore_opts = LayoutOptions {
+        explore_candidates: false,
+        ..LayoutOptions::default()
+    };
+
+    let e1 = compile_with(source, &explore_opts, None).unwrap();
+    let e2 = compile_with(source, &explore_opts, None).unwrap();
+    assert_eq!(e1.layout.nodes, e2.layout.nodes);
+    assert_eq!(e1.to_svg(), e2.to_svg());
+    layout::validate(&e1.scene, &e1.layout, &explore_opts).unwrap();
+
+    let n1 = compile_with(source, &no_explore_opts, None).unwrap();
+    let n2 = compile_with(source, &no_explore_opts, None).unwrap();
+    assert_eq!(n1.layout.nodes, n2.layout.nodes);
+    assert_eq!(n1.to_svg(), n2.to_svg());
+    layout::validate(&n1.scene, &n1.layout, &no_explore_opts).unwrap();
+    assert_ne!(
+        e1.layout.nodes, n1.layout.nodes,
+        "K3,3 candidate exploration should choose a distinct layout from canonical LTR"
+    );
+
+    let bin = env!("CARGO_BIN_EXE_smarter-diagrams");
+    let help = Command::new(bin).arg("--help").output().unwrap();
+    assert!(help.status.success());
+    assert!(
+        String::from_utf8_lossy(&help.stdout).contains("--no-explore-candidates"),
+        "help should document --no-explore-candidates"
+    );
+
+    let mut child = Command::new(bin)
+        .args(["-", "--format", "json", "--no-explore-candidates"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(source.as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(
+        out.status.success(),
+        "CLI failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let cli_layout: Layout = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(cli_layout.nodes, n1.layout.nodes);
+    assert_eq!(cli_layout.routes, n1.layout.routes);
 }
