@@ -529,7 +529,7 @@ fn align_container_columns(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOpt
                 PortConstraint::FixedPos {
                     side: Side::W | Side::E,
                     offset_grid,
-                } => return Some(r.top() + offset_grid * o.grid),
+                } => return Some(r.top() + crate::layout::record_slot_offset(&scene.nodes[idx], offset_grid, o.grid)),
                 _ => {}
             }
         }
@@ -1825,7 +1825,7 @@ fn group(
                     let credit = (if left_c { o.container_padding } else { 0. })
                         + (if right_c { o.container_padding } else { 0. });
                     let min_gap = if left_c && right_c { 42. } else { 58. };
-                    (span_w + 18. - credit).max(min_gap) * spacing
+                    (span_w + 30. - credit).max(min_gap) * spacing
                 };
                 x += (last_width + width) / 2. + pair_gap;
             } else {

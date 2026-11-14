@@ -101,6 +101,7 @@ pub(crate) fn ellipse_with_grid(
         let rx_base = match node.shape.as_str() {
             "actor" => 18.,
             "sql_table" => 2.,
+            "class" | "uml_class" => 4.,
             _ if node.container => 12.,
             _ => 8.,
         };
@@ -115,7 +116,7 @@ pub(crate) fn ellipse_with_grid(
     let external_rects: Vec<Rect> = scene
         .nodes
         .iter()
-        .filter(|n| !members.contains(&n.id) && !(n.container && n.shape != "sql_table"))
+        .filter(|n| !members.contains(&n.id) && !(n.container && !crate::layout::is_record_shape(&n.shape)))
         .filter_map(|n| nodes.get(&n.id).map(|&r| effective_member_rect(n, r)))
         .filter(|nr| nr.w > 0. && nr.h > 0. && !point_in_convex_hull(nr.center(), &hull))
         .map(|nr| nr.inflate(4.))

@@ -8,11 +8,65 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 pub const GRID: f64 = 16.;
+pub(crate) fn is_class_shape(shape: &str) -> bool {
+    matches!(shape, "class" | "uml_class")
+}
+pub(crate) fn is_record_shape(shape: &str) -> bool {
+    shape == "sql_table" || is_class_shape(shape)
+}
+pub(crate) fn class_extra_rows(node: &Node) -> (Vec<String>, Vec<String>) {
+    if !is_class_shape(&node.shape) {
+        return (Vec::new(), Vec::new());
+    }
+    let parse = |key: &str| -> Vec<String> {
+        node.attrs
+            .get(key)
+            .map(|v| {
+                crate::model::unquote(v.text.trim())
+                    .lines()
+                    .map(str::trim)
+                    .filter(|line| !line.is_empty())
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    (parse("fields"), parse("methods"))
+}
+pub(crate) fn class_header_height(node: &Node) -> f64 {
+    if !is_class_shape(&node.shape) {
+        return 0.;
+    }
+    let stereo = if node
+        .attrs
+        .get("stereotype")
+        .is_some_and(|v| !crate::model::unquote(v.text.trim()).trim().is_empty())
+    {
+        16.
+    } else {
+        0.
+    };
+    let title = crate::labels::node_title(node);
+    stereo + title.lines().count().max(1) as f64 * 20. + 16.
+}
+pub(crate) fn record_slot_offset(node: &Node, offset_grid: f64, grid: f64) -> f64 {
+    class_header_height(node) + offset_grid * grid
+}
+pub(crate) fn record_row_width(raw: &str) -> f64 {
+    let (left, right) = crate::labels::split_record_row(raw);
+    if let Some(ty) = right {
+        crate::labels::text_width(left) * 13. / 15.
+            + crate::labels::text_width(ty) * 12. / 15.
+            + 52.
+    } else {
+        crate::labels::text_width(raw) * 13. / 15. + 28.
+    }
+}
 pub(crate) fn header_height(node: &Node) -> f64 {
     24. + (node.label.split('\n').count() - 1) as f64 * 20.
 }
 pub(crate) fn container_header_rect(node: &Node, r: Rect) -> Option<Rect> {
-    if !node.container || node.shape == "sql_table" {
+    if !node.container || is_record_shape(&node.shape) {
         return None;
     }
     let width = (crate::labels::text_width(&node.label) * 16. / 15. + 8.).min((r.w - 24.).max(0.));
@@ -424,32 +478,81 @@ fn compute_base_sizes(
     let n = scene.nodes.len();
     let mut sizes = Vec::with_capacity(n);
     for (i, node) in scene.nodes.iter().enumerate() {
-        let mut w = title_width(node).max(112.).max(
-            node.ports
+        let (extra_fields, extra_methods) = class_extra_rows(node);
+        let stereo_w = if is_class_shape(&node.shape) {
+            node.attrs
+                .get("stereotype")
+                .map(|v| crate::model::unquote(v.text.trim()))
+                .filter(|s| !s.trim().is_empty())
+                .map_or(0., |s| crate::labels::text_width(&format!("«{}»", s.trim())) * 12. / 15. + 28.)
+        } else {
+            0.
+        };
+        let port_w = node
+            .ports
+            .values()
+            .map(|p| {
+                if is_record_shape(&node.shape) {
+                    record_row_width(&p.label)
+                } else {
+                    crate::labels::text_width(&p.label) + 32.
+                }
+            })
+            .reduce(f64::max)
+            .unwrap_or(0.);
+        let extra_w = extra_fields
+            .iter()
+            .chain(extra_methods.iter())
+            .map(|row| record_row_width(row))
+            .reduce(f64::max)
+            .unwrap_or(0.);
+        let mut w = title_width(node).max(112.).max(stereo_w).max(port_w).max(extra_w);
+        let has_fixed_rows = is_record_shape(&node.shape)
+            && node
+                .ports
                 .values()
-                .map(|p| crate::labels::text_width(&p.label) + 32.)
-                .reduce(f64::max)
-                .unwrap_or(0.),
-        );
-        let mut h = if node.ports.is_empty() {
+                .any(|p| matches!(p.constraint, PortConstraint::FixedPos { .. }));
+        let mut h = if is_record_shape(&node.shape)
+            && (has_fixed_rows || !extra_fields.is_empty() || !extra_methods.is_empty())
+        {
+            class_header_height(node).max(36.)
+        } else if node.ports.is_empty() {
             48.
         } else {
             (node.ports.len() as f64 + 2.) * o.grid
         };
         let title = crate::labels::node_title(node);
         h = h.max(title.split('\n').count() as f64 * 20. + 28.);
-        if node.container && node.shape != "sql_table" {
+        if is_class_shape(&node.shape) {
+            h = h.max(class_header_height(node));
+        }
+        if node.container && !is_record_shape(&node.shape) {
             h = h.max(header_height(node) + 24.);
         }
-        if node.shape == "sql_table" {
+        if is_record_shape(&node.shape) {
+            let mut slot_bottom = 0f64;
             for port in node.ports.values() {
                 if let PortConstraint::FixedPos { offset_grid, .. } = port.constraint {
-                    h = h.max(
-                        offset_grid * o.grid
-                            + 8.
+                    slot_bottom = slot_bottom.max(
+                        record_slot_offset(node, offset_grid, o.grid)
+                            + 16.
                             + (port.label.split('\n').count() - 1) as f64 * 18.,
                     );
                 }
+            }
+            h = h.max(slot_bottom);
+            if !extra_fields.is_empty() || !extra_methods.is_empty() {
+                let mut extra_y = if slot_bottom > 0. {
+                    slot_bottom - 4.
+                } else {
+                    class_header_height(node) + 6.
+                };
+                extra_y += extra_fields.len() as f64 * 18.;
+                if !extra_methods.is_empty() && (slot_bottom > 0. || !extra_fields.is_empty()) {
+                    extra_y += 8.;
+                }
+                extra_y += extra_methods.len() as f64 * 18.;
+                h = h.max(extra_y + 8.);
             }
         }
         // Sloping sides must contain the entire text rectangle, not just its
@@ -461,7 +564,7 @@ fn compute_base_sizes(
         }
         // Simulation nodes reserve a readable occupancy strip. An explicit
         // size lock below still wins; the viewer only paints status ink that fits.
-        h = if node.shape != "sql_table" && node.annotations.iter().any(|a| a.name == "sim") {
+        h = if !is_record_shape(&node.shape) && node.annotations.iter().any(|a| a.name == "sim") {
             h.max(title.lines().count() as f64 * 20. + 56.).max(
                 if matches!(node.shape.as_str(), "diamond" | "decision") {
                     96.
@@ -484,10 +587,24 @@ fn compute_base_sizes(
             let mut fixed_count = 0usize;
             for p in node.ports.values() {
                 if p.constraint.side() == Some(side) {
-                    fixed_count += 1;
+                    if !(is_record_shape(&node.shape)
+                        && matches!(p.constraint, PortConstraint::FixedPos { .. }))
+                    {
+                        fixed_count += 1;
+                    }
                     match p.constraint {
                         PortConstraint::FixedPos { offset_grid, .. } => {
-                            min = min.max(offset_grid * o.grid + o.corner);
+                            let pos = if !horiz && is_record_shape(&node.shape) {
+                                record_slot_offset(node, offset_grid, o.grid)
+                            } else {
+                                offset_grid * o.grid
+                            };
+                            let trail = if !horiz && is_record_shape(&node.shape) {
+                                16.
+                            } else {
+                                o.corner
+                            };
+                            min = min.max(pos + trail);
                         }
                         PortConstraint::FixedRatio { ratio, .. } => {
                             if ratio <= 0. || ratio >= 1. {
@@ -510,15 +627,20 @@ fn compute_base_sizes(
                 }
             }
             for e in &scene.edges {
-                for (ep_node, ep_c) in [
-                    (&e.source.node, &e.source.constraint),
-                    (&e.target.node, &e.target.constraint),
-                ] {
-                    if ep_node == &node.id && ep_c.side() == Some(side) {
+                for ep in [&e.source, &e.target] {
+                    if ep.port.is_none()
+                        && ep.node == node.id
+                        && ep.constraint.side() == Some(side)
+                    {
                         fixed_count += 1;
-                        match *ep_c {
+                        match ep.constraint {
                             PortConstraint::FixedPos { offset_grid, .. } => {
-                                min = min.max(offset_grid * o.grid + o.corner);
+                                let pos = if !horiz && is_record_shape(&node.shape) {
+                                    record_slot_offset(node, offset_grid, o.grid)
+                                } else {
+                                    offset_grid * o.grid
+                                };
+                                min = min.max(pos + o.corner);
                             }
                             PortConstraint::FixedRatio { ratio, .. } => {
                                 if ratio <= 0. || ratio >= 1. {
@@ -612,7 +734,7 @@ fn candidate_compatible_with_relations(scene: &SceneGraph, plan: &TopologyPlan) 
 }
 
 fn has_named_multiport(scene: &SceneGraph, node_idx: usize) -> bool {
-    if scene.nodes[node_idx].shape == "sql_table" {
+    if is_record_shape(&scene.nodes[node_idx].shape) {
         return false;
     }
     let mut count = 0usize;
@@ -3709,8 +3831,10 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
                     if let Some(request) = reqs.iter_mut().find(|p| p.key == port_key(edge, source))
                     {
                         request.side = side;
-                        let opposite = rects[scene.index(&other.node).unwrap()];
+                        let other_idx = scene.index(&other.node).unwrap();
+                        let opposite = rects[other_idx];
                         request.target = port_target(
+                            &scene.nodes[other_idx],
                             opposite,
                             &other.constraint,
                             side,
@@ -4305,7 +4429,7 @@ fn fixed_port_y(
         .flatten()
         .find_map(|c| match *c {
             PortConstraint::FixedPos { side, offset_grid } if side == expected_side => {
-                Some(r.top() + offset_grid * o.grid)
+                Some(r.top() + record_slot_offset(&scene.nodes[node_idx], offset_grid, o.grid))
             }
             PortConstraint::FixedRatio { side, ratio } if side == expected_side => {
                 Some(r.top() + ratio * r.h)
@@ -4441,7 +4565,7 @@ fn choose_attachment_pair(
     let dst_c = resolve_c(&e.target, bi);
     let bias_a = corridor_straddle_bias(scene, rects, ai, &e.source, bi, &e.target, o);
     let bias_b = corridor_straddle_bias(scene, rects, bi, &e.target, ai, &e.source, o);
-    let point = |r: Rect, s: Side, c: &PortConstraint| {
+    let point = |node: &Node, r: Rect, s: Side, c: &PortConstraint| {
         let cx = o.corner.min(r.w / 4.);
         let cy = o.corner.min(r.h / 4.);
         let tx = match *c {
@@ -4455,7 +4579,8 @@ fn choose_attachment_pair(
         };
         let ty = match *c {
             PortConstraint::FixedPos { side, offset_grid } if side == s => {
-                (r.top() + offset_grid * o.grid).clamp(r.top() + cy, r.bottom() - cy)
+                (r.top() + record_slot_offset(node, offset_grid, o.grid))
+                    .clamp(r.top() + cy, r.bottom() - cy)
             }
             PortConstraint::FixedRatio { side, ratio } if side == s => {
                 (r.top() + ratio * r.h).clamp(r.top() + cy, r.bottom() - cy)
@@ -4482,8 +4607,8 @@ fn choose_attachment_pair(
             if src_side.is_some_and(|s| s != sa) || dst_side.is_some_and(|s| s != sb) {
                 continue;
             }
-            let a = point(ra, sa, &src_c);
-            let b = point(rb, sb, &dst_c);
+            let a = point(&scene.nodes[ai], ra, sa, &src_c);
+            let b = point(&scene.nodes[bi], rb, sb, &dst_c);
             let (ax, ay) = sa.normal();
             let (bx, by) = sb.normal();
             let u = a.offset(ax * o.stub, ay * o.stub);
@@ -4754,6 +4879,7 @@ fn choose_attachment_pair(
 }
 
 fn port_target(
+    peer: &Node,
     b: Rect,
     constraint: &PortConstraint,
     side: Side,
@@ -4763,7 +4889,7 @@ fn port_target(
     match *constraint {
         PortConstraint::FixedPos { offset_grid, .. } => {
             if matches!(side, Side::E | Side::W) && matches!(other_side, Side::E | Side::W) {
-                b.top() + offset_grid * grid
+                b.top() + record_slot_offset(peer, offset_grid, grid)
             } else if matches!(side, Side::N | Side::S) && matches!(other_side, Side::N | Side::S) {
                 b.left() + offset_grid * grid
             } else if matches!(side, Side::E | Side::W) {
@@ -4848,7 +4974,7 @@ fn choose_port_sides(
             let b = rects[j];
             let side = if source { pair.0 } else { pair.1 };
             let other_side = if source { pair.1 } else { pair.0 };
-            let base = port_target(b, &other.constraint, side, other_side, o.grid);
+            let base = port_target(&scene.nodes[j], b, &other.constraint, side, other_side, o.grid);
             let target = parallel_order(scene, e, source, pair.0, pair.1, &endpoint_sides, base)
                 .unwrap_or(base);
 
@@ -5022,14 +5148,10 @@ fn grow_port_perimeters(
                         *facing_counts.entry(sa_i).or_default() += 1;
                     }
                 }
-                for (peer_idx, count) in facing_counts {
+                for (_peer_idx, count) in facing_counts {
                     if count >= 2 {
-                        let peer_ports = requests
-                            .iter()
-                            .filter(|q| q.node == peer_idx && q.side == opp)
-                            .count();
                         length = length.max(
-                            peer_ports.saturating_sub(1) as f64 * o.port_spacing + 2. * o.corner,
+                            count.saturating_sub(1) as f64 * o.port_spacing + 2. * o.corner,
                         );
                     }
                 }
@@ -5110,7 +5232,7 @@ fn grow_port_perimeters(
                 .count();
             if !locked && unconstrained_ports > 3 {
                 length = length.max(
-                    (ports.len().saturating_sub(1) as f64) * (o.port_spacing + o.margin)
+                    (unconstrained_ports.saturating_sub(1) as f64) * (o.port_spacing + o.margin)
                         + 2. * o.corner,
                 );
             }
@@ -5127,10 +5249,20 @@ fn grow_port_perimeters(
             for p in &ports {
                 match p.spec {
                     PortConstraint::FixedPos { offset_grid, .. } => {
-                        let pos = offset_grid * o.grid;
-                        if locked
-                            && (pos < eff_corner - 1e-6 || pos > locked_dim - eff_corner + 1e-6)
-                        {
+                        let node = &scene.nodes[i];
+                        let is_rec = !horiz && is_record_shape(&node.shape);
+                        let pos = if is_rec {
+                            record_slot_offset(node, offset_grid, o.grid)
+                        } else {
+                            offset_grid * o.grid
+                        };
+                        let min_pos = if is_rec {
+                            class_header_height(node) + 12. - 1e-6
+                        } else {
+                            eff_corner - 1e-6
+                        };
+                        let trail = if is_rec { 16. } else { eff_corner };
+                        if locked && (pos < min_pos || pos > locked_dim - trail + 1e-6) {
                             return Err(Error::Layout(format!(
                                 "fixed port {} exceeds locked face length",
                                 p.key
@@ -5139,7 +5271,7 @@ fn grow_port_perimeters(
                         // A free attachment must still fit beside an unused
                         // fixed slot. Counting ports alone misses the clearance
                         // consumed by a slot close to the start of the side.
-                        length = length.max(pos + movable as f64 * o.port_spacing + eff_corner);
+                        length = length.max(pos + movable as f64 * o.port_spacing + trail);
                     }
                     PortConstraint::FixedRatio { ratio, .. } => {
                         if ratio <= 0. || ratio >= 1. {
@@ -5221,7 +5353,7 @@ fn assign_ports<'a>(
                 if horiz {
                     r.left() + offset_grid * o.grid
                 } else {
-                    r.top() + offset_grid * o.grid
+                    r.top() + record_slot_offset(&scene.nodes[req.node], offset_grid, o.grid)
                 }
             }
             _ => {
@@ -5255,7 +5387,7 @@ fn assign_ports<'a>(
             Side::S => Point::new(r.left() + t, r.bottom()),
             Side::W => Point::new(r.left(), r.top() + t),
         };
-        let shape = if node.container && node.shape != "sql_table" {
+        let shape = if node.container && !is_record_shape(&node.shape) {
             "container"
         } else {
             &node.shape
@@ -5361,11 +5493,14 @@ fn assign_ports<'a>(
                     } else {
                         ratio * len
                     }),
-                    PortConstraint::FixedPos { offset_grid, .. } => Some(if reverse {
-                        len - offset_grid * o.grid
-                    } else {
-                        offset_grid * o.grid
-                    }),
+                    PortConstraint::FixedPos { offset_grid, .. } => {
+                        let off = if horiz_side {
+                            offset_grid * o.grid
+                        } else {
+                            record_slot_offset(node, offset_grid, o.grid)
+                        };
+                        Some(if reverse { len - off } else { off })
+                    }
                     _ => None,
                 };
             }
@@ -5745,11 +5880,14 @@ fn assign_ports<'a>(
                             } else {
                                 ratio * len
                             }),
-                            PortConstraint::FixedPos { offset_grid, .. } => Some(if reverse {
-                                len - offset_grid * o.grid
-                            } else {
-                                offset_grid * o.grid
-                            }),
+                            PortConstraint::FixedPos { offset_grid, .. } => {
+                                let off = if matches!(side, Side::N | Side::S) {
+                                    offset_grid * o.grid
+                                } else {
+                                    record_slot_offset(&scene.nodes[i], offset_grid, o.grid)
+                                };
+                                Some(if reverse { len - off } else { off })
+                            }
                             _ => None,
                         };
                         if let Some(fv) = fixed {
@@ -5972,7 +6110,7 @@ fn assign_ports<'a>(
             let rb = rects[bi];
             let shape_name = |node_idx: usize| -> &str {
                 let node = &scene.nodes[node_idx];
-                if node.container && node.shape != "sql_table" {
+                if node.container && !is_record_shape(&node.shape) {
                     "container"
                 } else {
                     &node.shape
@@ -6169,7 +6307,8 @@ pub fn validate(scene: &SceneGraph, l: &Layout, o: &LayoutOptions) -> Result<(),
             + 18.
             + if a.shape == "database" { 16. } else { 0. };
         if !a.container
-            && !matches!(a.shape.as_str(), "sql_table" | "diamond" | "decision")
+            && !is_record_shape(&a.shape)
+            && !matches!(a.shape.as_str(), "diamond" | "decision")
             && (title_width(a) - 32. > ra.w + 1e-6 || title_height > ra.h + 1e-6)
         {
             return Err(Error::Layout(format!(
@@ -6187,7 +6326,7 @@ pub fn validate(scene: &SceneGraph, l: &Layout, o: &LayoutOptions) -> Result<(),
                 a.id
             )));
         }
-        if a.shape == "sql_table" {
+        if is_record_shape(&a.shape) {
             let mut fields = Vec::new();
             for port in a
                 .ports
@@ -6196,9 +6335,9 @@ pub fn validate(scene: &SceneGraph, l: &Layout, o: &LayoutOptions) -> Result<(),
             {
                 let placement = &l.ports[&format!("{}#{}", a.id, port.id)];
                 let height = 15. + (port.label.split('\n').count() - 1) as f64 * 18.;
-                let width = crate::labels::text_width(&port.label) * 13. / 15.;
+                let width = (record_row_width(&port.label) - 24.).max(0.);
                 let bounds = Rect::new(
-                    ra.left() + 14. + width / 2.,
+                    ra.left() + 12. + width / 2.,
                     placement.point.y - 7. + height / 2.,
                     width,
                     height,
@@ -6852,7 +6991,7 @@ fn order_flat_ranks(
     let has_explicit_ports = scene
         .nodes
         .iter()
-        .any(|n| n.shape == "sql_table" || !n.ports.is_empty());
+        .any(|n| is_record_shape(&n.shape) || !n.ports.is_empty());
     let rank_list: Vec<usize> = by_rank.keys().copied().collect();
     let mut hop_cross_counts = vec![0usize; rank_list.len().saturating_sub(1)];
     for e in &scene.edges {
@@ -6931,7 +7070,12 @@ fn order_flat_ranks(
                 PortConstraint::FixedPos {
                     side: Side::W | Side::E,
                     offset_grid,
-                } => return Some((idx, r.top() + offset_grid * o.grid)),
+                } => {
+                    return Some((
+                        idx,
+                        r.top() + record_slot_offset(&scene.nodes[idx], offset_grid, o.grid),
+                    ));
+                }
                 _ => {}
             }
         }

@@ -50,7 +50,7 @@ impl Simulation {
     pub fn from_scene(scene: &SceneGraph) -> Result<Self, Error> {
         let mut traits = BTreeMap::new();
         for n in &scene.nodes {
-            if n.container && n.shape != "sql_table" {
+            if n.container && !crate::layout::is_record_shape(&n.shape) {
                 continue;
             }
             let mut t = SimTraits::default();

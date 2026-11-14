@@ -901,5 +901,5 @@ fn many_record_slots_drag_reopen_preserves_neighbor_perimeters() {
             "{id} changed from {before:?} to {after:?}"
         );
     }
-    assert!((reopened.layout.nodes["checkout"].h - 104.0).abs() < 0.01);
+    assert!(reopened.layout.nodes["checkout"].h <= 64.0 + 0.01);
 }

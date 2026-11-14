@@ -243,7 +243,7 @@ pub fn number(s: &str) -> Option<f64> {
 pub fn value(attrs: &Attributes, k: &str) -> Option<f64> {
     attrs.get(k).and_then(|v| number(&v.text))
 }
-fn unquote(s: &str) -> String {
+pub(crate) fn unquote(s: &str) -> String {
     serde_json::from_str::<String>(s).unwrap_or_else(|_| s.to_owned())
 }
 fn tokens(source: &str, span: Span) -> Vec<Token> {

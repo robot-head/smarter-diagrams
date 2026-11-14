@@ -1,7 +1,7 @@
 # Fenced diagram blocks inside technical Markdown, inspired by Pikchr's homepage.
 markdown: "Markdown\nsource"
 formatter: "Site engine\n(Hugo / VitePress)"
-compiler: "Smarter Diagrams\n(CLI or Wasm)"
+compiler: "Smarter Diagrams\n(CLI or Wasm)" [shape: cache]
 output: "HTML + SVG\ndocument"
 
 markdown.E -> formatter.W: "fenced block"
@@ -9,6 +9,6 @@ formatter.E -> output.W: "inline SVG"
 formatter.S <-> compiler.N: "compile"
 
 align row [markdown, formatter, output]
-distribute row [markdown, formatter, output] [gap: 8g]
+distribute row [markdown, formatter, output] [gap: 10g]
 align col [formatter, compiler]
-distribute col [formatter, compiler] [gap: 5.5g]
+distribute col [formatter, compiler] [gap: 6g]

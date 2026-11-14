@@ -7,7 +7,7 @@
 //! feasible incumbent and stops after a deterministic number of search states.
 use crate::{
     layout::{LayoutOptions, Point, Rect},
-    model::{Endpoint, PortConstraint, SceneGraph, Side},
+    model::{Endpoint, Node, PortConstraint, SceneGraph, Side},
     routing::{collinear_overlap, proper_crossing},
 };
 use std::collections::BTreeMap;
@@ -117,8 +117,8 @@ impl Search<'_> {
         ra.y = self.cells[a].y;
         rb.x = self.cells[b].x;
         rb.y = self.cells[b].y;
-        let (pa, sa) = port(&edge.source, ra, rb, self.options);
-        let (pb, sb) = port(&edge.target, rb, ra, self.options);
+        let (pa, sa) = port(&self.scene.nodes[va], &edge.source, ra, rb, self.options);
+        let (pb, sb) = port(&self.scene.nodes[vb], &edge.target, rb, ra, self.options);
         let an = sa.normal();
         let bn = sb.normal();
         let qs = pa.offset(an.0 * self.options.stub, an.1 * self.options.stub);
@@ -288,7 +288,7 @@ impl Search<'_> {
         }
     }
 }
-fn port(ep: &Endpoint, a: Rect, b: Rect, o: &LayoutOptions) -> (Point, Side) {
+fn port(node: &Node, ep: &Endpoint, a: Rect, b: Rect, o: &LayoutOptions) -> (Point, Side) {
     let side = ep.constraint.side().unwrap_or_else(|| {
         if (b.x - a.x).abs() >= (b.y - a.y).abs() {
             if b.x >= a.x { Side::E } else { Side::W }
@@ -305,7 +305,13 @@ fn port(ep: &Endpoint, a: Rect, b: Rect, o: &LayoutOptions) -> (Point, Side) {
     };
     let t = match ep.constraint {
         PortConstraint::FixedRatio { ratio, .. } => ratio * len,
-        PortConstraint::FixedPos { offset_grid, .. } => offset_grid * o.grid,
+        PortConstraint::FixedPos { offset_grid, .. } => {
+            if matches!(side, Side::E | Side::W) {
+                crate::layout::record_slot_offset(node, offset_grid, o.grid)
+            } else {
+                offset_grid * o.grid
+            }
+        }
         _ => len / 2.,
     };
     let p = match side {

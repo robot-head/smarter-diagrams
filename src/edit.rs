@@ -973,7 +973,7 @@ pub(crate) fn anchor_geometry(
         }
     }
     if n.container
-        && n.shape != "sql_table"
+        && !crate::layout::is_record_shape(&n.shape)
         && !existing.is_some_and(|a| a.attrs.contains_key("lock"))
     {
         attrs.insert(

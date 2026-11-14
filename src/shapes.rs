@@ -36,6 +36,7 @@ pub(crate) fn ray_attachment(shape: &str, r: Rect, toward: Point) -> Point {
             "actor" => 18.,
             "container" => 12.,
             "sql_table" => 2.,
+            "class" | "uml_class" => 4.,
             _ => 8.,
         };
         let radius = radius.min(r.w / 2.).min(r.h / 2.);
@@ -79,6 +80,7 @@ pub(crate) fn outline(shape: &str, r: Rect) -> String {
         "actor" => 18.,
         "container" => 12.,
         "sql_table" => 2.,
+        "class" | "uml_class" => 4.,
         _ => 8.,
     };
     let radius = radius.min(r.w / 2.).min(r.h / 2.);
@@ -183,6 +185,7 @@ pub(crate) fn attachment(shape: &str, r: Rect, side: Side, offset: f64) -> Point
             "actor" => 18.,
             "container" => 12.,
             "sql_table" => 2.,
+            "class" | "uml_class" => 4.,
             _ => 8.,
         };
         let radius = radius.min(r.w / 2.).min(r.h / 2.);

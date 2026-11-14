@@ -165,14 +165,21 @@ pub fn description(scene: &SceneGraph) -> String {
                     .unwrap_or_default())
         )
     };
+    let inline = |text: &str| {
+        text.lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
     let nodes = scene
         .nodes
         .iter()
         .map(|n| {
             format!(
-                "{} ({}, {}{}{})",
+                "- {} ({}, {}{}{})",
                 n.id,
-                n.label,
+                inline(&n.label),
                 n.shape,
                 n.parent
                     .as_ref()
@@ -185,7 +192,7 @@ pub fn description(scene: &SceneGraph) -> String {
                         ", ports {}",
                         n.ports
                             .values()
-                            .map(|p| format!("{}: {}", p.id, p.label))
+                            .map(|p| format!("{}: {}", p.id, inline(&p.label)))
                             .collect::<Vec<_>>()
                             .join(", ")
                     )
@@ -193,68 +200,64 @@ pub fn description(scene: &SceneGraph) -> String {
             )
         })
         .collect::<Vec<_>>()
-        .join(", ");
-    let edges = scene
-        .edges
-        .iter()
-        .map(|e| {
-            format!(
-                "{} {} {}{}",
-                endpoint(&e.source),
-                match e.kind {
-                    EdgeKind::Undirected => "connects to",
-                    EdgeKind::Bidirectional => "exchanges with",
-                    _ => "points to",
-                },
-                endpoint(&e.target),
-                if e.label.is_empty() {
-                    String::new()
-                } else {
-                    format!(" via {}", e.label)
-                }
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("; ");
+        .join("\n");
+    let edges = if scene.edges.is_empty() {
+        "- none".to_string()
+    } else {
+        scene
+            .edges
+            .iter()
+            .map(|e| {
+                format!(
+                    "- {} {} {}{}",
+                    endpoint(&e.source),
+                    match e.kind {
+                        EdgeKind::Undirected => "connects to",
+                        EdgeKind::Bidirectional => "exchanges with",
+                        _ => "points to",
+                    },
+                    endpoint(&e.target),
+                    if e.label.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" via {}", inline(&e.label))
+                    }
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
     let zones = scene
         .zones
         .iter()
-        .map(|z| format!("{} contains {}", z.label, z.members.join(", ")))
+        .map(|z| format!("- {} contains {}", inline(&z.label), z.members.join(", ")))
         .collect::<Vec<_>>()
-        .join("; ");
+        .join("\n");
     let flows = scene
         .flows
         .iter()
-        .map(|f| format!("{}: {}", f.label, f.steps.join(" → ")))
+        .map(|f| format!("- {}: {}", inline(&f.label), f.steps.join(" → ")))
         .collect::<Vec<_>>()
-        .join("; ");
-    format!(
-        "{} nodes and {} connections. Nodes: {nodes}. Connections: {edges}.{}{}",
+        .join("\n");
+    let mut sections = vec![format!(
+        "{} nodes and {} connections.",
         scene.nodes.len(),
-        scene.edges.len(),
-        if zones.is_empty() {
-            String::new()
-        } else {
-            format!(" Zones: {zones}.")
-        },
-        if flows.is_empty() && scene.story.is_empty() {
-            String::new()
-        } else {
-            format!(
-                "{}{}",
-                if flows.is_empty() {
-                    String::new()
-                } else {
-                    format!(" Flows: {flows}.")
-                },
-                if scene.story.is_empty() {
-                    String::new()
-                } else {
-                    format!(" Story: {}.", scene.story.join(" → "))
-                }
-            )
-        }
-    )
+        scene.edges.len()
+    )];
+    if !nodes.is_empty() {
+        sections.push(format!("Nodes:\n{nodes}"));
+    }
+    sections.push(format!("Connections:\n{edges}"));
+    if !zones.is_empty() {
+        sections.push(format!("Zones:\n{zones}"));
+    }
+    if !flows.is_empty() {
+        sections.push(format!("Flows:\n{flows}"));
+    }
+    if !scene.story.is_empty() {
+        sections.push(format!("Story:\n- {}", scene.story.join(" → ")));
+    }
+    sections.join("\n\n")
 }
 /// Smooth oriented enclosing ellipse contours for a zone. `Layout::zones` also
 /// stores the sampled enclosing ellipse polygon for layout consumers.
@@ -374,7 +377,7 @@ fn zone_title_at(
                     return true;
                 }
                 let node_pad = if !members.contains(n.id.as_str())
-                    && (!n.container || n.shape == "sql_table")
+                    && (!n.container || crate::layout::is_record_shape(&n.shape))
                 {
                     12.
                 } else {
@@ -608,7 +611,7 @@ pub(crate) fn svg_with_decorations(
     let bounds = bounds_with(scene, l, &ellipses, &titles);
     let masks = edge_masks(scene, l, &edge_visible);
     let mut s = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:var(--sd-fg,#233347)}}.node-title{{font-weight:600;font-size:16px}}.port-label{{font-size:13px}}.edge{{fill:none;stroke:var(--sd-edge,#53657a);stroke-width:1.7;stroke-linejoin:round}}.flow{{fill:none;stroke:var(--sd-flow,#356bd9);stroke-width:3;stroke-linejoin:round}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:var(--sd-edge,#53657a)}}</style>",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:var(--sd-fg,#233347)}}.node-title{{font-weight:600;font-size:16px}}.port-label{{font-size:13px}}.edge{{fill:none;stroke:var(--sd-edge,#53657a);stroke-width:1.85;stroke-linejoin:round}}.flow{{fill:none;stroke:var(--sd-flow,#356bd9);stroke-width:3.2;stroke-linejoin:round}}.class-hdr{{fill:var(--sd-node,#e5eef6)}}.class-sub{{font:500 11.5px/1.2 var(--sd-font,Inter,ui-sans-serif,system-ui,sans-serif);fill:var(--sd-edge,#53657a)}}.port-type{{font:500 12px/1.35 ui-monospace,'SFMono-Regular',Consolas,monospace;fill:var(--sd-edge,#53657a)}}.class-rule{{stroke:var(--sd-border,#6b8198);stroke-opacity:.36}}.row-rule{{stroke:var(--sd-border,#6b8198);stroke-opacity:.22}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:var(--sd-edge,#53657a)}}</style>",
         bounds.left(),
         bounds.top(),
         bounds.w,
@@ -652,7 +655,7 @@ pub(crate) fn svg_with_decorations(
     for n in scene
         .nodes
         .iter()
-        .filter(|n| n.container && n.shape != "sql_table")
+        .filter(|n| n.container && !crate::layout::is_record_shape(&n.shape))
     {
         let r = l.nodes[&n.id];
         let _ = write!(
@@ -713,15 +716,15 @@ pub(crate) fn svg_with_decorations(
             "var(--sd-edge,#53657a)"
         };
         let width = if active {
-            4.0
+            4.2
         } else if e.kind == EdgeKind::Bold {
             3.0
         } else {
-            1.7
+            1.85
         };
         let covered_by_flow = in_flow.contains(e.id.as_str());
         let trim_width = if covered_by_flow && !active {
-            3.0
+            3.2
         } else {
             width
         };
@@ -751,7 +754,7 @@ pub(crate) fn svg_with_decorations(
     for n in scene
         .nodes
         .iter()
-        .filter(|n| !n.container || n.shape == "sql_table")
+        .filter(|n| !n.container || crate::layout::is_record_shape(&n.shape))
     {
         let r = l.nodes[&n.id];
         let _ = write!(
@@ -821,17 +824,35 @@ pub(crate) fn svg_with_decorations(
                 let fill = match n.shape.as_str() {
                     "queue" => "var(--sd-queue,#e7e0fa)",
                     "sql_table" => "var(--sd-database,#e1edf9)",
+                    "class" | "uml_class" => "var(--sd-surface,#f6f8fb)",
                     _ => "var(--sd-node,#e5eef6)",
+                };
+                let rx = match n.shape.as_str() {
+                    "sql_table" => 2,
+                    "class" | "uml_class" => 4,
+                    _ => 8,
                 };
                 let _ = write!(
                     s,
-                    "<rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"{}\" fill=\"{fill}\" stroke=\"var(--sd-border,#6b8198)\"/>",
+                    "<rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"{rx}\" fill=\"{fill}\" stroke=\"var(--sd-border,#6b8198)\"/>",
                     r.left(),
                     r.top(),
                     r.w,
                     r.h,
-                    if n.shape == "sql_table" { 2 } else { 8 }
                 );
+                if crate::layout::is_class_shape(&n.shape) {
+                    let hdr_h = crate::layout::class_header_height(n).min(r.h);
+                    let hb = r.top() + hdr_h;
+                    let rad = 4.0f64.min(r.w / 2.).min(hdr_h);
+                    let _ = write!(
+                        s,
+                        "<path class=\"class-hdr\" d=\"M {:.2} {:.2} a {rad:.2} {rad:.2} 0 0 1 {rad:.2} -{rad:.2} H {:.2} a {rad:.2} {rad:.2} 0 0 1 {rad:.2} {rad:.2} V {hb:.2} H {:.2} Z\" stroke=\"var(--sd-border,#6b8198)\"/>",
+                        r.left(),
+                        r.top() + rad,
+                        r.right() - rad,
+                        r.left(),
+                    );
+                }
                 if n.shape == "queue" {
                     for k in 1..4 {
                         let x = r.left() + k as f64 * ((r.w - 8.).max(0.) / 4.).min(10.);
@@ -855,23 +876,150 @@ pub(crate) fn svg_with_decorations(
                 index + 1
             );
         }
-        if n.shape == "sql_table" {
-            for (pidx, p) in n.ports.values().enumerate() {
-                if !matches!(p.constraint, PortConstraint::FixedPos { .. }) {
-                    continue;
+        if crate::layout::is_record_shape(&n.shape) {
+            let is_class = crate::layout::is_class_shape(&n.shape);
+            let hdr_h = crate::layout::class_header_height(n).min(r.h);
+            if is_class {
+                let stereo = n
+                    .attrs
+                    .get("stereotype")
+                    .map(|v| crate::model::unquote(v.text.trim()))
+                    .map(|s| s.trim().to_string())
+                    .filter(|t| !t.is_empty());
+                if let Some(ref st) = stereo {
+                    let _ = write!(
+                        s,
+                        "<text class=\"class-sub\" text-anchor=\"middle\" dominant-baseline=\"central\" x=\"{:.2}\" y=\"{:.2}\">«{}»</text>",
+                        r.x,
+                        r.top() + 13.,
+                        escape(st)
+                    );
                 }
-                let y = l
-                    .ports
-                    .get(&format!("{}#{}", n.id, p.id))
-                    .map(|p| p.point.y)
-                    .unwrap_or(r.top() + 32. + pidx as f64 * 16.);
+                let title_y = if stereo.is_some() {
+                    r.top() + 16. + (hdr_h - 16.) / 2.
+                } else {
+                    r.top() + hdr_h / 2.
+                };
                 let _ = write!(
                     s,
-                    "<text class=\"port-label\" x=\"{}\" y=\"{}\">{}</text>",
-                    r.left() + 14.,
-                    y + 4. + (p.label.split('\n').count() - 1) as f64 * 9.,
-                    text_content(&p.label, r.left() + 14., 18.)
+                    "<text class=\"node-title\" text-anchor=\"middle\" dominant-baseline=\"central\" x=\"{:.2}\" y=\"{title_y:.2}\">{}</text>",
+                    r.x,
+                    text_content(&crate::labels::node_title(n), r.x, 20.)
                 );
+            }
+            let emit_row = |out: &mut String, baseline_y: f64, raw: &str| {
+                if !raw.contains('\n')
+                    && let Some((lhs, Some(rhs))) = Some(crate::labels::split_record_row(raw))
+                {
+                    let lhs_w = crate::labels::text_width(lhs) * 13. / 15.;
+                    let rhs_w = crate::labels::text_width(rhs) * 13. / 15.;
+                    if lhs_w + rhs_w + 36. <= r.w {
+                        let _ = write!(
+                            out,
+                            "<text class=\"port-label\" x=\"{:.2}\" y=\"{baseline_y:.2}\">{}</text><text class=\"port-type\" text-anchor=\"end\" x=\"{:.2}\" y=\"{baseline_y:.2}\">{}</text>",
+                            r.left() + 12.,
+                            escape(lhs),
+                            r.right() - 12.,
+                            escape(rhs)
+                        );
+                        return;
+                    }
+                }
+                let _ = write!(
+                    out,
+                    "<text class=\"port-label\" x=\"{:.2}\" y=\"{baseline_y:.2}\">{}</text>",
+                    r.left() + 12.,
+                    text_content(raw, r.left() + 12., 18.)
+                );
+            };
+            let mut fixed_ports: Vec<(&crate::model::Port, f64)> = n
+                .ports
+                .values()
+                .filter_map(|p| {
+                    let PortConstraint::FixedPos { offset_grid, .. } = p.constraint else {
+                        return None;
+                    };
+                    let y = l
+                        .ports
+                        .get(&format!("{}#{}", n.id, p.id))
+                        .map(|lp| lp.point.y)
+                        .unwrap_or_else(|| {
+                            r.top() + crate::layout::record_slot_offset(n, offset_grid, 16.)
+                        });
+                    Some((p, y))
+                })
+                .collect();
+            fixed_ports.sort_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.id.cmp(&b.0.id)));
+            for (pidx, &(p, y)) in fixed_ports.iter().enumerate() {
+                if pidx > 0 {
+                    let ry = (fixed_ports[pidx - 1].1 + y) / 2.;
+                    let _ = write!(
+                        s,
+                        "<line class=\"row-rule\" x1=\"{:.2}\" y1=\"{ry:.2}\" x2=\"{:.2}\" y2=\"{ry:.2}\"/>",
+                        r.left() + 8.,
+                        r.right() - 8.
+                    );
+                }
+                let baseline_y = y + 4. + (p.label.split('\n').count() - 1) as f64 * 9.;
+                emit_row(&mut s, baseline_y, &p.label);
+            }
+            if is_class {
+                let (extra_fields, extra_methods) = crate::layout::class_extra_rows(n);
+                if !extra_fields.is_empty() || !extra_methods.is_empty() {
+                    let mut slot_bottom = 0f64;
+                    for &(p, _) in &fixed_ports {
+                        if let PortConstraint::FixedPos { offset_grid, .. } = p.constraint {
+                            slot_bottom = slot_bottom.max(
+                                crate::layout::record_slot_offset(n, offset_grid, 16.)
+                                    + 16.
+                                    + (p.label.split('\n').count() - 1) as f64 * 18.,
+                            );
+                        }
+                    }
+                    let mut extra_y = if slot_bottom > 0. {
+                        slot_bottom - 4.
+                    } else {
+                        hdr_h + 6.
+                    };
+                    for (idx, row) in extra_fields.iter().enumerate() {
+                        if idx > 0 || slot_bottom > 0. {
+                            let ry = r.top() + extra_y - 2.;
+                            let _ = write!(
+                                s,
+                                "<line class=\"row-rule\" x1=\"{:.2}\" y1=\"{ry:.2}\" x2=\"{:.2}\" y2=\"{ry:.2}\"/>",
+                                r.left() + 8.,
+                                r.right() - 8.
+                            );
+                        }
+                        emit_row(&mut s, r.top() + extra_y + 12., row);
+                        extra_y += 18.;
+                    }
+                    if !extra_methods.is_empty()
+                        && (slot_bottom > 0. || !extra_fields.is_empty())
+                    {
+                        let dy = r.top() + extra_y + 2.;
+                        let _ = write!(
+                            s,
+                            "<line class=\"class-rule\" x1=\"{:.2}\" y1=\"{dy:.2}\" x2=\"{:.2}\" y2=\"{dy:.2}\"/>",
+                            r.left(),
+                            r.right()
+                        );
+                        extra_y += 8.;
+                    }
+                    for (idx, row) in extra_methods.iter().enumerate() {
+                        if idx > 0 {
+                            let ry = r.top() + extra_y - 2.;
+                            let _ = write!(
+                                s,
+                                "<line class=\"row-rule\" x1=\"{:.2}\" y1=\"{ry:.2}\" x2=\"{:.2}\" y2=\"{ry:.2}\"/>",
+                                r.left() + 8.,
+                                r.right() - 8.
+                            );
+                        }
+                        emit_row(&mut s, r.top() + extra_y + 12., row);
+                        extra_y += 18.;
+                    }
+                }
             }
         } else {
             let _ = write!(
@@ -937,7 +1085,7 @@ pub(crate) fn svg_with_decorations(
                 .join(" ");
             let _ = write!(
                 s,
-                "<path data-callout=\"true\" data-callout-for=\"{}\" d=\"{d}\" stroke=\"var(--sd-muted,#73869b)\" stroke-linejoin=\"round\" fill=\"none\"/>",
+                "<path data-callout=\"true\" data-callout-for=\"{}\" d=\"{d}\" stroke=\"var(--sd-muted,#73869b)\" stroke-width=\"1.2\" stroke-dasharray=\"3 2.5\" stroke-linejoin=\"round\" fill=\"none\"/>",
                 escape(&label.feature)
             );
         }
@@ -951,13 +1099,13 @@ pub(crate) fn svg_with_decorations(
             if let Some(r) = l.routes.get(id) {
                 let edge = scene.edge(id).unwrap();
                 let flow_width = if edge.attrs.contains_key("active") {
-                    4.
+                    4.2
                 } else {
-                    3.
+                    3.2
                 };
                 let (shaft, heads) = connector(&r.points, edge.kind, flow_width);
                 let mask = gap_mask(id, &masks);
-                let width_attr = if flow_width != 3. {
+                let width_attr = if flow_width != 3.2 {
                     format!(" style=\"stroke-width:{flow_width}\"")
                 } else {
                     String::new()
@@ -984,7 +1132,7 @@ pub(crate) fn svg_with_decorations(
     for n in scene
         .nodes
         .iter()
-        .filter(|n| n.container && n.shape != "sql_table")
+        .filter(|n| n.container && !crate::layout::is_record_shape(&n.shape))
     {
         let r = l.nodes[&n.id];
         let hx = container_header_rect_with_ports(n, r, &l.ports)
@@ -1019,7 +1167,7 @@ pub(crate) fn svg_with_decorations(
             let inside_container = !flow
                 && scene.nodes.iter().any(|n| {
                     n.container
-                        && n.shape != "sql_table"
+                        && !crate::layout::is_record_shape(&n.shape)
                         && l.nodes.get(&n.id).is_some_and(|nr| nr.contains(r.center()))
                 });
             let _ = write!(

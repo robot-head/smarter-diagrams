@@ -64,7 +64,7 @@ Like [Pikchr](https://pikchr.org/home/doc/trunk/homepage.md) in Fossil, a diagra
 ```diagram
 markdown: "Markdown\nsource"
 formatter: "Site engine\n(Hugo / VitePress)"
-compiler: "Smarter Diagrams\n(CLI or Wasm)"
+compiler: "Smarter Diagrams\n(CLI or Wasm)" [shape: cache]
 output: "HTML + SVG\ndocument"
 
 markdown.E -> formatter.W: "fenced block"
@@ -72,9 +72,9 @@ formatter.E -> output.W: "inline SVG"
 formatter.S <-> compiler.N: "compile"
 
 align row [markdown, formatter, output]
-distribute row [markdown, formatter, output] [gap: 8g]
+distribute row [markdown, formatter, output] [gap: 10g]
 align col [formatter, compiler]
-distribute col [formatter, compiler] [gap: 5.5g]
+distribute col [formatter, compiler] [gap: 6g]
 ```
 
 </div>
@@ -132,9 +132,9 @@ kubectl: "kubectl / GitOps" [shape: actor] @sim(rate: 45, service_rate: 160)
 
 apiserver: "kube-apiserver" {
   sts: "StatefulSet & Svc"
-  cr: "PostgresCluster CR" [shape: sql_table] {
-    port spec: DesiredSpec [side: W, pos: 1]
-    port status: ReadyStatus [side: E, pos: 2]
+  cr: "PostgresCluster CR" [shape: class, stereotype: "CustomResource", methods: "+reconcile(ctx: Context): Result"] {
+    port spec: ClusterSpec [side: W, pos: 1]
+    port status: ClusterStatus [side: E, pos: 2]
   }
   etcd: "etcd Quorum" [shape: database] @sim(service_rate: 180)
   sts -> etcd: "store"

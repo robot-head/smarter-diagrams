@@ -53,9 +53,47 @@ fn box_to_point_dist(b: Rect, p: Point) -> f64 {
     let dy = (b.top() - p.y).max(p.y - b.bottom()).max(0.);
     dx.hypot(dy)
 }
+/// Split a record or UML class row (`name: Type` or `+method(x: T): R`)
+/// into its left identifier/signature and right type annotation.
+pub(crate) fn split_record_row(raw: &str) -> (&str, Option<&str>) {
+    let mut depth = 0i32;
+    for (idx, ch) in raw.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => depth = (depth - 1).max(0),
+            ':' if depth == 0 => {
+                let left = raw[..idx].trim();
+                let right = raw[idx + 1..].trim();
+                if !right.is_empty() {
+                    return (left, Some(right));
+                }
+            }
+            _ => {}
+        }
+    }
+    (raw.trim(), None)
+}
 /// Approximate painted title box of a leaf node (centred in its silhouette).
 fn node_title_rect(node: &Node, r: Rect) -> Rect {
     let title = node_title(node);
+    if crate::layout::is_class_shape(&node.shape) {
+        let header_h = crate::layout::class_header_height(node);
+        let stereo_off = if node
+            .attrs
+            .get("stereotype")
+            .is_some_and(|v| !crate::model::unquote(v.text.trim()).trim().is_empty())
+        {
+            8.
+        } else {
+            0.
+        };
+        return Rect::new(
+            r.x,
+            r.top() + header_h / 2. + stereo_off,
+            (text_width(&title) * 16. / 15.).min(r.w),
+            text_height(&title).min(header_h),
+        );
+    }
     Rect::new(
         r.x + crate::shapes::title_gutter(&node.shape) / 2.,
         r.y,
@@ -243,11 +281,12 @@ pub(crate) fn placements_clear(scene: &SceneGraph, layout: &Layout) -> bool {
                     && crate::layout::container_header_rect_with_ports(node, rect, &layout.ports)
                         .is_some_and(|h| bounds.intersects(h))
             } else if crossed.contains(&node.id) {
-                let opaque_flow_pill = !label.callout
-                    && scene
-                        .edge(&label.feature)
-                        .is_some_and(|e| crate::render::flow_caption(scene, e).is_some());
-                let clear_border = opaque_flow_pill
+                let opaque_inline_pill = !label.callout
+                    && (label.knockout
+                        || scene
+                            .edge(&label.feature)
+                            .is_some_and(|e| crate::render::flow_caption(scene, e).is_some()));
+                let clear_border = opaque_inline_pill
                     || !bounds.intersects(rect)
                     || rect.inflate(-6.).encloses(bounds);
                 let hits_header =
@@ -492,7 +531,7 @@ fn place_inner(
             });
         }
         for port in node.ports.values() {
-            if node.shape == "sql_table"
+            if crate::layout::is_record_shape(&node.shape)
                 && matches!(port.constraint, PortConstraint::FixedPos { .. })
             {
                 continue;
@@ -2411,11 +2450,12 @@ fn valid_with_port_box(
                 return false;
             }
         } else if f.crossed.contains(&n.id) {
-            let opaque_flow_pill = !label.callout
-                && scene
-                    .edge(&f.id)
-                    .is_some_and(|e| crate::render::flow_caption(scene, e).is_some());
-            if !opaque_flow_pill && r.intersects(hit.bounds) && !hit.bounds.inflate(-6.).encloses(r)
+            let opaque_inline_pill = !label.callout
+                && (label.knockout
+                    || scene
+                        .edge(&f.id)
+                        .is_some_and(|e| crate::render::flow_caption(scene, e).is_some()));
+            if !opaque_inline_pill && r.intersects(hit.bounds) && !hit.bounds.inflate(-6.).encloses(r)
             {
                 return false;
             }

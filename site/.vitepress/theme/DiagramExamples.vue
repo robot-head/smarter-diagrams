@@ -67,7 +67,7 @@ const units = (value:number) => Number((value/current.value.grid).toFixed(2))
       <figcaption>{{ current.label }} · <a :href="withBase(`/generated/language/${isDark ? current.darkFile : current.file}`)" target="_blank" rel="noopener" :aria-label="`Open SVG: ${title} — ${current.label}`">Open SVG ↗</a><span v-if="examples.length>1"> · Comparisons keep the same scale and frame.</span></figcaption>
       <details :id="`${id}-description`" class="diagram-description">
         <summary>Diagram description · {{ current.nodes.length }} nodes, {{ current.edges.length }} connections</summary>
-        <p>{{ current.description }}</p>
+        <pre class="diagram-description-pre">{{ current.description }}</pre>
         <table><caption>Nodes and ownership</caption><thead><tr><th scope="col">Node</th><th scope="col">Label</th><th scope="col">Shape</th><th scope="col">Parent</th><th scope="col">Ports</th></tr></thead><tbody><tr v-for="node in current.nodes" :key="node.id"><th scope="row">{{node.id}}</th><td>{{node.label}}</td><td>{{node.shape}}</td><td>{{node.parent || '—'}}</td><td>{{node.ports.map(p=>`${p.id}: ${p.label}`).join('; ') || '—'}}</td></tr></tbody></table>
         <table v-if="current.edges.length"><caption>Connections</caption><thead><tr><th scope="col">From</th><th scope="col">To</th><th scope="col">Direction</th><th scope="col">Label</th></tr></thead><tbody><tr v-for="edge in current.edges" :key="edge.id"><td>{{edge.source}}</td><td>{{edge.target}}</td><td>{{edge.kind}}</td><td>{{edge.label || '—'}}</td></tr></tbody></table>
         <p v-for="zone in current.zones" :key="zone.label">Zone {{zone.label}}: {{zone.members.join(', ')}}</p>

@@ -379,6 +379,23 @@
   cursor: pointer;
 }
 
+.diagram-description-pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--vp-font-family-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  margin: 10px 0 12px;
+  padding: 12px 14px;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+}
+
+.diagram-description td {
+  white-space: pre-line;
+}
+
 .diagram-description table,
 .diagram-coordinates table {
   font-size: 13px;

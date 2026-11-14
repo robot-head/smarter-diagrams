@@ -37,7 +37,7 @@ const languageSamples = new Map();
 const comparisons = [];
 const samplePages=['site/index.md','site/examples.md',...['language','guide'].flatMap(dir=>fs.readdirSync(path.join(root,'site',dir)).filter(f=>f.endsWith('.md')).map(f=>`site/${dir}/${f}`))];
 for (const file of samplePages) {
-  const text = fs.readFileSync(path.join(root, file), 'utf8');
+  const text = fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n/g, '\n');
   for (const match of text.matchAll(/^```(diagram[^\n]*)\n([\s\S]*?)^```/gm)) {
     const group=samples(match[2],match[1]);
     for (const sample of group) languageSamples.set(key(sample), { ...sample, label: `${file}: ${sample.label}` });
@@ -53,7 +53,7 @@ for (const file of fs.readdirSync(path.join(root, 'examples')).filter(file => fi
   fs.mkdirSync(path.dirname(output), { recursive: true }); fs.writeFileSync(output, themed(result.stdout));
   fs.writeFileSync(output.replace(/\.svg$/,'-dark.svg'),themed(result.stdout,true));
   // Imported example fences use exactly the same rendering path as inline code.
-  const sample = samples(fs.readFileSync(path.join(root, 'examples', file), 'utf8'))[0];
+  const sample = samples(fs.readFileSync(path.join(root, 'examples', file), 'utf8').replace(/\r\n/g, '\n'))[0];
   languageSamples.set(key(sample), { ...sample, label: file });
 }
 const build = spawnSync('cargo', ['build', '--locked', '--all-features', '--example', 'render_docs'], { cwd: root, encoding: 'utf8' });

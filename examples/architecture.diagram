@@ -11,13 +11,13 @@ prod: Production {
     port id: uuid [side: W, pos: 1]
     port org_id: uuid [side: W, pos: 2]
   }
-  gateway.E -> auth.W: JWT
-  gateway.S -> broker.W: publish
-  broker#orders -> worker.W: consume
-  auth.S -> postgres#id: identity
-  worker.S -> postgres#org_id: write
+  gateway -> auth: JWT
+  gateway -> broker: publish
+  broker#orders -> worker: consume
+  auth -> postgres#id: identity
+  worker -> postgres#org_id: write
 }
-client.E -> prod.gateway.W: HTTPS
+client -> prod.gateway: HTTPS
 kms: Key service
 zone pci "PCI scope" around [prod.auth, prod.postgres, kms] {
   padding: 1.5g

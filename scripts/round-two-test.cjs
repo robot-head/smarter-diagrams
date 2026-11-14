@@ -28,7 +28,7 @@ module.exports=async function roundTwo(browser,base){
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await table.first().scrollIntoViewIfNeeded();await page.screenshot({path:'artifacts/round-two/mobile-tables.png'});
   await page.setViewportSize({width:1440,height:1000});await page.goto(url('guide/getting-started.html'));
   const copy=page.locator('.vp-doc button.copy').first(),expectedCopy=await copy.evaluate(button=>button.parentElement.querySelector('pre').textContent.trim());await copy.click();await page.waitForFunction(()=>document.querySelector('.vp-doc button.copy')?.classList.contains('copied'));
-  assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).trim(),expectedCopy,'copy button must write the snippet');
+  assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replace(/\r\n/g,'\n').trim(),expectedCopy.replace(/\r\n/g,'\n'),'copy button must write the snippet');
   assert.equal(await page.locator('.vp-doc pre').evaluateAll(blocks=>blocks.filter(pre=>!pre.parentElement.querySelector(':scope > button')).length),0,'all documentation code blocks need a copy control');
 
   await page.goto(url('demo/'));await page.waitForFunction(()=>document.querySelector('#status')?.textContent.includes('revision'));
