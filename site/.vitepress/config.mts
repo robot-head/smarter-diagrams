@@ -62,7 +62,7 @@ export default defineConfig({
         const examples = diagramSamples.samples(token.content, token.info).map(sample => {
           const data = manifest[diagramSamples.key(sample)]
           if (!data) throw new Error(`Missing rendered example in ${env.relativePath}; run npm run docs:build`)
-          return { ...data, label: sample.label }
+          return { ...data, label: data.stepLabel || sample.label, step: sample.step || null }
         })
         if (examples[0].diagnostic) return `${code}<div class="diagram-diagnostic" role="note"><strong>Expected layout diagnostic</strong><pre>${escape(examples[0].diagnostic)}</pre></div>`
         return `${code}<DiagramExamples :examples="${escape(JSON.stringify(examples))}" title="${escape(heading)}" :guides="${/\bguides\b/.test(token.info)}" />`

@@ -7,16 +7,26 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 pub fn project(scene: &SceneGraph, name: &str) -> Result<SceneGraph, Error> {
-    let view = scene
+    let idx = scene
         .views
         .iter()
-        .find(|v| v.id == name)
+        .position(|v| v.id == name)
         .ok_or_else(|| Error::Layout(format!("unknown view {name}")))?;
+    let view = &scene.views[idx];
+    let patterns: Vec<&str> = if view.kind == ViewKind::Step {
+        scene.views[..=idx]
+            .iter()
+            .filter(|v| v.kind == ViewKind::Step)
+            .flat_map(|v| v.include.iter().map(String::as_str))
+            .collect()
+    } else {
+        view.include.iter().map(String::as_str).collect()
+    };
     let mut keep = BTreeSet::new();
-    for pattern in &view.include {
+    for pattern in patterns {
         let mut last = Vec::new();
-        for part in pattern.split("->").map(str::trim) {
-            if part == "*" {
+        for segment in pattern.split("->").map(str::trim) {
+            if segment == "*" {
                 let mut frontier: VecDeque<_> = last.iter().cloned().collect();
                 while let Some(id) = frontier.pop_front() {
                     for e in scene.edges.iter().filter(|e| e.source.node == id) {
@@ -27,12 +37,22 @@ pub fn project(scene: &SceneGraph, name: &str) -> Result<SceneGraph, Error> {
                 }
                 continue;
             }
-            let id = part.trim_matches(['[', ']', ',', ' ']);
-            if scene.node(id).is_none() {
-                return Err(Error::Layout(format!("unknown view member {id}")));
+            let mut next_last = Vec::new();
+            for raw in segment.split(',') {
+                let unquoted = crate::model::unquote(raw.trim_matches(['[', ']', ' ']));
+                let id = unquoted.trim();
+                if id.is_empty() {
+                    continue;
+                }
+                if scene.node(id).is_none() {
+                    return Err(Error::Layout(format!("unknown view member {id}")));
+                }
+                keep.insert(id.into());
+                next_last.push(id.to_string());
             }
-            keep.insert(id.into());
-            last = vec![id.to_string()];
+            if !next_last.is_empty() {
+                last = next_last;
+            }
         }
     }
     let explicit = keep.clone();
@@ -40,6 +60,82 @@ pub fn project(scene: &SceneGraph, name: &str) -> Result<SceneGraph, Error> {
         keep.extend(ancestors(scene, &id));
     }
     Ok(filter(scene, &keep))
+}
+
+fn border_point(from: Rect, toward: Point) -> Point {
+    let dx = toward.x - from.x;
+    let dy = toward.y - from.y;
+    let hw = (from.w / 2.).max(1.);
+    let hh = (from.h / 2.).max(1.);
+    if dx.abs() < 1e-6 && dy.abs() < 1e-6 {
+        return Point::new(from.x, from.y);
+    }
+    if dx.abs() / hw >= dy.abs() / hh {
+        let sx = dx.signum() * hw;
+        Point::new(from.x + sx, from.y + dy * hw / dx.abs())
+    } else {
+        let sy = dy.signum() * hh;
+        Point::new(from.x + dx * hh / dy.abs(), from.y + sy)
+    }
+}
+
+/// Render a progressive `step` (or `view`/`scenario`) while preserving the full
+/// diagram's canonical coordinates and `viewBox` so elements stay visually anchored.
+pub fn step_svg(
+    diagram: &crate::Diagram,
+    name: &str,
+    theme: Option<&crate::themes::ThemePalette>,
+) -> Result<String, Error> {
+    let mut projected = project(&diagram.scene, name)?;
+    let visible_nodes: BTreeSet<String> = projected.nodes.iter().map(|n| n.id.clone()).collect();
+    for zone in &mut projected.zones {
+        zone.members.retain(|m| visible_nodes.contains(m));
+    }
+    projected.zones.retain(|z| !z.members.is_empty());
+    let canonical_bounds = crate::render::bounds(&diagram.scene, &diagram.layout);
+    let mut step_layout = diagram.layout.clone();
+    step_layout.labels.retain(|lb| {
+        projected.edge(&lb.feature).is_some() || projected.node(&lb.feature).is_some()
+    });
+    for e in &projected.edges {
+        if !step_layout.routes.contains_key(&e.id)
+            && let (Some(&src), Some(&dst)) = (
+                step_layout.nodes.get(&e.source.node),
+                step_layout.nodes.get(&e.target.node),
+            )
+        {
+            let p0 = border_point(src, Point::new(dst.x, dst.y));
+            let p1 = border_point(dst, Point::new(src.x, src.y));
+            let mut points = vec![p0];
+            if (p0.x - p1.x).abs() > 1. && (p0.y - p1.y).abs() > 1. {
+                if (src.x - dst.x).abs() >= (src.y - dst.y).abs() {
+                    let mx = (p0.x + p1.x) / 2.;
+                    points.push(Point::new(mx, p0.y));
+                    points.push(Point::new(mx, p1.y));
+                } else {
+                    let my = (p0.y + p1.y) / 2.;
+                    points.push(Point::new(p0.x, my));
+                    points.push(Point::new(p1.x, my));
+                }
+            }
+            points.push(p1);
+            step_layout.routes.insert(
+                e.id.clone(),
+                crate::layout::Route {
+                    edge: e.id.clone(),
+                    points,
+                },
+            );
+        }
+    }
+    Ok(crate::render::svg_themed_with_bounds(
+        &projected,
+        &step_layout,
+        Some(canonical_bounds),
+        theme,
+        |_| true,
+        |_, _| String::new(),
+    ))
 }
 /// Retain visible nodes and contract causal paths through hidden intermediates.
 pub fn filter(scene: &SceneGraph, keep: &BTreeSet<String>) -> SceneGraph {
@@ -480,5 +576,74 @@ mod tests {
             r += 5.;
         }
         assert!(crate::layout::validate(&diag.scene, &high, &LayoutOptions::default()).is_ok());
+    }
+
+    fn svg_attr<'a>(svg: &'a str, needle: &str) -> Option<&'a str> {
+        let pos = svg.find(needle)?;
+        let rest = &svg[pos + needle.len()..];
+        let end = rest.find('"')?;
+        Some(&rest[..end])
+    }
+
+    #[test]
+    fn progressive_steps_accumulate_preserve_canonical_coordinates_and_isolate_scenarios() {
+        let source = r#"
+client -> api -> db
+api -> cache
+step: "Deployment Step"
+api -> step
+
+step core: "1. Core" {
+  include client -> api -> db
+}
+step caching [label: "2. Add Cache"] {
+  include cache
+}
+scenario isolated: "Cache Only" {
+  include api -> cache
+}
+"#;
+        let diagram = crate::compile(source).unwrap();
+        // A node literally named `step` without `{ ... }` remains a normal NodeDecl.
+        assert!(diagram.scene.node("step").is_some());
+        assert_eq!(diagram.scene.views.len(), 3);
+        assert_eq!(diagram.scene.views[0].kind, ViewKind::Step);
+        assert_eq!(diagram.scene.views[0].label.as_deref(), Some("1. Core"));
+        assert_eq!(diagram.scene.views[1].kind, ViewKind::Step);
+        assert_eq!(
+            diagram.scene.views[1].label.as_deref(),
+            Some("2. Add Cache")
+        );
+        assert_eq!(diagram.scene.views[2].kind, ViewKind::Scenario);
+
+        let p1 = project(&diagram.scene, "core").unwrap();
+        assert!(p1.node("client").is_some() && p1.node("db").is_some());
+        assert!(p1.node("cache").is_none());
+
+        let p2 = project(&diagram.scene, "caching").unwrap();
+        assert!(p2.node("client").is_some() && p2.node("cache").is_some());
+
+        let sc = project(&diagram.scene, "isolated").unwrap();
+        assert!(sc.node("api").is_some() && sc.node("cache").is_some());
+        assert!(sc.node("client").is_none());
+
+        let full_svg = diagram.to_svg();
+        let s1 = step_svg(&diagram, "core", None).unwrap();
+        let s2 = step_svg(&diagram, "caching", None).unwrap();
+        assert_eq!(
+            svg_attr(&s1, "viewBox=\""),
+            svg_attr(&full_svg, "viewBox=\"")
+        );
+        assert_eq!(
+            svg_attr(&s2, "viewBox=\""),
+            svg_attr(&full_svg, "viewBox=\"")
+        );
+        assert!(!s1.contains("data-node=\"cache\""));
+        assert!(s2.contains("data-node=\"cache\""));
+
+        // Node coordinates of `api` must remain identical across step 1, step 2, and full diagram.
+        let api_marker = "data-node=\"api\" data-x=\"";
+        assert_eq!(svg_attr(&s1, api_marker), svg_attr(&full_svg, api_marker));
+        assert_eq!(svg_attr(&s2, api_marker), svg_attr(&full_svg, api_marker));
     }
 }

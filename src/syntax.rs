@@ -447,6 +447,19 @@ impl Parser<'_> {
             "distribute" => Kind::DistributeDecl,
             "flow" => Kind::FlowDecl,
             "view" => Kind::ViewDecl,
+            "step" | "scenario"
+                if significant(&self.tokens[self.i..line_end])
+                    .nth(1)
+                    .is_some_and(|t| {
+                        matches!(t.kind, Kind::Ident | Kind::String | Kind::Number)
+                    })
+                    && self
+                        .tokens
+                        .get(line_end)
+                        .is_some_and(|t| t.kind == Kind::LBrace) =>
+            {
+                Kind::ViewDecl
+            }
             "strata" => Kind::StrataDecl,
             "@" if self
                 .tokens

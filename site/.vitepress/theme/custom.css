@@ -307,6 +307,43 @@
   font-weight: 650;
 }
 
+.diagram-stepper-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.diagram-stepper-nav button {
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.diagram-stepper-nav button:hover:not(:disabled) {
+  border-color: var(--vp-c-brand-1);
+}
+
+.diagram-stepper-nav button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.diagram-step-counter {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vp-c-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
 .diagram-controls output {
   font-size: 13px;
   font-variant-numeric: tabular-nums;

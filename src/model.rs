@@ -240,9 +240,22 @@ pub struct LayoutRule {
     pub span: Span,
     pub variant: Option<String>,
 }
+/// Progressive-disclosure or alternative view classification.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ViewKind {
+    #[default]
+    View,
+    Step,
+    Scenario,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct View {
     pub id: String,
+    #[serde(default)]
+    pub kind: ViewKind,
+    #[serde(default)]
+    pub label: Option<String>,
     pub include: Vec<String>,
     pub origin: Span,
 }
@@ -1396,6 +1409,35 @@ impl Lower<'_> {
         if ts.len() < 2 {
             return;
         }
+        let kind = match ts[0].text(self.source) {
+            "step" => ViewKind::Step,
+            "scenario" => ViewKind::Scenario,
+            _ => ViewKind::View,
+        };
+        let id = unquote(ts[1].text(self.source));
+        let mut label = None;
+        let mut i = 2;
+        if ts.get(i).is_some_and(|t| t.kind == Kind::Colon) {
+            i += 1;
+            let begin = i;
+            while i < ts.len() && !matches!(ts[i].kind, Kind::LBracket | Kind::At) {
+                i += 1;
+            }
+            if begin < i {
+                label = Some(unquote(
+                    Span::new(ts[begin].span.start, ts[i - 1].span.end)
+                        .text(self.source)
+                        .trim(),
+                ));
+            }
+        }
+        if ts.get(i).is_some_and(|t| t.kind == Kind::LBracket) {
+            let end = matching(&ts, i);
+            let attrs = attributes(self.source, &ts[i + 1..end]);
+            if let Some(v) = attrs.get("label") {
+                label = Some(unquote(&v.text));
+            }
+        }
         let mut include = Vec::new();
         for child in stmt.children() {
             let t = self.header(&child);
@@ -1405,10 +1447,18 @@ impl Lower<'_> {
                         .text(self.source)
                         .into(),
                 );
+            } else if t.first().is_some_and(|t| t.text(self.source) == "label") && t.len() > 1 {
+                label = Some(unquote(
+                    Span::new(t[1].span.start, t.last().unwrap().span.end)
+                        .text(self.source)
+                        .trim(),
+                ));
             }
         }
         self.scene.views.push(View {
-            id: ts[1].text(self.source).into(),
+            id,
+            kind,
+            label,
             include,
             origin: Span::from(stmt.text_range()),
         });

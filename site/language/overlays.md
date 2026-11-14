@@ -44,7 +44,7 @@ view downstream {
 
 `*` includes outgoing reachability from the preceding seed. Named members and required ownership ancestors are retained; edges and relations are filtered to the projected graph. A named sequence selects those members; it is not a new protocol definition.
 
-Use `views::project(&scene, name)` or `--view name` in the CLI. A view chooses graph membership; an `@layout(name)` variant chooses constraints. They solve different authoring needs.
+Use `views::project(&scene, name)` or `--view name` in the CLI. For cumulative progressive disclosure (`step <name> { ... }`) that keeps canonical node coordinates anchored across steps, plus non-cumulative `scenario` overlays, see [Views, progressive steps, focus & lenses](/runtime/views). A view chooses graph membership; an `@layout(name)` variant chooses constraints. They solve different authoring needs.
 
 Use the comparison tabs above to inspect the full graph, the request path without `metrics`, and the downstream view without `client`.
 

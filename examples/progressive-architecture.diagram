@@ -1,0 +1,45 @@
+client: "Web / Mobile Client" [shape: actor]
+waf: "Edge CDN & WAF"
+api: "Orders API"
+cache: "Redis Session Cache" [shape: cache]
+db: "Orders Primary" [shape: database]
+replica: "Read Replica" [shape: database]
+bus: "Event Bus" [shape: queue]
+billing: "Billing Worker"
+telemetry: "OTel Collector" [shape: database]
+
+zone edge_tier "Edge Tier" around [waf] {
+  tint: oklch(0.78 0.08 240 / 0.14)
+}
+zone async_tier "Async & Observability" around [bus, billing, telemetry] {
+  tint: oklch(0.82 0.08 155 / 0.14)
+}
+
+client -> waf: "HTTPS"
+waf -> api: "forwarded"
+api -> cache: "session GET"
+api -> db: "INSERT order"
+db -> replica: "WAL stream"
+api -> bus: "OrderPlaced" [style: marching-ants]
+bus -> billing: "charge card"
+api -> telemetry: "traces" [style: dashed]
+billing -> telemetry: "metrics" [style: dashed]
+
+align row [client, waf, api, db]
+
+step core: "1. Core Request Path" {
+  include client, api, db
+}
+step edge: "2. Edge WAF & Cache" {
+  include waf, cache
+}
+step async: "3. Event Bus & Billing" {
+  include bus, billing
+}
+step observability: "4. Metrics & Traces" {
+  include telemetry, replica
+}
+
+scenario failover: "Read-Replica Failover" {
+  include client -> waf -> api -> db -> replica
+}

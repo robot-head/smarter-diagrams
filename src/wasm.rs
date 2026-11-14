@@ -347,25 +347,29 @@ impl WasmDocument {
         crate::render::focused_svg(&d.scene, &d.layout, node, hops)
     }
 }
+fn resolve_theme(spec: &str) -> Result<Option<crate::themes::ThemePalette>, JsValue> {
+    let trimmed = spec.trim();
+    if trimmed.is_empty() || trimmed == "auto" {
+        return Ok(None);
+    }
+    if let Some(preset) = crate::themes::by_name(trimmed) {
+        return Ok(Some(preset));
+    }
+    if trimmed.starts_with('{') || trimmed.contains("base00") {
+        return Ok(Some(
+            crate::themes::ThemePalette::from_base16_str(trimmed).map_err(js_error)?,
+        ));
+    }
+    Err(JsValue::from_str(&format!("unknown theme {trimmed}")))
+}
 #[wasm_bindgen]
 impl WasmDocument {
     pub fn svg_themed(&self, theme_or_base16: &str) -> Result<String, JsValue> {
         let d = self.inner.snapshot();
-        if theme_or_base16.trim().is_empty() || theme_or_base16 == "auto" {
-            return Ok(d.to_svg());
+        match resolve_theme(theme_or_base16)? {
+            Some(palette) => Ok(d.to_svg_with_theme(&palette)),
+            None => Ok(d.to_svg()),
         }
-        let palette = if let Some(preset) = crate::themes::by_name(theme_or_base16) {
-            preset
-        } else if theme_or_base16.trim_start().starts_with('{')
-            || theme_or_base16.contains("base00")
-        {
-            crate::themes::ThemePalette::from_base16_str(theme_or_base16).map_err(js_error)?
-        } else {
-            return Err(JsValue::from_str(&format!(
-                "unknown theme {theme_or_base16}"
-            )));
-        };
-        Ok(d.to_svg_with_theme(&palette))
     }
     pub fn flows_json(&self) -> Result<String, JsValue> {
         serde_json::to_string(&self.inner.snapshot().scene.flows).map_err(js_error)
@@ -373,6 +377,14 @@ impl WasmDocument {
     pub fn flow_frame_svg(&self, id: &str, step: usize) -> Result<String, JsValue> {
         let d = self.inner.snapshot();
         crate::render::flow_frame_svg(&d.scene, &d.layout, id, step).map_err(js_error)
+    }
+    pub fn steps_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.inner.snapshot().scene.views).map_err(js_error)
+    }
+    pub fn step_svg(&self, name: &str, theme_or_base16: &str) -> Result<String, JsValue> {
+        let d = self.inner.snapshot();
+        let palette = resolve_theme(theme_or_base16)?;
+        crate::views::step_svg(&d, name, palette.as_ref()).map_err(js_error)
     }
 }
 #[wasm_bindgen]

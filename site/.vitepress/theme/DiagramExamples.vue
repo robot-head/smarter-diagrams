@@ -4,12 +4,13 @@ import { withBase, useData } from 'vitepress'
 import {touchGestures} from '../../../web/touch-gestures.js'
 
 type NodeRow = { id: string; label: string; shape: string; parent: string | null; bounds: { x:number; y:number; w:number; h:number }; ports: { id:string; label:string; constraint:unknown }[] }
-type Example = { file:string; darkFile:string; label:string; description:string; viewBox:number[]; grid:number; nodes:NodeRow[]; edges:{ id:string; source:string; target:string; label:string; kind:string }[]; zones:{label:string;members:string[]}[]; flows:{label:string;steps:string[]}[] }
+type Example = { file:string; darkFile:string; label:string; step?:string | null; stepLabel?:string | null; description:string; viewBox:number[]; grid:number; nodes:NodeRow[]; edges:{ id:string; source:string; target:string; label:string; kind:string }[]; zones:{label:string;members:string[]}[]; flows:{label:string;steps:string[]}[] }
 type ThemeEntry = { id:string; label:string; dark:boolean; bg:string; css:string }
 const props = defineProps<{ examples:Example[]; title:string; guides?:boolean }>()
 const { isDark } = useData()
 const fitted = ref(true), readable = ref(true), coarse = ref(false)
 const active = ref(0), zoom = ref(1), showGrid = ref(false), viewport = ref<HTMLElement>(), viewportWidth = ref(640)
+const isStepper = computed(() => props.examples.length > 1 && props.examples.every(e => Boolean(e.step)))
 const selectedTheme = ref('auto')
 const themedBlobUrl = ref<string | null>(null)
 let themeCache: ThemeEntry[] | null = null
@@ -77,7 +78,12 @@ const units = (value:number) => Number((value/current.value.grid).toFixed(2))
 </script>
 
 <template>
-  <div class="diagram-examples" :data-example-count="examples.length">
+  <div class="diagram-examples" :data-example-count="examples.length" :data-stepper="isStepper ? 'true' : undefined">
+    <div v-if="isStepper" class="diagram-stepper-nav" role="group" :aria-label="`${title} step navigation`">
+      <button type="button" :disabled="active <= 0" @click="choose(active - 1)">◀ Prev</button>
+      <span class="diagram-step-counter">Step {{ active + 1 }} of {{ examples.length }}</span>
+      <button type="button" :disabled="active >= examples.length - 1" @click="choose(active + 1)">Next ▶</button>
+    </div>
     <div v-if="examples.length>1" class="diagram-tabs" role="tablist" :aria-label="`${title} comparisons`">
       <button v-for="(example,index) in examples" :id="`${id}-tab-${index}`" :key="example.file" role="tab" :aria-selected="active===index" :aria-controls="`${id}-panel`" :tabindex="active===index?0:-1" @click="choose(index)" @keydown="tabs($event,index)">{{ example.label }}</button>
     </div>

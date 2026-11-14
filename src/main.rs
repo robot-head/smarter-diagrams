@@ -31,8 +31,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             std::io::stdout().lock(),
         )?);
     }
-    let (mut input, mut output, mut view, mut theme_name, mut theme_file, mut events_arg) =
-        (None, None, None, None, None, None);
+    let (
+        mut input,
+        mut output,
+        mut view,
+        mut step_name,
+        mut theme_name,
+        mut theme_file,
+        mut events_arg,
+    ) = (None, None, None, None, None, None, None);
     let mut format = "svg".to_string();
     let mut frames: usize = 16;
     let mut fps: u16 = 4;
@@ -49,13 +56,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             "-h" | "--help" => {
                 println!(
-                    "smarter-diagrams [INPUT|-] [-o OUTPUT] [--view NAME] [--theme NAME] [--theme-file PATH] [--format svg|json|check|lint|png|pdf|gif|apng] [--frames N] [--fps N] [--events E1,E2,...] [--no-explore-candidates]\nsmarter-diagrams mcp\nPNG/PDF/GIF/APNG require cargo install --features export. Omit INPUT to read stdin."
+                    "smarter-diagrams [INPUT|-] [-o OUTPUT] [--view NAME] [--step NAME] [--theme NAME] [--theme-file PATH] [--format svg|json|check|lint|png|pdf|gif|apng] [--frames N] [--fps N] [--events E1,E2,...] [--no-explore-candidates]\nsmarter-diagrams mcp\nPNG/PDF/GIF/APNG require cargo install --features export. Omit INPUT to read stdin."
                 );
                 return Ok(());
             }
             "-o" | "--output" => output = Some(args.next().ok_or("missing output path")?),
             "--format" => format = args.next().ok_or("missing format")?,
             "--view" => view = Some(args.next().ok_or("missing view name")?),
+            "--step" => step_name = Some(args.next().ok_or("missing step name")?),
             "--theme" => theme_name = Some(args.next().ok_or("missing theme name")?),
             "--theme-file" => theme_file = Some(args.next().ok_or("missing theme file path")?),
             "--frames" => {
@@ -90,6 +98,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         source = std::fs::read_to_string(input.unwrap())?;
     }
+    if view.is_some() && step_name.is_some() {
+        return Err("cannot combine --view and --step".into());
+    }
     let mut d = smarter_diagrams::compile_with(&source, &options, None)?;
     if let Some(name) = view {
         d.scene = smarter_diagrams::views::project(&d.scene, &name)?;
@@ -110,12 +121,23 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
     #[cfg(not(feature = "export"))]
     let _ = (frames, fps, &events_arg);
-    let render_svg = |diagram: &smarter_diagrams::Diagram| match &active_theme {
-        Some(t) => diagram.to_svg_with_theme(t),
-        None => diagram.to_svg(),
-    };
+    let render_svg =
+        |diagram: &smarter_diagrams::Diagram| -> Result<String, Box<dyn std::error::Error>> {
+            if let Some(ref step) = step_name {
+                Ok(smarter_diagrams::views::step_svg(
+                    diagram,
+                    step,
+                    active_theme.as_ref(),
+                )?)
+            } else {
+                Ok(match &active_theme {
+                    Some(t) => diagram.to_svg_with_theme(t),
+                    None => diagram.to_svg(),
+                })
+            }
+        };
     let result = match format.as_str() {
-        "svg" => render_svg(&d).into_bytes(),
+        "svg" => render_svg(&d)?.into_bytes(),
         "json" => serde_json::to_vec_pretty(&d.layout)?,
         "lint" => serde_json::to_vec_pretty(&smarter_diagrams::lint::lint(&d))?,
         "check" => format!(
@@ -125,9 +147,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         )
         .into_bytes(),
         #[cfg(feature = "export")]
-        "png" => smarter_diagrams::export::png(&render_svg(&d), 1.)?,
+        "png" => smarter_diagrams::export::png(&render_svg(&d)?, 1.)?,
         #[cfg(feature = "export")]
-        "pdf" => smarter_diagrams::export::pdf(&render_svg(&d))?,
+        "pdf" => smarter_diagrams::export::pdf(&render_svg(&d)?)?,
         #[cfg(feature = "export")]
         "gif" => {
             let svgs =
@@ -245,6 +267,20 @@ fn collect_animation_frames(
             out.push(smarter_diagrams::render::flow_frame_svg(
                 &d.scene, &d.layout, &flow.id, step,
             )?);
+        }
+        return Ok(out);
+    }
+
+    let step_views: Vec<_> = d
+        .scene
+        .views
+        .iter()
+        .filter(|v| v.kind == smarter_diagrams::model::ViewKind::Step)
+        .collect();
+    if !step_views.is_empty() {
+        let mut out = Vec::with_capacity(step_views.len());
+        for sv in step_views {
+            out.push(smarter_diagrams::views::step_svg(&d, &sv.id, theme)?);
         }
         return Ok(out);
     }

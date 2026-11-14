@@ -1,34 +1,118 @@
-# Views, zoom and lenses
+# Views, Progressive Steps, Focus & Lenses
 
-## Project a named view
+One canonical model backs every projection, progressive walkthrough, scenario slice and interactive lens.
 
-```rust
-let diagram = smarter_diagrams::compile(
-    "client -> api -> db\nview request { include client -> api -> db }\n"
-)?;
-let scene = smarter_diagrams::views::project(&diagram.scene, "request")?;
-let layout = smarter_diagrams::layout::layout(&scene, &Default::default(), None)?;
-let svg = smarter_diagrams::render::svg(&scene, &layout);
+## Canonical `view` projections vs. `step` & `scenario`
+
+- **`view <id>`**: selects a subset of nodes and edges (including `*` downstream closure) and re-runs layout for that slice. Use `--view <id>` when you want a compact standalone diagram of one subsystem.
+- **`step <id>` (cumulative progressive disclosure)**: accumulates every earlier `step` block up through `<id>`, keeps the full diagram's solved node coordinates and `viewBox`, and reveals new layers without shifting elements you already read. If an intermediate hop (such as a WAF) is hidden in an earlier step, connections cleanly contract between visible endpoints and expand in place when the intermediate node enters.
+- **`scenario <id>`**: non-cumulative overlay highlighting one self-contained scenario (such as failover or degraded mode) over the shared canonical graph.
+
+### Progressive disclosure walkthrough
+
+Click **Next ▶** or pick a step tab below to reveal the architecture one layer at a time while every node stays anchored in place:
+
+```diagram steps=core,edge,async,observability
+client: "Web / Mobile Client" [shape: actor]
+waf: "Edge CDN & WAF"
+api: "Orders API"
+cache: "Redis Session Cache" [shape: cache]
+db: "Orders Primary" [shape: database]
+replica: "Read Replica" [shape: database]
+bus: "Event Bus" [shape: queue]
+billing: "Billing Worker"
+telemetry: "OTel Collector" [shape: database]
+
+zone edge_tier "Edge Tier" around [waf] {
+  tint: oklch(0.78 0.08 240 / 0.14)
+}
+zone async_tier "Async & Observability" around [bus, billing, telemetry] {
+  tint: oklch(0.82 0.08 155 / 0.14)
+}
+
+client -> waf: "HTTPS"
+waf -> api: "forwarded"
+api -> cache: "session GET"
+api -> db: "INSERT order"
+db -> replica: "WAL stream"
+api -> bus: "OrderPlaced" [style: marching-ants]
+bus -> billing: "charge card"
+api -> telemetry: "traces" [style: dashed]
+billing -> telemetry: "metrics" [style: dashed]
+
+align row [client, waf, api, db]
+
+step core: "1. Core Request Path" {
+  include client, api, db
+}
+step edge: "2. Edge WAF & Cache" {
+  include waf, cache
+}
+step async: "3. Event Bus & Billing" {
+  include bus, billing
+}
+step observability: "4. Metrics & Traces" {
+  include telemetry, replica
+}
+
+scenario failover: "Read-Replica Failover" {
+  include client -> waf -> api -> db -> replica
+}
 ```
 
-Projection filters canonical entities and preserves required ancestors. It keeps labels and origins intact. Use a new layout for a projected graph rather than indexing the canonical layout with missing/filtered entities.
+### CLI & animated step export
 
-## Causal focus
+Render an individual step to SVG, PNG, or PDF with `--step <NAME>`, or export all declared `step` blocks sequentially into an animated GIF or APNG:
 
-`causal_cone(scene, start, hops, direction)` returns graph membership for bounded incoming, outgoing or bidirectional reachability. `attention(scene, focus, hops)` maps node IDs to opacity/stroke/fill tones. `render::focused_svg` renders those tones without removing context.
+```sh
+# Render step 2 while preserving the full diagram's coordinates
+smarter-diagrams examples/progressive-architecture.diagram --step edge -o step2.svg
 
-`@story` provides a static saliency path when there is no transient hover focus. The [playground](/playground) demonstrates causal emphasis on pointer hover.
+# Export all progressive steps as a looping animated GIF or APNG
+smarter-diagrams examples/progressive-architecture.diagram --format gif --fps 1 -o walkthrough.gif
+smarter-diagrams examples/progressive-architecture.diagram --format apng --fps 1 -o walkthrough.apng
 
-## Semantic lenses
+# Project a standalone alternative scenario
+smarter-diagrams examples/progressive-architecture.diagram --view failover -o failover.svg
+```
 
-A `Lens` has a pixel `center`, positive `radius`, finite `strength` and `LensKind`. Kinds are explicit `Members`, `SqlSchema`, `IamThreat` and `ByteLayout`. Membership combines semantic selection with spatial radius.
+### Library & Wasm APIs
 
-`lens_intersection` intersects memberships for multiple lenses. With no lenses it returns an empty set. `fisheye(scene, layout, lenses, options)` displaces selected geometry and reprojects it through the hard layout constraints, avoiding a purely visual distortion that would make nodes overlap.
+```rust,no_run
+use smarter_diagrams::{compile, views};
 
-The built-in semantic categories use shapes/IDs/attributes: SQL tables and databases; auth/KMS/security entities; and byte/memory metadata. They are lightweight selectors rather than a domain inference engine.
+let src = std::fs::read_to_string("examples/progressive-architecture.diagram")?;
+let d = compile(&src)?;
 
-## Continuous zoom
+// Cumulative progressive step with canonical bounds preserved
+let step2_svg = views::step_svg(&d, "edge", None)?;
 
-`zoom(scene, layout, depth)` returns a `ZoomFrame` with interpolated geometry and opacity. `smoothstep` supplies a cubic C1 transition; boxes scale homothetically. These are animation frames for an embedding UI. The current playground exposes focus, while applications can compose the lower-level lens and zoom APIs into their own controls.
+// Causal cone focus and semantic zoom
+let cone = views::causal_cone(&d.scene, "api", 1, views::Direction::Both);
+let focused = views::zoom(&d.scene, &d.layout, 1.0);
+println!(
+    "step SVG bytes={}, cone nodes={}, zoom level={}",
+    step2_svg.len(),
+    cone.len(),
+    focused.nodes.len()
+);
+```
 
-When a named view hides intermediate services, projection contracts their causal paths into dashed summary connections labeled `via …`. Traversal stops at the next visible node and handles cycles; the canonical source graph stays intact.
+In JavaScript/Wasm, `WasmDocument.steps_json()` lists declared views, steps, and scenarios (`id`, `kind`, `label`), and `WasmDocument.step_svg(name, theme)` renders any step or scenario at the canonical canvas frame.
+
+```rust,no_run
+use smarter_diagrams::{compile, LayoutOptions, layout::Point, views};
+
+let d = compile("a -> b -> c -> d\n")?;
+let cone = views::causal_cone(&d.scene, "b", 1, views::Direction::Both);
+let lens = views::Lens {
+    center: d.layout.nodes["b"].center(),
+    radius: 260.,
+    strength: 0.7,
+    kind: views::LensKind::Members(cone),
+};
+let lensed = views::fisheye(&d.scene, &d.layout, &[lens], &LayoutOptions::default())?;
+let _ = (Point::new(0., 0.), &lensed);
+```
+
+See the standalone viewer documentation in [Live playground](/demo/) for interactive focus lenses and theme switching.

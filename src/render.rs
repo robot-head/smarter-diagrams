@@ -675,9 +675,20 @@ pub(crate) fn svg_themed_with_decorations(
     edge_visible: impl Fn(&str) -> bool,
     decorate: impl Fn(&Node, Rect) -> String,
 ) -> String {
+    svg_themed_with_bounds(scene, l, None, theme, edge_visible, decorate)
+}
+
+pub(crate) fn svg_themed_with_bounds(
+    scene: &SceneGraph,
+    l: &Layout,
+    explicit_bounds: Option<Rect>,
+    theme: Option<&crate::themes::ThemePalette>,
+    edge_visible: impl Fn(&str) -> bool,
+    decorate: impl Fn(&Node, Rect) -> String,
+) -> String {
     let ellipses = all_zone_ellipses(scene, l);
     let titles = zone_titles_from_ellipses(scene, l, &ellipses);
-    let bounds = bounds_with(scene, l, &ellipses, &titles);
+    let bounds = explicit_bounds.unwrap_or_else(|| bounds_with(scene, l, &ellipses, &titles));
     let masks = edge_masks(scene, l, &edge_visible);
     let theme_attrs = theme
         .map(|t| {
