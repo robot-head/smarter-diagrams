@@ -23,6 +23,14 @@ pub(crate) fn container_header_rect(node: &Node, r: Rect) -> Option<Rect> {
         28. + h - 24.,
     ))
 }
+#[allow(dead_code)]
+pub(crate) fn container_header_rect_with_ports(
+    node: &Node,
+    r: Rect,
+    _ports: &BTreeMap<String, PortPlacement>,
+) -> Option<Rect> {
+    container_header_rect(node, r)
+}
 pub(crate) fn sql_table_title_rect(node: &Node, r: Rect) -> Option<Rect> {
     if node.shape != "sql_table" {
         return None;

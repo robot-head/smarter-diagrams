@@ -620,6 +620,68 @@ pub fn coffman_graham(scene: &SceneGraph, width: usize) -> Vec<usize> {
 }
 
 pub(crate) type SideHints = Vec<Option<(Side, Side)>>;
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FlowAxis {
+    LeftToRight,
+    TopToBottom,
+    QuadrantCross,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub(crate) struct TopologyPlan {
+    pub axis: FlowAxis,
+    pub ranks: Vec<i32>,
+    pub order: Vec<i32>,
+    pub fold_row: Vec<usize>,
+    pub edge_guides: BTreeMap<String, Vec<(i32, f64)>>,
+    pub side_hints: SideHints,
+    pub search_states: usize,
+}
+
+#[allow(dead_code)]
+pub(crate) fn candidates(
+    scene: &SceneGraph,
+    sizes: &[Point],
+    options: &LayoutOptions,
+) -> Vec<TopologyPlan> {
+    let n = scene.nodes.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let layer_width = if options.max_layer_width == 0 {
+        ((n as f64 * 240. / (112. * options.target_aspect_ratio))
+            .sqrt()
+            .ceil() as usize)
+            .max(2)
+    } else {
+        options.max_layer_width
+    };
+    let raw = coffman_graham(scene, layer_width);
+    let mut per_rank: BTreeMap<i32, i32> = BTreeMap::new();
+    let mut ranks = Vec::with_capacity(n);
+    let mut order = Vec::with_capacity(n);
+    for &r in &raw {
+        let r = r as i32;
+        let slot = per_rank.entry(r).or_insert(0);
+        ranks.push(r);
+        order.push(*slot);
+        *slot += 1;
+    }
+    let _ = sizes;
+    let _ = options.explore_candidates;
+    vec![TopologyPlan {
+        axis: FlowAxis::LeftToRight,
+        ranks,
+        order,
+        fold_row: vec![0; n],
+        edge_guides: BTreeMap::new(),
+        side_hints: vec![None; scene.edges.len()],
+        search_states: 0,
+    }]
+}
 /// Recognize elementary concepts. Fresh placement may move nodes; route-only
 /// planning reuses existing pinned or dragged geometry without changing it.
 pub(crate) fn readable_concept(
