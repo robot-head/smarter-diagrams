@@ -1,6 +1,6 @@
 {
-  "engineFingerprint": "e91dbaf2990e154af363b2f8afd10ae6f45a0eddb9b7e7d128f90c8e563a4f49",
-  "baseRevision": "1461f609d09fd6db407e4df2d2e8088d2e70ef4d",
+  "engineFingerprint": "7da7983e9a51f9a8153eedbc6b8b98c50bf494af4227928a6e1a8c47e6b5aed8",
+  "baseRevision": "0cd71282a6fadac9e22d3d1e5acc74909b4965f5",
   "method": "Current semantic, native geometry, Chromium paint and repeated-compilation checks, followed by individual visual inspection. Earlier findings and scores are preserved under historicalAudits.",
   "knownDiagnostics": {},
   "counts": {

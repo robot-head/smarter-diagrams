@@ -2,7 +2,7 @@
   "status": "complete",
   "reviewer": "Codex visual inspection",
   "reviewedAt": "2026-11-13",
-  "engineFingerprint": "e91dbaf2990e154af363b2f8afd10ae6f45a0eddb9b7e7d128f90c8e563a4f49",
+  "engineFingerprint": "7da7983e9a51f9a8153eedbc6b8b98c50bf494af4227928a6e1a8c47e6b5aed8",
   "method": "Inspect every distinct SVG on Chromium contact sheets; reopen dense or ambiguous examples at native size. Reuse a review only when SVG SHA-256 bytes match. Scores are subjective visual judgments, separate from semantic and geometry assertions. After discovery, every one of the 220 distinct sources was recompiled in each of five complete confirmation passes; every SVG byte hash matched its inspected image.",
   "rubric": {
     "beauty": "5: no observed material spacing, alignment, shape, clipping or connector defect at readable/native zoom; 4 or below: a concrete visual improvement remains.",
