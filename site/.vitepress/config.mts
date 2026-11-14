@@ -27,6 +27,7 @@ const reference = [
   ['Module map', 'modules'], ['Feature flags', 'features'],
   ['Errors and troubleshooting', 'errors'], ['Architecture', 'architecture'],
   ['Performance', 'performance'], ['Validation evidence', 'verification'],
+  ['Licensing & third-party audit', 'licensing'],
 ].map(([text, page]) => ({ text, link: `/reference/${page}` }))
 
 export default defineConfig({

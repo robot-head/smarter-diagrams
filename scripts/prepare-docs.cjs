@@ -23,7 +23,7 @@ if (fs.existsSync(path.join(root, 'target/doc'))) copy(path.join(root, 'target/d
 for (const file of ['benchmarks.csv', 'browser-benchmark.json', 'wasm-size.json', 'github-plan.json', 'layout-audit.json', 'layout-exploration.json', 'layout-quality-review.json']) copy(path.join(root, 'docs', file), path.join(publicDir, 'evidence', file));
 copy(path.join(root, 'docs/requirements'), path.join(publicDir, 'evidence/requirements'));
 fs.mkdirSync(path.join(root, 'site/reference'), { recursive: true });
-for (const file of ['architecture', 'performance', 'verification']) {
+for (const file of ['architecture', 'performance', 'verification', 'licensing']) {
   let text = fs.readFileSync(path.join(root, 'docs', `${file}.md`), 'utf8');
   // The originals remain canonical. Rewrite repository-relative evidence links
   // for the hosted guide without maintaining a second copy of their content.
