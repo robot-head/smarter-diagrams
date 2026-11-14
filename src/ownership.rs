@@ -93,7 +93,11 @@ fn should_skip_owner_pack(scene: &SceneGraph, owner_idx: Option<usize>, o: &Layo
     }
     if owner_idx.is_none() {
         let root_of_idx = |mut idx: usize| -> usize {
-            while let Some(p) = scene.nodes[idx].parent.as_deref().and_then(|id| scene.index(id)) {
+            while let Some(p) = scene.nodes[idx]
+                .parent
+                .as_deref()
+                .and_then(|id| scene.index(id))
+            {
                 idx = p;
             }
             idx
@@ -109,7 +113,9 @@ fn should_skip_owner_pack(scene: &SceneGraph, owner_idx: Option<usize>, o: &Layo
                 }
                 for key in ["x", "y", "from"] {
                     if let Some(val) = a.attrs.get(key) {
-                        for tok in val.text.split(|c: char| !c.is_alphanumeric() && c != '_' && c != '-' && c != '.') {
+                        for tok in val.text.split(|c: char| {
+                            !c.is_alphanumeric() && c != '_' && c != '-' && c != '.'
+                        }) {
                             let cand = tok.trim_end_matches('.');
                             if cand.is_empty() {
                                 continue;
@@ -232,7 +238,13 @@ fn compute_macro_flow(scene: &SceneGraph, owners: &[usize]) -> MacroFlow {
                     }
                 }
             }
-            let prio = |idx: usize| (dag_in[idx] > 0, local_out[idx] - local_in[idx], std::cmp::Reverse(idx));
+            let prio = |idx: usize| {
+                (
+                    dag_in[idx] > 0,
+                    local_out[idx] - local_in[idx],
+                    std::cmp::Reverse(idx),
+                )
+            };
             let mut dag = local.clone();
             dag.edges.retain(|e| {
                 let (Some(u), Some(v)) = (local.index(&e.source.node), local.index(&e.target.node))
@@ -254,17 +266,21 @@ fn compute_macro_flow(scene: &SceneGraph, owners: &[usize]) -> MacroFlow {
                 .collect();
             if part_owners.len() == 2 {
                 let (a, b) = (part_owners[0], part_owners[1]);
-                let fwd = local
-                    .edges
-                    .iter()
-                    .any(|e| e.source.node == local.nodes[a].id && e.target.node == local.nodes[b].id);
-                let rev = local
-                    .edges
-                    .iter()
-                    .any(|e| e.source.node == local.nodes[b].id && e.target.node == local.nodes[a].id);
-                let prefixes_clean = (0..part.len())
-                    .filter(|i| !part_owners.contains(i))
-                    .all(|i| local.edges.iter().all(|e| e.target.node != local.nodes[i].id));
+                let fwd = local.edges.iter().any(|e| {
+                    e.source.node == local.nodes[a].id && e.target.node == local.nodes[b].id
+                });
+                let rev = local.edges.iter().any(|e| {
+                    e.source.node == local.nodes[b].id && e.target.node == local.nodes[a].id
+                });
+                let prefixes_clean =
+                    (0..part.len())
+                        .filter(|i| !part_owners.contains(i))
+                        .all(|i| {
+                            local
+                                .edges
+                                .iter()
+                                .all(|e| e.target.node != local.nodes[i].id)
+                        });
                 if fwd && rev && prefixes_clean {
                     flow.reciprocal_vertical
                         .insert((units[part[a]], units[part[b]]));
@@ -379,7 +395,15 @@ pub(crate) fn pack(scene: &SceneGraph, rects: &mut [Rect], o: &LayoutOptions, sp
         }
         let owner_pinned = has_node_annotation(scene, owner, o, &["pin"]);
         let orig_owner_center = (rects[owner].x, rects[owner].y);
-        group(scene, rects, o, &children, Some(owner), &macro_flow, spacing);
+        group(
+            scene,
+            rects,
+            o,
+            &children,
+            Some(owner),
+            &macro_flow,
+            spacing,
+        );
         let bounds = children
             .iter()
             .map(|&i| with_top_extra(&scene.nodes[i], rects[i]))
@@ -872,14 +896,20 @@ fn ancestor_pair_sharing_parent(
     let mut cur = Some(a_id);
     while let Some(id) = cur {
         let idx = scene.index(id)?;
-        let parent = scene.nodes[idx].parent.as_deref().and_then(|p| scene.index(p));
+        let parent = scene.nodes[idx]
+            .parent
+            .as_deref()
+            .and_then(|p| scene.index(p));
         a_chain.push((idx, parent));
         cur = scene.nodes[idx].parent.as_deref();
     }
     let mut b_cur = Some(b_id);
     while let Some(id) = b_cur {
         let b_idx = scene.index(id)?;
-        let b_parent = scene.nodes[b_idx].parent.as_deref().and_then(|p| scene.index(p));
+        let b_parent = scene.nodes[b_idx]
+            .parent
+            .as_deref()
+            .and_then(|p| scene.index(p));
         for &(a_idx, a_parent) in &a_chain {
             if a_parent == b_parent && a_idx != b_idx {
                 return Some((a_idx, b_idx, a_parent));
@@ -966,7 +996,10 @@ fn project_border_info(
             if let Some(pos) = part_units.iter().position(|&j| i == j) {
                 return Some(pos);
             }
-            i = scene.nodes[i].parent.as_deref().and_then(|p| scene.index(p))?;
+            i = scene.nodes[i]
+                .parent
+                .as_deref()
+                .and_then(|p| scene.index(p))?;
         }
     };
     let mut seen_anchors: BTreeMap<(usize, u8, bool, String), usize> = BTreeMap::new();
@@ -977,7 +1010,10 @@ fn project_border_info(
             (Some(a), Some(b)) if a != b => {
                 let sf = endpoint_y_fraction(scene, rects, part_units[a], &edge.source.node);
                 let df = endpoint_y_fraction(scene, rects, part_units[b], &edge.target.node);
-                info.internal_fracs.entry((a, b)).or_default().push((sf, df));
+                info.internal_fracs
+                    .entry((a, b))
+                    .or_default()
+                    .push((sf, df));
             }
             (Some(a), None) => {
                 if let Some(oi) = owner_idx {
@@ -1054,8 +1090,12 @@ fn project_border_info(
             _ => {}
         }
     }
-    info.anchors
-        .sort_by(|a, b| a.unit_pos.cmp(&b.unit_pos).then(a.side.cmp(&b.side)).then(a.ext_key.cmp(&b.ext_key)));
+    info.anchors.sort_by(|a, b| {
+        a.unit_pos
+            .cmp(&b.unit_pos)
+            .then(a.side.cmp(&b.side))
+            .then(a.ext_key.cmp(&b.ext_key))
+    });
     info
 }
 
@@ -1286,9 +1326,8 @@ fn build_forster_constraints(
             }
         }
     }
-    let pos_of_id = |id: &str| -> Option<usize> {
-        part.iter().position(|&ui| scene.nodes[units[ui]].id == id)
-    };
+    let pos_of_id =
+        |id: &str| -> Option<usize> { part.iter().position(|&ui| scene.nodes[units[ui]].id == id) };
     for rel in &scene.relations {
         if rel.distribute && rel.axis == Axis::Col {
             let mapped: Vec<usize> = rel.members.iter().filter_map(|m| pos_of_id(m)).collect();
@@ -1425,9 +1464,10 @@ fn run_forster_sweeps(
                     } else {
                         continue;
                     };
-                    let other_pos = slot_norm[&other] + (other_f - 0.5) * 0.35 - (self_f - 0.5) * 0.25;
-                    let on_pref = (prefer_left && ranks[other] < rk)
-                        || (prefer_right && ranks[other] > rk);
+                    let other_pos =
+                        slot_norm[&other] + (other_f - 0.5) * 0.35 - (self_f - 0.5) * 0.25;
+                    let on_pref =
+                        (prefer_left && ranks[other] < rk) || (prefer_right && ranks[other] > rk);
                     if on_pref {
                         sum_dir += other_pos;
                         w_dir += 1;
@@ -1564,7 +1604,10 @@ fn group(
             if units.contains(&i) {
                 return Some(scene.nodes[i].id.clone());
             }
-            i = scene.nodes[i].parent.as_deref().and_then(|p| scene.index(p))?;
+            i = scene.nodes[i]
+                .parent
+                .as_deref()
+                .and_then(|p| scene.index(p))?;
         }
     };
     let mut row_coupled: BTreeSet<(String, String)> = BTreeSet::new();
@@ -1685,10 +1728,8 @@ fn group(
         };
         let mut ranks = crate::topology::coffman_graham(&ranking_graph, part.len().max(2));
         apply_boundary_slack_alignment(&ranking_graph, &mut ranks, &border);
-        let forster_constraints =
-            build_forster_constraints(scene, units, &part, &ranks, rects, o);
-        let order_in_rank =
-            run_forster_sweeps(&local, &ranks, &border, &forster_constraints);
+        let forster_constraints = build_forster_constraints(scene, units, &part, &ranks, rects, o);
+        let order_in_rank = run_forster_sweeps(&local, &ranks, &border, &forster_constraints);
         let edge_caption_w = |e: &Edge| {
             let text = scene
                 .edge(&e.id)
@@ -1906,10 +1947,22 @@ fn group(
                 .count();
             let has_n = border.anchors.iter().any(|a| a.side == Side::N);
             let has_s = border.anchors.iter().any(|a| a.side == Side::S);
-            let has_in_n_out_s = border.anchors.iter().any(|a| !a.outgoing && a.side == Side::N)
-                && border.anchors.iter().any(|a| a.outgoing && a.side == Side::S);
-            let has_in_s_out_n = border.anchors.iter().any(|a| !a.outgoing && a.side == Side::S)
-                && border.anchors.iter().any(|a| a.outgoing && a.side == Side::N);
+            let has_in_n_out_s = border
+                .anchors
+                .iter()
+                .any(|a| !a.outgoing && a.side == Side::N)
+                && border
+                    .anchors
+                    .iter()
+                    .any(|a| a.outgoing && a.side == Side::S);
+            let has_in_s_out_n = border
+                .anchors
+                .iter()
+                .any(|a| !a.outgoing && a.side == Side::S)
+                && border
+                    .anchors
+                    .iter()
+                    .any(|a| a.outgoing && a.side == Side::N);
             let explicit_ns_ports = border
                 .anchors
                 .iter()
@@ -2074,7 +2127,11 @@ fn group(
             .map(|(at, &r)| with_top_extra(&scene.nodes[units[part[at]]], r))
             .reduce(Rect::union)
             .unwrap();
-        let ref_x = if in_container { bounds.x } else { bounds.left() };
+        let ref_x = if in_container {
+            bounds.x
+        } else {
+            bounds.left()
+        };
         let mut base_x_shift = 0.0;
         let mut base_y_top = bottom;
         if !in_container && !placed_parts.is_empty() {
@@ -2142,7 +2199,8 @@ fn group(
                 None => cur_r,
             });
         }
-        let part_rect = placed_box.unwrap_or(Rect::new(base_x_shift, base_y_top, bounds.w, bounds.h));
+        let part_rect =
+            placed_box.unwrap_or(Rect::new(base_x_shift, base_y_top, bounds.w, bounds.h));
         let part_ids: BTreeSet<String> = part
             .iter()
             .map(|&u| scene.nodes[units[u]].id.clone())
@@ -2196,7 +2254,10 @@ mod tests {
         let prod = d.layout.nodes["prod"];
         let api = d.layout.nodes["prod.api"];
         let worker = d.layout.nodes["prod.worker"];
-        assert!(api.x < worker.x, "client->prod.api->worker should pack L->R inside prod");
+        assert!(
+            api.x < worker.x,
+            "client->prod.api->worker should pack L->R inside prod"
+        );
         assert!(prod.left() <= api.left() && worker.right() <= prod.right());
     }
 
@@ -2230,8 +2291,14 @@ mod tests {
             .filter(|(_, n)| n.parent.as_deref() == Some("west"))
             .map(|(i, _)| i)
             .collect();
-        let west_border =
-            project_border_info(&scene, &west_children, &rects, Some(west_idx), &macro_flow, &opts);
+        let west_border = project_border_info(
+            &scene,
+            &west_children,
+            &rects,
+            Some(west_idx),
+            &macro_flow,
+            &opts,
+        );
         assert_eq!(west_border.anchors.len(), 1);
         assert_eq!(west_border.anchors[0].side, Side::E);
         assert!(west_border.anchors[0].outgoing);
@@ -2244,8 +2311,14 @@ mod tests {
             .filter(|(_, n)| n.parent.as_deref() == Some("east"))
             .map(|(i, _)| i)
             .collect();
-        let east_border =
-            project_border_info(&scene, &east_children, &rects, Some(east_idx), &macro_flow, &opts);
+        let east_border = project_border_info(
+            &scene,
+            &east_children,
+            &rects,
+            Some(east_idx),
+            &macro_flow,
+            &opts,
+        );
         assert_eq!(east_border.anchors.len(), 1);
         assert_eq!(east_border.anchors[0].side, Side::W);
         assert!(!east_border.anchors[0].outgoing);
@@ -2272,7 +2345,11 @@ mod tests {
         let src = "top\nbot\nbox_c {\n  s1 -> s2 -> s3\n}\ntop -> box_c.s1.N\nbox_c.s3.S -> bot\n";
         let compiled = crate::compile(src).unwrap();
         let scene = compiled.scene;
-        let mut rects: Vec<Rect> = scene.nodes.iter().map(|_| Rect::new(0., 0., 110., 48.)).collect();
+        let mut rects: Vec<Rect> = scene
+            .nodes
+            .iter()
+            .map(|_| Rect::new(0., 0., 110., 48.))
+            .collect();
         let opts_explore = LayoutOptions {
             explore_candidates: true,
             ..LayoutOptions::default()

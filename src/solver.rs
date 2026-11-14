@@ -606,19 +606,21 @@ fn solve_vpsc_component(
         has_anchor
     };
 
-    let remove_active_edge =
-        |slot: usize, adj: &mut [Vec<usize>], active_edges: &mut [ActiveEdge], free: &mut Vec<usize>| {
-            let u = active_edges[slot].u;
-            let v = active_edges[slot].v;
-            active_edges[slot].alive = false;
-            if let Some(pos) = adj[u].iter().position(|&s| s == slot) {
-                adj[u].swap_remove(pos);
-            }
-            if let Some(pos) = adj[v].iter().position(|&s| s == slot) {
-                adj[v].swap_remove(pos);
-            }
-            free.push(slot);
-        };
+    let remove_active_edge = |slot: usize,
+                              adj: &mut [Vec<usize>],
+                              active_edges: &mut [ActiveEdge],
+                              free: &mut Vec<usize>| {
+        let u = active_edges[slot].u;
+        let v = active_edges[slot].v;
+        active_edges[slot].alive = false;
+        if let Some(pos) = adj[u].iter().position(|&s| s == slot) {
+            adj[u].swap_remove(pos);
+        }
+        if let Some(pos) = adj[v].iter().position(|&s| s == slot) {
+            adj[v].swap_remove(pos);
+        }
+        free.push(slot);
+    };
 
     let mut recompute_block_exact = |start: usize,
                                      adj: &[Vec<usize>],
@@ -1009,10 +1011,7 @@ fn solve_vpsc_component(
     for _ in 0..k + 4 {
         let mut neg_slot: Option<(usize, f64)> = None;
         for (slot, e) in active_edges.iter().enumerate() {
-            if e.alive
-                && e.lm < -1e-7
-                && neg_slot.is_none_or(|(_, best)| e.lm < best)
-            {
+            if e.alive && e.lm < -1e-7 && neg_slot.is_none_or(|(_, best)| e.lm < best) {
                 neg_slot = Some((slot, e.lm));
             }
         }
@@ -1047,7 +1046,10 @@ fn solve_vpsc_component(
             &mut x,
         );
         // Re-check feasibility after split; if violated, defer to KKT solver.
-        if ineqs.iter().any(|e| e.gap - (x[e.v] - x[e.u]) > ACTIVATE_TOL) {
+        if ineqs
+            .iter()
+            .any(|e| e.gap - (x[e.v] - x[e.u]) > ACTIVATE_TOL)
+        {
             return solve_kkt_component(desired, weights, rows);
         }
     }

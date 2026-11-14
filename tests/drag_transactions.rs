@@ -720,9 +720,7 @@ fn distribute_perpendicular_gap_and_scoped_container_drags_behave_cleanly() {
         let source = format!("{nodes_src}distribute {axis_kw} [a, b, c]\n");
         let mut doc = Document::new(&source).unwrap();
         let original = doc.snapshot();
-        let target = original.layout.nodes["b"]
-            .center()
-            .offset(delta.x, delta.y);
+        let target = original.layout.nodes["b"].center().offset(delta.x, delta.y);
         let mut drag = doc.begin_drag().unwrap();
         drag.update(&[at("b", target.x, target.y)]).unwrap();
         let shown = drag.snapshot();
@@ -758,10 +756,7 @@ fn distribute_perpendicular_gap_and_scoped_container_drags_behave_cleanly() {
     end_drag.update(&[at("a", a_target.x, a_target.y)]).unwrap();
     let end_shown = end_drag.snapshot();
     assert_eq!(end_shown.scene.relations.len(), 1);
-    assert_eq!(
-        end_shown.scene.relations[0].members,
-        vec!["b", "c", "d"]
-    );
+    assert_eq!(end_shown.scene.relations[0].members, vec!["b", "c", "d"]);
     let mut mid_drag = four_doc.begin_drag().unwrap();
     let b_target = four_orig.layout.nodes["b"].center().offset(40., 64.);
     mid_drag.update(&[at("b", b_target.x, b_target.y)]).unwrap();
@@ -783,9 +778,7 @@ fn distribute_perpendicular_gap_and_scoped_container_drags_behave_cleanly() {
     assert_eq!(box_drag.snapshot().scene.relations.len(), 1);
 
     let mut child_drag = scoped_doc.begin_drag().unwrap();
-    let pb_target = scoped_orig.layout.nodes["prod.b"]
-        .center()
-        .offset(96., 32.);
+    let pb_target = scoped_orig.layout.nodes["prod.b"].center().offset(96., 32.);
     child_drag
         .update(&[at("prod.b", pb_target.x, pb_target.y)])
         .unwrap();

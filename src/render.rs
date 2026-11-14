@@ -595,7 +595,10 @@ pub(crate) fn svg_with_decorations(
                 s,
                 "<path data-zone=\"{}\" d=\"{}\" fill=\"{}\" fill-opacity=\"{}\" fill-rule=\"evenodd\"/>",
                 escape(&z.id),
-                zone_polys.iter().map(|p| rounded_hull(p)).collect::<String>(),
+                zone_polys
+                    .iter()
+                    .map(|p| rounded_hull(p))
+                    .collect::<String>(),
                 escape(&tint),
                 alpha
             );
@@ -635,7 +638,11 @@ pub(crate) fn svg_with_decorations(
             1.7
         };
         let covered_by_flow = in_flow.contains(e.id.as_str());
-        let trim_width = if covered_by_flow && !active { 3.0 } else { width };
+        let trim_width = if covered_by_flow && !active {
+            3.0
+        } else {
+            width
+        };
         let (shaft, heads) = connector(&r.points, e.kind, trim_width);
         let mask = gap_mask(&e.id, &masks);
         let _ = write!(
@@ -931,9 +938,7 @@ pub(crate) fn svg_with_decorations(
                 && scene.nodes.iter().any(|n| {
                     n.container
                         && n.shape != "sql_table"
-                        && l.nodes
-                            .get(&n.id)
-                            .is_some_and(|nr| nr.contains(r.center()))
+                        && l.nodes.get(&n.id).is_some_and(|nr| nr.contains(r.center()))
                 });
             let _ = write!(
                 s,

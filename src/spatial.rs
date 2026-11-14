@@ -158,7 +158,8 @@ pub fn strata(scene: &SceneGraph, options: &LayoutOptions, theta: f64) -> Result
                     prior.cache_key.clear();
                     prior.cache_config.clear();
                     prior.entity_keys.clear();
-                    if let Ok(updated) = crate::layout::layout(&plane_graphs[pi], options, Some(&prior))
+                    if let Ok(updated) =
+                        crate::layout::layout(&plane_graphs[pi], options, Some(&prior))
                     {
                         planes[pi].layout = updated;
                     }
@@ -757,8 +758,14 @@ fn explicit_numeric_pin(node: &Node, grid: f64) -> Option<Point> {
             return Some(Point::new(x, y));
         }
     }
-    let x = pin.attrs.get("x").and_then(|v| parse_pin_scalar(&v.text, grid))?;
-    let y = pin.attrs.get("y").and_then(|v| parse_pin_scalar(&v.text, grid))?;
+    let x = pin
+        .attrs
+        .get("x")
+        .and_then(|v| parse_pin_scalar(&v.text, grid))?;
+    let y = pin
+        .attrs
+        .get("y")
+        .and_then(|v| parse_pin_scalar(&v.text, grid))?;
     Some(Point::new(x, y))
 }
 
@@ -1200,13 +1207,17 @@ bridge -> host [relation: runs_on]
         let gx = (a_pos.x / options.grid).round() as i64;
         let gy = (a_pos.y / options.grid).round() as i64;
         // `proposal` explicitly pins a new node `added` directly over `a`'s old position.
-        let prop_src = format!("a -> b\nfar @pin(grid: 40, 0)\nadded @pin(grid: {gx}, {gy})\na -> added\n");
+        let prop_src =
+            format!("a -> b\nfar @pin(grid: 40, 0)\nadded @pin(grid: {gx}, {gy})\na -> added\n");
         let proposal = crate::model::lower(&crate::syntax::parse(&prop_src));
         let diff = compare(&base.scene, &proposal, &base.layout, &options).unwrap();
         assert!(crate::layout::validate(&diff.union, &diff.layout, &options).is_ok());
         // Distant unobstructed node keeps exact coordinate while colliding `a` yields cleanly.
         assert_eq!(diff.layout.nodes["far"].x, base.layout.nodes["far"].x);
-        assert!(!rects_overlap(diff.layout.nodes["a"], diff.layout.nodes["added"]));
+        assert!(!rects_overlap(
+            diff.layout.nodes["a"],
+            diff.layout.nodes["added"]
+        ));
     }
 }
 

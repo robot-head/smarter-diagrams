@@ -1099,7 +1099,10 @@ pub fn synthesize_drag(
                 let Some(base) = layout.nodes.get(id) else {
                     return 0.;
                 };
-                let target = drag_positions.get(id).copied().unwrap_or_else(|| base.center());
+                let target = drag_positions
+                    .get(id)
+                    .copied()
+                    .unwrap_or_else(|| base.center());
                 coord(target) - coord(base.center())
             };
             let id_disp = disp(&n.id);
@@ -1209,18 +1212,34 @@ pub fn synthesize_drag(
             match side {
                 Border::N => PinExpr::Relative {
                     x: grid_abs(drag.position.x),
-                    y: format!("{}.N - {}", c.id, grid_offset(r.top() - drag.position.y, hh)),
+                    y: format!(
+                        "{}.N - {}",
+                        c.id,
+                        grid_offset(r.top() - drag.position.y, hh)
+                    ),
                 },
                 Border::E => PinExpr::Relative {
-                    x: format!("{}.E + {}", c.id, grid_offset(drag.position.x - r.right(), hw)),
+                    x: format!(
+                        "{}.E + {}",
+                        c.id,
+                        grid_offset(drag.position.x - r.right(), hw)
+                    ),
                     y: grid_abs(drag.position.y),
                 },
                 Border::S => PinExpr::Relative {
                     x: grid_abs(drag.position.x),
-                    y: format!("{}.S + {}", c.id, grid_offset(drag.position.y - r.bottom(), hh)),
+                    y: format!(
+                        "{}.S + {}",
+                        c.id,
+                        grid_offset(drag.position.y - r.bottom(), hh)
+                    ),
                 },
                 Border::W => PinExpr::Relative {
-                    x: format!("{}.W - {}", c.id, grid_offset(r.left() - drag.position.x, hw)),
+                    x: format!(
+                        "{}.W - {}",
+                        c.id,
+                        grid_offset(r.left() - drag.position.x, hw)
+                    ),
                     y: grid_abs(drag.position.y),
                 },
             }

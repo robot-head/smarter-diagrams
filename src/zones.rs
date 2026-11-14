@@ -534,6 +534,10 @@ mod tests {
                 (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x
             })
             .count();
-        assert_eq!(crossings % 2, 0, "blocker must remain excluded outside hull");
+        assert_eq!(
+            crossings % 2,
+            0,
+            "blocker must remain excluded outside hull"
+        );
     }
 }

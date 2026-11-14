@@ -198,9 +198,7 @@ pub(crate) fn filter_exact(scene: &SceneGraph, keep: &BTreeSet<String>) -> Scene
     out.layout_rules
         .retain(|r| keep.contains(&r.target) || out.edges.iter().any(|e| e.id == r.target));
     for rule in &mut out.layout_rules {
-        let scope = scene
-            .node(&rule.target)
-            .and_then(|n| n.parent.as_deref());
+        let scope = scene.node(&rule.target).and_then(|n| n.parent.as_deref());
         sanitize_pin_annotations(&mut rule.annotations, scope, scene, keep);
     }
     out.layout_rules.retain(|r| !r.annotations.is_empty());
@@ -420,7 +418,12 @@ mod tests {
         let mut kept_only = BTreeSet::from(["b".to_string()]);
         let projected = filter_exact(&scene, &kept_only);
         assert!(
-            projected.node("b").unwrap().annotations.iter().all(|a| a.name != "pin" || !a.attrs.contains_key("x")),
+            projected
+                .node("b")
+                .unwrap()
+                .annotations
+                .iter()
+                .all(|a| a.name != "pin" || !a.attrs.contains_key("x")),
             "expected pin referencing excluded node `a` to be stripped"
         );
         assert!(crate::layout::layout(&projected, &LayoutOptions::default(), None).is_ok());
@@ -465,8 +468,14 @@ mod tests {
         while r < 400. {
             let strength = 10.0_f64.min(2.95);
             let mapped = r * (1. + strength * (1. - r / 400.).powi(2));
-            assert!(mapped > prev, "radial distortion must remain strictly monotonic: {mapped} <= {prev}");
-            assert!(mapped < 400., "interior node must stay inside lens radius: {mapped}");
+            assert!(
+                mapped > prev,
+                "radial distortion must remain strictly monotonic: {mapped} <= {prev}"
+            );
+            assert!(
+                mapped < 400.,
+                "interior node must stay inside lens radius: {mapped}"
+            );
             prev = mapped;
             r += 5.;
         }

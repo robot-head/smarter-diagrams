@@ -334,7 +334,11 @@ fn synthesize_drag_attaches_all_four_container_borders() {
             Point::new(box_r.x, box_r.bottom() + hh + gap),
             "box.S + ",
         ),
-        ("W", Point::new(box_r.left() - hw - gap, box_r.y), "box.W - "),
+        (
+            "W",
+            Point::new(box_r.left() - hw - gap, box_r.y),
+            "box.W - ",
+        ),
     ];
     for (side, pos, expected_prefix) in cases {
         let ops = synthesize_drag(
@@ -423,7 +427,8 @@ fn synthesize_drag_attaches_all_four_container_borders() {
     }
 
     // Closest border wins when adjacent to multiple containers.
-    let two_src = "left_box {\n  a @pin(grid: 0, 0)\n}\nright_box {\n  b @pin(grid: 40, 0)\n}\nsat\n";
+    let two_src =
+        "left_box {\n  a @pin(grid: 0, 0)\n}\nright_box {\n  b @pin(grid: 40, 0)\n}\nsat\n";
     let two = compile(two_src).unwrap();
     let lr = two.layout.nodes["left_box"];
     let rr = two.layout.nodes["right_box"];
