@@ -1,0 +1,18 @@
+api: "API Gateway" @sim(rate: 95, service_rate: 160)
+workers: "Worker Pool" @sim(workers: 2, service_rate: 18, queue_cap: 25, retry: exp_backoff(0.4, 0.25))
+db: "Database" [shape: database] @sim(service_rate: 80)
+
+api -> workers: "dispatch"
+workers -> db: "write"
+
+breaker [label: "Circuit Breaker", context: "trips=0"] {
+  b_init [shape: initial]
+  closed [label: "Closed"]
+  open [label: "Open"]
+  half_open [label: "Half-Open"]
+  b_init -> closed
+  closed -> open: "[workers.saturation >= 0.85] / trips += 1; sever(api -> workers)"
+  open -> half_open: "probe / restore(api -> workers); set_rate(api, 30)"
+  half_open -> closed: "stabilized / set_rate(api, 55)"
+  half_open -> open: "[workers.saturation >= 0.85] / trips += 1; sever(api -> workers)"
+}

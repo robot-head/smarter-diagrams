@@ -14,6 +14,16 @@ pub(crate) fn is_class_shape(shape: &str) -> bool {
 pub(crate) fn is_record_shape(shape: &str) -> bool {
     shape == "sql_table" || is_class_shape(shape)
 }
+pub(crate) fn is_compact_pseudostate(node: &Node) -> bool {
+    let tail = node.id.rsplit('.').next().unwrap_or(&node.id);
+    node.ports.is_empty()
+        && (matches!(node.shape.as_str(), "initial" | "final")
+            || (matches!(node.shape.as_str(), "history" | "deep_history")
+                && (node.label.is_empty()
+                    || node.label == node.id
+                    || node.label == tail
+                    || node.label.chars().count() <= 2)))
+}
 pub(crate) fn class_extra_rows(node: &Node) -> (Vec<String>, Vec<String>) {
     if !is_class_shape(&node.shape) {
         return (Vec::new(), Vec::new());
@@ -140,6 +150,9 @@ pub(crate) fn with_top_extra(node: &Node, r: Rect) -> Rect {
     Rect::new(r.x, r.y - extra / 2., r.w, r.h + extra)
 }
 pub(crate) fn title_width(node: &Node) -> f64 {
+    if is_compact_pseudostate(node) {
+        return 36.;
+    }
     if let Some(code) = crate::highlight::measure(&node.label, &node.shape) {
         return code.total_w;
     }
@@ -511,17 +524,24 @@ fn compute_base_sizes(
             .map(|row| record_row_width(row))
             .reduce(f64::max)
             .unwrap_or(0.);
-        let mut w = title_width(node)
-            .max(112.)
-            .max(stereo_w)
-            .max(port_w)
-            .max(extra_w);
+        let is_pseudostate = is_compact_pseudostate(node);
+        let mut w = if is_pseudostate {
+            36.
+        } else {
+            title_width(node)
+                .max(112.)
+                .max(stereo_w)
+                .max(port_w)
+                .max(extra_w)
+        };
         let has_fixed_rows = is_record_shape(&node.shape)
             && node
                 .ports
                 .values()
                 .any(|p| matches!(p.constraint, PortConstraint::FixedPos { .. }));
-        let mut h = if is_record_shape(&node.shape)
+        let mut h = if is_pseudostate {
+            36.
+        } else if is_record_shape(&node.shape)
             && (has_fixed_rows || !extra_fields.is_empty() || !extra_methods.is_empty())
         {
             class_header_height(node).max(36.)
@@ -6329,6 +6349,7 @@ pub fn validate(scene: &SceneGraph, l: &Layout, o: &LayoutOptions) -> Result<(),
         if !a.container
             && !is_record_shape(&a.shape)
             && !matches!(a.shape.as_str(), "diamond" | "decision")
+            && !is_compact_pseudostate(a)
             && (title_width(a) - 32. > ra.w + 1e-6 || title_height > ra.h + 1e-6)
         {
             return Err(Error::Layout(format!(

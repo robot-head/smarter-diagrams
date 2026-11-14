@@ -12,7 +12,7 @@
 <script type="module" src="./embed-size.js"></script>
 <h1>Smarter Diagrams</h1><div class="demo-links"><button id="theme-toggle" aria-label="Toggle dark theme" aria-pressed="false">Theme</button><select id="theme-preset" aria-label="Color theme"><option value="auto">Theme: Auto (Site)</option></select><label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:6px 10px;border:1px solid #bdcbdc;border-radius:6px;background:var(--sd-bg,#ffffff)">Import Base16<input id="theme-file" type="file" accept=".yaml,.yml,.json" hidden></label><a href="https://robot-head.github.io/smarter-diagrams/">Documentation</a><a href="./advanced.html">Strata and Spatial Git</a></div>
 <p>Drag nodes and labels. Double-click labels to reset. Shift-click connections to cut them during simulation. Escape cancels a drag.</p>
-<nav aria-label="Diagram actions"><span class="toolbar-group"><button id="render">Render</button><button id="undo">Undo</button><button id="redo">Redo</button></span><span class="toolbar-group"><button id="simulate" aria-pressed="false">Run simulation</button><select id="trace" aria-label="Protocol trace"></select><button id="next">Next step</button></span><span class="toolbar-group"><label>Ingress <input id="load" type="range" min="0" max="300" value="80"></label><a id="download" download="diagram.svg">Download SVG</a></span></nav>
+<nav aria-label="Diagram actions"><span class="toolbar-group"><button id="render">Render</button><button id="undo">Undo</button><button id="redo">Redo</button></span><span class="toolbar-group"><button id="simulate" aria-pressed="false">Run simulation</button><select id="trace" aria-label="Protocol trace"></select><button id="next">Next step</button></span><span class="toolbar-group"><label>Ingress <input id="load" type="range" min="0" max="300" value="80"></label><a id="download" download="diagram.svg">Download SVG</a><button id="record-webm" type="button">Record WebM</button></span></nav>
 <main><section><details id="source-panel" class="source-panel"><summary>Diagram source</summary><label class="sr-only" for="source">Diagram source</label><p id="editor-help" class="editor-help">Tab / Shift+Tab: indent. Escape then Tab: leave editor.</p><textarea aria-describedby="editor-help" id="source" spellcheck="false">client: Client @sim(rate: 80, service_rate: 200)
 gateway: API gateway @sim(service_rate: 100, queue_cap: 200)
 worker: Worker @sim(service_rate: 50, queue_cap: 100, retry: exp_backoff(0.5, 0.2))
@@ -77,4 +77,34 @@ dragController=new NodeDragController({canvas,view,status,getDocument:()=>doc,to
 document.querySelector('#simulate').onclick=()=>{if(worker){worker.postMessage({type:'stop'});worker.terminate();worker=undefined;latestState=undefined;cuts.clear();show(doc.svg());document.querySelector('#simulation-legend').hidden=true;document.querySelector('#metrics').textContent='';toggleState(document.querySelector('#simulate'),false,'Run simulation');return;}worker=new Worker('./simulation-worker.js',{type:'module'});const currentWorker=worker;worker.onmessage=({data})=>{if(worker!==currentWorker||data.generation!==generation)return;if(data.type==='error'){status.textContent=data.message;return;}latestState=data.state;if(performance.now()-lastFrame<100)return;lastFrame=performance.now();document.querySelector('#metrics').textContent=Object.entries(data.state.nodes).map(([id,q])=>`${id}: queue ${q.queued.toFixed(1)}, saturation ${(q.saturation*100).toFixed(0)}%, drops ${q.dropped.toFixed(1)}`).join('\n');applyState();};syncSimulation();document.querySelector('#simulation-legend').hidden=false;toggleState(document.querySelector('#simulate'),true,'Stop simulation');};
 
 document.querySelector('#load').oninput=e=>{ingressOverride=true;if(worker)worker.postMessage({type:'rate',node:'client',rate:Number(e.target.value)});};
+let webmRec=null,webmTimer=null,webmChunks=[];
+document.querySelector('#record-webm').onclick=()=>{
+  if(webmRec&&webmRec.state!=='inactive'){webmRec.stop();return;}
+  const svgEl=canvas.querySelector('svg');
+  if(!svgEl||typeof MediaRecorder==='undefined'){status.textContent='MediaRecorder or SVG unavailable.';return;}
+  const r=svgEl.viewBox.baseVal;
+  const cw=Math.max(320,Math.round((r&&r.width?r.width:800)*1.25));
+  const ch=Math.max(180,Math.round((r&&r.height?r.height:450)*1.25));
+  const off=document.createElement('canvas');off.width=cw;off.height=ch;
+  if(typeof off.captureStream!=='function'){status.textContent='Canvas captureStream unavailable.';return;}
+  const mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
+  webmChunks=[];
+  const rec=new MediaRecorder(off.captureStream(10),mime?{mimeType:mime}:undefined);
+  webmRec=rec;
+  const ctx=off.getContext('2d');
+  const drawFrame=()=>{
+    const cur=canvas.querySelector('svg');if(!cur)return;
+    const url=URL.createObjectURL(new Blob([standaloneSvg(cur)],{type:'image/svg+xml;charset=utf-8'}));
+    const img=new Image();
+    img.onload=()=>{ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cw,ch);ctx.drawImage(img,0,0,cw,ch);URL.revokeObjectURL(url);};
+    img.onerror=()=>URL.revokeObjectURL(url);
+    img.src=url;
+  };
+  rec.ondataavailable=e=>{if(e.data&&e.data.size>0)webmChunks.push(e.data);};
+  rec.onstop=()=>{clearInterval(webmTimer);webmTimer=null;document.querySelector('#record-webm').textContent='Record WebM';const a=document.createElement('a');const u=URL.createObjectURL(new Blob(webmChunks,{type:mime||'video/webm'}));a.href=u;a.download='smarter-diagram.webm';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);status.textContent='Downloaded WebM animation.';};
+  drawFrame();
+  rec.start(100);
+  document.querySelector('#record-webm').textContent='Stop WebM';
+  webmTimer=setInterval(drawFrame,120);
+};
 </script>

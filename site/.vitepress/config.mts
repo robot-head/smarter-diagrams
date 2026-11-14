@@ -20,8 +20,8 @@ const language = [
 ].map(([text, page]) => ({ text, link: `/language/${page}` }))
 const runtime = [
   ['Views, zoom and lenses', 'views'], ['Queue simulation', 'simulation'],
-  ['Telemetry and code drift', 'drift'], ['Bounded verification', 'verification'],
-  ['Strata and Spatial Git', 'spatial'],
+  ['Statecharts', 'statecharts'], ['Telemetry and code drift', 'drift'],
+  ['Bounded verification', 'verification'], ['Strata and Spatial Git', 'spatial'],
 ].map(([text, page]) => ({ text, link: `/runtime/${page}` }))
 const reference = [
   ['Module map', 'modules'], ['Feature flags', 'features'],

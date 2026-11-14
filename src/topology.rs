@@ -1909,6 +1909,11 @@ mod stage1a {
         let mut node_h = vec![0f64; scene.nodes.len()];
         for &u in members {
             let nd = &scene.nodes[u];
+            if crate::layout::is_compact_pseudostate(nd) {
+                node_w[u] = 36.;
+                node_h[u] = 36.;
+                continue;
+            }
             let title = crate::labels::node_title(nd);
             let mut w = crate::layout::title_width(nd).max(112.).max(
                 nd.ports

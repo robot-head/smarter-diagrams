@@ -148,6 +148,91 @@ impl WasmSimulation {
         serde_json::to_string(&self.inner).map_err(js_error)
     }
 }
+/// Browser handle driving an executable Harel statechart optionally coupled to queue simulation.
+#[cfg(feature = "wasm-runtime")]
+#[wasm_bindgen]
+pub struct WasmStatechart {
+    chart: crate::statecharts::Statechart,
+    sim: Option<crate::simulation::Simulation>,
+}
+#[cfg(feature = "wasm-runtime")]
+#[wasm_bindgen]
+impl WasmStatechart {
+    #[wasm_bindgen(constructor)]
+    pub fn new(source: &str) -> Result<WasmStatechart, JsValue> {
+        let chart = crate::statecharts::Statechart::from_source(source)
+            .map_err(|e| JsValue::from_str(&e.with_source(source)))?;
+        let sim = crate::simulation::Simulation::from_scene(&chart.diagram().scene).ok();
+        Ok(Self { chart, sim })
+    }
+
+    pub fn dispatch(&mut self, event: &str) -> Result<bool, JsValue> {
+        let res = match &mut self.sim {
+            Some(sim) => self.chart.dispatch_with_simulation(event, sim),
+            None => self.chart.dispatch(event),
+        };
+        res.map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    pub fn step_coupled(&mut self, ticks: usize) -> Result<bool, JsValue> {
+        if let Some(sim) = &mut self.sim {
+            self.chart
+                .step_coupled(sim, ticks)
+                .map_err(|e| JsValue::from_str(&e.to_string()))
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub fn set_rate(&mut self, node: &str, rate: f64) -> Result<(), JsValue> {
+        if let Some(sim) = &mut self.sim {
+            sim.set_rate(node, rate)
+                .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    pub fn sever(&mut self, edge: &str, severed: bool) -> Result<(), JsValue> {
+        if let Some(sim) = &mut self.sim {
+            sim.sever(edge, severed)
+                .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    pub fn set_context_json(&mut self, json: &str) -> Result<(), JsValue> {
+        self.chart
+            .set_context_json(json)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    pub fn reset(&mut self) {
+        self.chart.reset();
+        self.sim = crate::simulation::Simulation::from_scene(&self.chart.diagram().scene).ok();
+    }
+
+    pub fn events_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.chart.inspect_events(self.sim.as_ref()))
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    pub fn state_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.chart.snapshot(self.sim.as_ref()))
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    pub fn svg(&self) -> String {
+        self.chart.to_svg_with_simulation(self.sim.as_ref())
+    }
+
+    pub fn svg_themed(&self, theme_or_base16: &str) -> Result<String, JsValue> {
+        let palette = crate::themes::by_name(theme_or_base16)
+            .map(Ok)
+            .unwrap_or_else(|| crate::themes::ThemePalette::from_base16_str(theme_or_base16))
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(self.chart.to_svg_with_theme(&palette, self.sim.as_ref()))
+    }
+}
 #[cfg(feature = "wasm-runtime")]
 #[wasm_bindgen]
 pub fn check_safety(

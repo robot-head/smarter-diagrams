@@ -34,6 +34,7 @@ pub(crate) fn ray_attachment(shape: &str, r: Rect, toward: Point) -> Point {
         }
         let radius: f64 = match shape {
             "actor" => 18.,
+            "initial" | "final" | "history" | "deep_history" => 18.,
             "container" => 12.,
             "sql_table" => 2.,
             "class" | "uml_class" => 4.,
@@ -78,6 +79,7 @@ pub(crate) fn outline(shape: &str, r: Rect) -> String {
     }
     let radius: f64 = match shape {
         "actor" => 18.,
+        "initial" | "final" | "history" | "deep_history" => 18.,
         "container" => 12.,
         "sql_table" => 2.,
         "class" | "uml_class" => 4.,
@@ -183,6 +185,7 @@ pub(crate) fn attachment(shape: &str, r: Rect, side: Side, offset: f64) -> Point
     } else {
         let radius: f64 = match shape {
             "actor" => 18.,
+            "initial" | "final" | "history" | "deep_history" => 18.,
             "container" => 12.,
             "sql_table" => 2.,
             "class" | "uml_class" => 4.,

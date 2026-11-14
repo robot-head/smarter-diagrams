@@ -1,0 +1,42 @@
+order [label: "Order Lifecycle", context: "retries=0; max_retries=2"] {
+  init [shape: initial]
+  draft [label: "Draft"]
+  checkout [label: "Checkout"] {
+    c_init [shape: initial]
+    h [shape: history]
+    dh [shape: deep_history]
+    review [label: "Review Order"]
+    fulfilling [label: "Fulfillment", parallel: true] {
+      billing [label: "Billing Region", region: true] {
+        b_init [shape: initial]
+        authorizing [label: "Authorizing"]
+        retrying [label: "Retrying"]
+        paid [label: "Captured"]
+        b_init -> authorizing
+        authorizing -> retrying: "decline [retries < max_retries] / retries += 1"
+        retrying -> authorizing: "retry"
+        authorizing -> paid: "capture"
+      }
+      shipping [label: "Shipping Region", region: true] {
+        s_init [shape: initial]
+        picking [label: "Picking"]
+        packed [label: "Packed"]
+        s_init -> picking
+        picking -> packed: "pack"
+      }
+    }
+    c_init -> review
+    review -> fulfilling: "approve"
+  }
+  paused [label: "On Hold"]
+  settled [shape: final]
+  failed [label: "Cancelled"]
+
+  init -> draft
+  draft -> checkout: "submit"
+  checkout -> paused: "hold"
+  paused -> checkout.h: "resume_shallow"
+  paused -> checkout.dh: "resume_deep"
+  checkout.fulfilling.billing.authorizing -> failed: "decline [retries >= max_retries]"
+  checkout.fulfilling -> settled: "complete"
+}

@@ -31,6 +31,7 @@ mod shapes;
 pub mod simulation;
 pub mod solver;
 pub mod spatial;
+pub mod statecharts;
 pub mod syntax;
 pub mod themes;
 pub mod topology;

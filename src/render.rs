@@ -753,9 +753,22 @@ pub(crate) fn svg_themed_with_decorations(
         if let Some(href) = &link {
             write_link_open(&mut s, href);
         }
+        let is_parallel_region = n
+            .attrs
+            .get("region")
+            .or_else(|| n.attrs.get("parallel"))
+            .is_some_and(|v| v.text.trim() == "true")
+            || n.annotations
+                .iter()
+                .any(|a| a.name == "region" || a.name == "parallel");
+        let dash = if is_parallel_region {
+            " stroke-dasharray=\"6 4\""
+        } else {
+            ""
+        };
         let _ = write!(
             s,
-            "<g data-node=\"{}\" data-shape=\"container\" aria-label=\"{}\"><rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"12\" fill=\"var(--sd-container,#f0f4f9)\" stroke=\"var(--sd-muted,#73869b)\"/>",
+            "<g data-node=\"{}\" data-shape=\"container\" aria-label=\"{}\"><rect data-silhouette=\"true\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"12\" fill=\"var(--sd-container,#f0f4f9)\" stroke=\"var(--sd-muted,#73869b)\"{dash}/>",
             escape(&n.id),
             escape(&n.label),
             r.left(),
@@ -874,6 +887,31 @@ pub(crate) fn svg_themed_with_decorations(
             escape(&n.label)
         );
         match n.shape.as_str() {
+            "initial" => {
+                let rad = (r.w.min(r.h) / 2.).max(6.);
+                let _ = write!(
+                    s,
+                    "<circle data-silhouette=\"true\" cx=\"{:.2}\" cy=\"{:.2}\" r=\"{:.2}\" fill=\"var(--sd-ink,#1c2a3a)\" stroke=\"var(--sd-ink,#1c2a3a)\"/>",
+                    r.x, r.y, rad
+                );
+            }
+            "final" => {
+                let outer_r = (r.w.min(r.h) / 2.).max(8.);
+                let inner_r = (outer_r * 0.56).max(4.);
+                let _ = write!(
+                    s,
+                    "<circle data-silhouette=\"true\" cx=\"{:.2}\" cy=\"{:.2}\" r=\"{:.2}\" fill=\"var(--sd-surface,#ffffff)\" stroke=\"var(--sd-ink,#1c2a3a)\" stroke-width=\"2\"/><circle cx=\"{:.2}\" cy=\"{:.2}\" r=\"{:.2}\" fill=\"var(--sd-ink,#1c2a3a)\"/>",
+                    r.x, r.y, outer_r, r.x, r.y, inner_r
+                );
+            }
+            "history" | "deep_history" => {
+                let rad = (r.w.min(r.h) / 2.).max(8.);
+                let _ = write!(
+                    s,
+                    "<circle data-silhouette=\"true\" cx=\"{:.2}\" cy=\"{:.2}\" r=\"{:.2}\" fill=\"var(--sd-cache,#fff1d6)\" stroke=\"var(--sd-cache-border,#95723b)\" stroke-width=\"1.5\"/>",
+                    r.x, r.y, rad
+                );
+            }
             "actor" => {
                 let _ = write!(
                     s,
@@ -1189,7 +1227,20 @@ pub(crate) fn svg_themed_with_decorations(
                 }
                 cy += block.h;
             }
+        } else if matches!(n.shape.as_str(), "initial" | "final") {
+            // Initial and final pseudostate markers render only geometry and accessible labels.
         } else {
+            let raw_title = crate::labels::node_title(n);
+            let default_label = n.label.is_empty()
+                || n.label == n.id
+                || n.id.rsplit('.').next().is_some_and(|tail| tail == n.label);
+            let title_text: &str = if n.shape == "history" && default_label {
+                "H"
+            } else if n.shape == "deep_history" && default_label {
+                "H*"
+            } else {
+                &raw_title
+            };
             let _ = write!(
                 s,
                 "<text class=\"node-title\" text-anchor=\"middle\" dominant-baseline=\"central\" x=\"{:.2}\" y=\"{:.2}\">{}</text>",
@@ -1205,7 +1256,7 @@ pub(crate) fn svg_themed_with_decorations(
                     0.
                 },
                 text_content(
-                    &crate::labels::node_title(n),
+                    title_text,
                     r.x + crate::shapes::title_gutter(&n.shape) / 2.,
                     20.
                 )
