@@ -256,68 +256,131 @@ pub fn description(scene: &SceneGraph) -> String {
         }
     )
 }
-/// Rounded SVG contours use these orthogonal union boundaries. Multiple rings
-/// use even-odd fill: disconnected members and non-member exclusion holes are
-/// retained. `Layout::zones` remains the legacy convex envelope for consumers.
+/// Smooth oriented enclosing ellipse contours for a zone. `Layout::zones` also
+/// stores the sampled enclosing ellipse polygon for layout consumers.
 pub fn zone_contours(scene: &SceneGraph, l: &Layout, zone: &Zone) -> Vec<Vec<Point>> {
     crate::zones::contours(scene, l, zone)
 }
-fn all_zone_contours(scene: &SceneGraph, l: &Layout) -> Vec<Vec<Vec<Point>>> {
+fn all_zone_ellipses(scene: &SceneGraph, l: &Layout) -> Vec<Option<crate::zones::ZoneEllipse>> {
     scene
         .zones
         .iter()
-        .map(|zone| crate::zones::contours(scene, l, zone))
+        .map(|zone| crate::zones::ellipse(scene, l, zone))
         .collect()
 }
-fn zone_titles_from_contours<'a>(
+fn zone_titles_from_ellipses<'a>(
     scene: &'a SceneGraph,
     l: &Layout,
-    zone_contours_list: &[Vec<Vec<Point>>],
+    ellipses: &[Option<crate::zones::ZoneEllipse>],
 ) -> Vec<(&'a Zone, Rect)> {
     let mut titles = Vec::new();
     let mut occupied = Vec::new();
-    for (zone, contours) in scene.zones.iter().zip(zone_contours_list) {
-        for contour in contours {
-            let area: f64 = contour
-                .iter()
-                .zip(contour.iter().cycle().skip(1))
-                .take(contour.len())
-                .map(|(a, b)| a.x * b.y - b.x * a.y)
-                .sum();
-            if area <= 1e-6 {
-                continue;
-            }
-            if let Some(r) = zone_title_at(scene, zone, l, contour, &occupied) {
-                occupied.push(r);
-                titles.push((zone, r));
-            }
+    for (idx, (zone, ellipse)) in scene.zones.iter().zip(ellipses).enumerate() {
+        let Some(e) = ellipse else {
+            continue;
+        };
+        let others: Vec<crate::zones::ZoneEllipse> = ellipses
+            .iter()
+            .enumerate()
+            .filter(|(j, _)| *j != idx)
+            .filter_map(|(_, other)| *other)
+            .collect();
+        if let Some(r) = zone_title_at(scene, zone, l, *e, &others, &occupied) {
+            occupied.push(r);
+            titles.push((zone, r));
         }
     }
     titles
+}
+fn ellipse_y_range_on_span(e: crate::zones::ZoneEllipse, x0: f64, x1: f64) -> (f64, f64) {
+    let eb = e.bounds();
+    let lo = x0.min(x1).max(eb.left());
+    let hi = x0.max(x1).min(eb.right());
+    if lo > hi {
+        return (eb.top(), eb.bottom());
+    }
+    let (c, s) = (e.theta.cos(), e.theta.sin());
+    let (ax, bx) = (e.rx * c, -e.ry * s);
+    let (ay, by) = (e.rx * s, e.ry * c);
+    let rx_eff = ax.hypot(bx).max(1e-9);
+    let ry_eff = ay.hypot(by);
+    let phi_x = bx.atan2(ax);
+    let t_top = (-by).atan2(-ay);
+    let x_top = e.cx + ax * t_top.cos() + bx * t_top.sin();
+    let x_bot = 2. * e.cx - x_top;
+
+    let mut min_y = f64::INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    if x_top >= lo - 1e-6 && x_top <= hi + 1e-6 {
+        min_y = min_y.min(e.cy - ry_eff);
+    }
+    if x_bot >= lo - 1e-6 && x_bot <= hi + 1e-6 {
+        max_y = max_y.max(e.cy + ry_eff);
+    }
+    for i in 0..=8 {
+        let x = lo + (hi - lo) * (i as f64) / 8.;
+        let delta = ((x - e.cx) / rx_eff).clamp(-1., 1.).acos();
+        for t in [phi_x + delta, phi_x - delta] {
+            let y = e.cy + ay * t.cos() + by * t.sin();
+            min_y = min_y.min(y);
+            max_y = max_y.max(y);
+        }
+    }
+    if min_y.is_finite() && max_y.is_finite() {
+        (min_y, max_y)
+    } else {
+        (eb.top(), eb.bottom())
+    }
 }
 fn zone_title_at(
     scene: &SceneGraph,
     zone: &Zone,
     l: &Layout,
-    points: &[Point],
+    e: crate::zones::ZoneEllipse,
+    other_ellipses: &[crate::zones::ZoneEllipse],
     occupied: &[Rect],
 ) -> Option<Rect> {
-    let left = points.iter().map(|p| p.x).reduce(f64::min)?;
-    let top = points.iter().map(|p| p.y).reduce(f64::min)?;
-    let right = points.iter().map(|p| p.x).reduce(f64::max)?;
-    let bottom = points.iter().map(|p| p.y).reduce(f64::max)?;
+    let eb = e.bounds();
     let w = crate::labels::text_width(&zone.label) + 16.;
     let h = crate::labels::text_height(&zone.label) + 4.;
+    let t_top = (-e.ry * e.theta.cos()).atan2(-e.rx * e.theta.sin());
+    let x_top = e.cx + e.rx * e.theta.cos() * t_top.cos() - e.ry * e.theta.sin() * t_top.sin();
+    let x_bot = 2. * e.cx - x_top;
+    let members: std::collections::BTreeSet<&str> = scene
+        .nodes
+        .iter()
+        .filter(|n| {
+            zone.members.contains(&n.id)
+                || crate::model::ancestors(scene, &n.id)
+                    .iter()
+                    .any(|id| zone.members.contains(id))
+        })
+        .map(|n| n.id.as_str())
+        .collect();
+
     let clear = |r: Rect| {
-        !occupied.iter().any(|old| r.inflate(4.).intersects(*old))
+        !e.contains(r.center())
+            && !occupied.iter().any(|old| r.inflate(4.).intersects(*old))
             && !scene.nodes.iter().any(|n| {
                 let node = l.nodes[&n.id];
                 if crate::layout::container_header_rect_with_ports(n, node, &l.ports)
-                    .is_some_and(|h| r.inflate(4.).intersects(h))
+                    .is_some_and(|hr| r.inflate(4.).intersects(hr))
                 {
                     return true;
                 }
-                r.inflate(4.).intersects(node)
+                if crate::layout::sql_table_title_rect(n, node)
+                    .is_some_and(|tr| r.inflate(4.).intersects(tr))
+                {
+                    return true;
+                }
+                let node_pad = if !members.contains(n.id.as_str())
+                    && (!n.container || n.shape == "sql_table")
+                {
+                    12.
+                } else {
+                    4.
+                };
+                r.inflate(node_pad).intersects(node)
                     && !(n.container && node.inflate(-6.).encloses(r.inflate(4.)))
             })
             && !l.routes.values().any(|route| {
@@ -331,41 +394,69 @@ fn zone_title_at(
                 .iter()
                 .any(|label| r.inflate(4.).intersects(label.bounds))
     };
-    let mut r = Rect::new(left + w / 2., top - h / 2. - 6., w, h);
-    // Search finely along the contour edge before climbing away from it. A connector
-    // entering near the left corner should not push the title above unrelated
-    // nodes and make its scope ambiguous.
-    let columns = ((right - left - w).max(0.) / 8.).ceil() as usize;
-    let columns = columns.min(256);
-    for row in 0..scene.nodes.len() + l.labels.len() + 4 {
-        let candidates_y = if row == 0 {
-            vec![top - h / 2. - 6., bottom + h / 2. + 6.]
-        } else {
-            vec![
-                top - h / 2. - 6. - row as f64 * 20.,
-                bottom + h / 2. + 6. + row as f64 * 20.,
-            ]
-        };
-        for y in candidates_y {
-            for col in 0..=columns + 1 {
-                let x = left + w / 2. + col as f64 * 8.;
-                r = Rect::new(x, y, w, h);
-                if clear(r) {
-                    return Some(r);
+
+    let xs_from = |anchor: f64| -> Vec<f64> {
+        let min_x = eb.left() + w / 2.;
+        let max_x = eb.right() - w / 2.;
+        if max_x <= min_x {
+            return vec![e.cx];
+        }
+        let start = anchor.clamp(min_x, max_x);
+        let mut xs = vec![start];
+        let max_steps = (((max_x - min_x) / 8.).ceil() as usize).clamp(1, 256);
+        for k in 1..=max_steps {
+            let right_x = start + (k as f64) * 8.;
+            if right_x <= max_x + 1e-6 {
+                xs.push(right_x.min(max_x));
+            }
+            let left_x = start - (k as f64) * 8.;
+            if left_x >= min_x - 1e-6 {
+                xs.push(left_x.max(min_x));
+            }
+        }
+        xs
+    };
+    let top_xs = xs_from(x_top);
+    let bot_xs = xs_from(x_bot);
+
+    for avoid_other_zones in [true, false] {
+        for row in 0..scene.nodes.len() + l.labels.len() + 4 {
+            let offset = (row as f64) * 20.;
+            for (upper, xs) in [(true, &top_xs), (false, &bot_xs)] {
+                for &x in xs {
+                    let (y_min, y_max) = ellipse_y_range_on_span(e, x - w / 2., x + w / 2.);
+                    let y = if upper {
+                        y_min - h / 2. - 6. - offset
+                    } else {
+                        y_max + h / 2. + 6. + offset
+                    };
+                    let r = Rect::new(x, y, w, h);
+                    if clear(r)
+                        && (!avoid_other_zones
+                            || !other_ellipses
+                                .iter()
+                                .any(|other| other.contains(r.center())))
+                    {
+                        return Some(r);
+                    }
                 }
             }
         }
     }
+
     let top = l
         .nodes
         .values()
-        .map(|r| r.top())
-        .chain(l.labels.iter().map(|l| l.bounds.top()))
-        .chain(occupied.iter().map(|r| r.top()))
-        .chain(l.routes.values().flat_map(|r| r.points.iter().map(|p| p.y)))
-        .fold(r.top(), f64::min);
-    r.y = top - r.h / 2. - 16.;
-    Some(r)
+        .map(|nr| nr.top())
+        .chain(l.labels.iter().map(|lb| lb.bounds.top()))
+        .chain(occupied.iter().map(|nr| nr.top()))
+        .chain(
+            l.routes
+                .values()
+                .flat_map(|rt| rt.points.iter().map(|p| p.y)),
+        )
+        .fold(eb.top(), f64::min);
+    Some(Rect::new(e.cx, top - h / 2. - 16., w, h))
 }
 fn crossing_gaps(l: &Layout, visible: impl Fn(&str) -> bool) -> BTreeMap<String, Vec<Point>> {
     let routes: Vec<_> = l
@@ -453,7 +544,7 @@ fn gap_mask(id: &str, masks: &BTreeMap<String, EdgeMask>) -> String {
 fn bounds_with(
     scene: &SceneGraph,
     l: &Layout,
-    zone_contours_list: &[Vec<Vec<Point>>],
+    ellipses: &[Option<crate::zones::ZoneEllipse>],
     titles: &[(&Zone, Rect)],
 ) -> Rect {
     let ink = l
@@ -476,13 +567,7 @@ fn bounds_with(
                 .values()
                 .flat_map(|z| z.iter().map(|p| Rect::new(p.x, p.y, 1., 1.))),
         )
-        .chain(
-            zone_contours_list
-                .iter()
-                .flatten()
-                .flatten()
-                .map(|p| Rect::new(p.x, p.y, 1., 1.)),
-        )
+        .chain(ellipses.iter().flatten().map(|e| e.bounds()))
         .chain(titles.iter().map(|(_, r)| *r))
         .chain(
             scene
@@ -502,9 +587,9 @@ fn bounds_with(
 }
 /// Bounds of every painted feature, including external record and zone titles.
 pub fn bounds(scene: &SceneGraph, l: &Layout) -> Rect {
-    let contours = all_zone_contours(scene, l);
-    let titles = zone_titles_from_contours(scene, l, &contours);
-    bounds_with(scene, l, &contours, &titles)
+    let ellipses = all_zone_ellipses(scene, l);
+    let titles = zone_titles_from_ellipses(scene, l, &ellipses);
+    bounds_with(scene, l, &ellipses, &titles)
 }
 
 pub fn svg(scene: &SceneGraph, l: &Layout) -> String {
@@ -518,9 +603,9 @@ pub(crate) fn svg_with_decorations(
     edge_visible: impl Fn(&str) -> bool,
     decorate: impl Fn(&Node, Rect) -> String,
 ) -> String {
-    let contours = all_zone_contours(scene, l);
-    let titles = zone_titles_from_contours(scene, l, &contours);
-    let bounds = bounds_with(scene, l, &contours, &titles);
+    let ellipses = all_zone_ellipses(scene, l);
+    let titles = zone_titles_from_ellipses(scene, l, &ellipses);
+    let bounds = bounds_with(scene, l, &ellipses, &titles);
     let masks = edge_masks(scene, l, &edge_visible);
     let mut s = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{:.2} {:.2} {:.2} {:.2}\" width=\"{:.0}\" height=\"{:.0}\" role=\"img\" aria-labelledby=\"diagram-title diagram-description\"><title id=\"diagram-title\">Architecture diagram</title><desc id=\"diagram-description\">{}</desc><style>text{{font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:var(--sd-fg,#233347)}}.node-title{{font-weight:600;font-size:16px}}.port-label{{font-size:13px}}.edge{{fill:none;stroke:var(--sd-edge,#53657a);stroke-width:1.7;stroke-linejoin:round}}.flow{{fill:none;stroke:var(--sd-flow,#356bd9);stroke-width:3;stroke-linejoin:round}}.context-node>:not(text){{opacity:.35}}.context-node text{{fill:var(--sd-edge,#53657a)}}</style>",
@@ -583,8 +668,8 @@ pub(crate) fn svg_with_decorations(
         s.push_str(&decorate(n, r));
         s.push_str("</g>");
     }
-    for (z, zone_polys) in scene.zones.iter().zip(&contours) {
-        if !zone_polys.is_empty() {
+    for (z, ellipse) in scene.zones.iter().zip(&ellipses) {
+        if let Some(e) = ellipse {
             let (tint, alpha) = paint(
                 z.attrs
                     .get("tint")
@@ -593,12 +678,9 @@ pub(crate) fn svg_with_decorations(
             );
             let _ = write!(
                 s,
-                "<path data-zone=\"{}\" d=\"{}\" fill=\"{}\" fill-opacity=\"{}\" fill-rule=\"evenodd\"/>",
+                "<path data-zone=\"{}\" d=\"{}\" fill=\"{}\" fill-opacity=\"{}\"/>",
                 escape(&z.id),
-                zone_polys
-                    .iter()
-                    .map(|p| rounded_hull(p))
-                    .collect::<String>(),
+                ellipse_svg_path(*e),
                 escape(&tint),
                 alpha
             );
@@ -1057,37 +1139,38 @@ pub fn path(points: &[Point]) -> String {
     }
     s
 }
-fn rounded_hull(p: &[Point]) -> String {
-    if p.len() < 3 {
-        return path(p);
-    }
-    let mut s = String::new();
-    for (i, b) in p.iter().enumerate() {
-        let a = p[(i + p.len() - 1) % p.len()];
-        let c = p[(i + 1) % p.len()];
-        let radius = 4_f64.min(a.distance(*b) / 2.).min(b.distance(c) / 2.);
-        let from = b.offset(
-            (a.x - b.x) * radius / a.distance(*b),
-            (a.y - b.y) * radius / a.distance(*b),
-        );
-        let to = b.offset(
-            (c.x - b.x) * radius / b.distance(c),
-            (c.y - b.y) * radius / b.distance(c),
-        );
-        let _ = write!(
-            s,
-            "{} {} {} Q {} {} {} {} ",
-            if i == 0 { "M" } else { "L" },
-            from.x,
-            from.y,
-            b.x,
-            b.y,
-            to.x,
-            to.y
-        );
-    }
-    s.push('Z');
-    s
+fn ellipse_svg_path(e: crate::zones::ZoneEllipse) -> String {
+    let (c, s) = (e.theta.cos(), e.theta.sin());
+    let p0 = Point::new(e.cx + e.rx * c, e.cy + e.rx * s);
+    let p1 = Point::new(e.cx - e.ry * s, e.cy + e.ry * c);
+    let p2 = Point::new(e.cx - e.rx * c, e.cy - e.rx * s);
+    let p3 = Point::new(e.cx + e.ry * s, e.cy - e.ry * c);
+    let deg = e.theta.to_degrees();
+    format!(
+        "M {:.2} {:.2} A {:.2} {:.2} {:.2} 0 1 {:.2} {:.2} A {:.2} {:.2} {:.2} 0 1 {:.2} {:.2} A {:.2} {:.2} {:.2} 0 1 {:.2} {:.2} A {:.2} {:.2} {:.2} 0 1 {:.2} {:.2} Z",
+        p0.x,
+        p0.y,
+        e.rx,
+        e.ry,
+        deg,
+        p1.x,
+        p1.y,
+        e.rx,
+        e.ry,
+        deg,
+        p2.x,
+        p2.y,
+        e.rx,
+        e.ry,
+        deg,
+        p3.x,
+        p3.y,
+        e.rx,
+        e.ry,
+        deg,
+        p0.x,
+        p0.y,
+    )
 }
 pub fn at_arc(points: &[Point], t: f64) -> Point {
     let total = points.windows(2).map(|p| p[0].distance(p[1])).sum::<f64>();

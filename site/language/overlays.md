@@ -13,7 +13,7 @@ zone pci "PCI scope" around [prod.db, kms] {
 }
 ```
 
-Zones render a padded rounded contour around their members. Root-level members share one enclosing area with holes for nonmembers. Ownership clipping can leave separate regions for members inside different containers. They can cross container boundaries and overlap other zones. `padding` is in grid units. OKLCH tints are converted to sRGB with alpha for consistent native exports.
+Zones render a smooth oriented enclosing ellipse around their members, crossing container boundaries and overlapping other zones without changing node ownership. `padding` is in grid units. OKLCH tints are converted to sRGB with alpha for consistent native exports.
 
 Zone `state` and `invariant` entries also provide metadata for [bounded verification](/runtime/verification). The caller supplies the finite transition system.
 

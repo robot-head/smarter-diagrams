@@ -227,28 +227,44 @@ fn trust_scope_is_contiguous_across_owners_and_excludes_non_members() {
     valid(&d);
     assert_eq!(d.to_svg().matches("data-zone-label=").count(), 1);
     let contours = render::zone_contours(&d.scene, &d.layout, &d.scene.zones[0]);
-    let outer = contours
+    assert_eq!(contours.len(), 1);
+    let poly = &contours[0];
+    let outer = poly
         .iter()
-        .filter(|poly| {
-            poly.iter()
-                .zip(poly.iter().cycle().skip(1))
-                .take(poly.len())
-                .map(|(a, b)| a.x * b.y - b.x * a.y)
-                .sum::<f64>()
-                > 1e-6
-        })
-        .count();
-    assert_eq!(outer, 1);
-    for excluded in ["client", "west.worker", "east.worker"] {
-        let p = d.layout.nodes[excluded].center();
-        let xings = contours
-            .iter()
-            .flat_map(|poly| (0..poly.len()).map(move |i| (poly[i], poly[(i + 1) % poly.len()])))
+        .zip(poly.iter().cycle().skip(1))
+        .take(poly.len())
+        .map(|(a, b)| a.x * b.y - b.x * a.y)
+        .sum::<f64>();
+    assert!(outer > 1e-6);
+    for i in 0..poly.len() {
+        let a = poly[i];
+        let b = poly[(i + 1) % poly.len()];
+        let c = poly[(i + 2) % poly.len()];
+        assert!(
+            (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x) > 1e-6,
+            "trusted zone contour must be strictly convex"
+        );
+    }
+    let count_crossings = |p: Point| {
+        poly.iter()
+            .zip(poly.iter().cycle().skip(1))
+            .take(poly.len())
             .filter(|(a, b)| {
                 (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x
             })
-            .count();
-        assert_eq!(xings % 2, 0, "{excluded} must lie outside zone contour");
+            .count()
+    };
+    assert_eq!(
+        count_crossings(d.layout.nodes["client"].center()) % 2,
+        0,
+        "external client must lie outside zone contour"
+    );
+    for member in ["west.api", "east.api", "central.ledger", "central.keys"] {
+        assert_eq!(
+            count_crossings(d.layout.nodes[member].center()) % 2,
+            1,
+            "{member} must lie inside zone contour"
+        );
     }
 }
 #[test]

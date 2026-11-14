@@ -1,6 +1,6 @@
 {
-  "engineFingerprint": "7da7983e9a51f9a8153eedbc6b8b98c50bf494af4227928a6e1a8c47e6b5aed8",
-  "baseRevision": "0cd71282a6fadac9e22d3d1e5acc74909b4965f5",
+  "engineFingerprint": "67d129be4eb893c8e90aa43b447cdf31265c07cb08d85568a6637a8259094df9",
+  "baseRevision": "c2db2eb5bf253a46d924eb8d71dd1ea98a25d61a",
   "method": "Current semantic, native geometry, Chromium paint and repeated-compilation checks, followed by individual visual inspection. Earlier findings and scores are preserved under historicalAudits.",
   "knownDiagnostics": {},
   "counts": {
@@ -255,7 +255,7 @@
       },
       {
         "id": "08-cross-ownership",
-        "svgSha256": "9652a0da1c856ef2d525bc3edccf3ef03fe0d279c56bde6292771d0e469fcce0",
+        "svgSha256": "790b2ef1efcee026a5ae5ed777085ecd6aef8e4b916794c3c46cddca32e0e7d6",
         "beauty": 5,
         "clarity": 5,
         "review": "West, East and Shared services retain their ownership; every disjoint trusted island carries the same scope title.",

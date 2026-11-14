@@ -1,6 +1,6 @@
 {
-  "engineFingerprint": "7da7983e9a51f9a8153eedbc6b8b98c50bf494af4227928a6e1a8c47e6b5aed8",
-  "baseRevision": "0cd71282a6fadac9e22d3d1e5acc74909b4965f5",
+  "engineFingerprint": "67d129be4eb893c8e90aa43b447cdf31265c07cb08d85568a6637a8259094df9",
+  "baseRevision": "c2db2eb5bf253a46d924eb8d71dd1ea98a25d61a",
   "method": "Current semantic, native geometry, Chromium paint and repeated-compilation checks, followed by individual visual inspection. Earlier findings and scores are preserved under historicalAudits.",
   "knownDiagnostics": {},
   "counts": {
@@ -326,11 +326,11 @@
       },
       {
         "id": "19-zone",
-        "svgSha256": "72f3ce2c8aa24f81b3c250f17df4394ee0a7a8e51f5e2460074d73630c384ee3",
+        "svgSha256": "70783c100251cd5f7cf6c5add2b97ad31e0d02902f914ff2a17b36e39dea76ea",
         "beauty": 5,
         "clarity": 5,
         "review": "API, Ledger and Key service share one contiguous trust enclosure, while Browser stays outside.",
-        "minFitTextPx": 14.808904618595475,
+        "minFitTextPx": 13.818255367928934,
         "routeMetrics": {
           "properCrossings": 0,
           "overlappingRoutePairs": 0,

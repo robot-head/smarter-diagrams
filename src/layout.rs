@@ -4100,24 +4100,7 @@ fn layout_pass(
     if !coordinated_fan && !coordinated_loops {
         crate::labels::polish_channels(scene, o, &mut out);
     }
-    for zone in &scene.zones {
-        let padding = value(&zone.attrs, "padding").unwrap_or(1.5) * o.grid;
-        let points: Vec<_> = zone
-            .members
-            .iter()
-            .filter_map(|id| out.nodes.get(id))
-            .flat_map(|r| {
-                let r = r.inflate(padding);
-                [
-                    Point::new(r.left(), r.top()),
-                    Point::new(r.right(), r.top()),
-                    Point::new(r.right(), r.bottom()),
-                    Point::new(r.left(), r.bottom()),
-                ]
-            })
-            .collect();
-        out.zones.insert(zone.id.clone(), convex_hull(points));
-    }
+    populate_zones(scene, &mut out, o.grid);
     if let Some(prior) = previous {
         out.stability = stability(scene, prior, &out);
     }
@@ -6280,6 +6263,14 @@ pub fn validate(scene: &SceneGraph, l: &Layout, o: &LayoutOptions) -> Result<(),
     }
     Ok(())
 }
+fn populate_zones(scene: &SceneGraph, out: &mut Layout, grid: f64) {
+    for zone in &scene.zones {
+        let contour = crate::zones::ellipse_with_grid(scene, &out.nodes, zone, grid)
+            .map(|e| e.sample_polygon(64))
+            .unwrap_or_default();
+        out.zones.insert(zone.id.clone(), contour);
+    }
+}
 pub fn convex_hull(mut points: Vec<Point>) -> Vec<Point> {
     points.sort_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y)));
     points.dedup();
@@ -6664,24 +6655,7 @@ fn local_query(
     out.labels.extend(local.labels);
     out.reused_routes = out.routes.len().saturating_sub(internal_edges.len()) + local.reused_routes;
     out.stability = stability(scene, prior, &out);
-    for zone in &scene.zones {
-        let padding = value(&zone.attrs, "padding").unwrap_or(1.5) * o.grid;
-        let points = zone
-            .members
-            .iter()
-            .filter_map(|id| out.nodes.get(id))
-            .flat_map(|r| {
-                let r = r.inflate(padding);
-                [
-                    Point::new(r.left(), r.top()),
-                    Point::new(r.right(), r.top()),
-                    Point::new(r.right(), r.bottom()),
-                    Point::new(r.left(), r.bottom()),
-                ]
-            })
-            .collect();
-        out.zones.insert(zone.id.clone(), convex_hull(points));
-    }
+    populate_zones(scene, &mut out, o.grid);
     // Outside routes cannot enter the unchanged container boundary, so geometry validity composes.
     if validate(scene, &out, o).is_ok() && crate::labels::placements_clear(scene, &out) {
         Some(out)
