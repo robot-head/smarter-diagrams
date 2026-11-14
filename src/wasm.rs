@@ -1,4 +1,11 @@
 use wasm_bindgen::prelude::*;
+fn parse_options(options_json: &str) -> Result<crate::LayoutOptions, JsValue> {
+    if options_json.trim().is_empty() {
+        Ok(crate::LayoutOptions::default())
+    } else {
+        serde_json::from_str(options_json).map_err(js_error)
+    }
+}
 #[wasm_bindgen]
 pub fn render_svg(source: &str) -> Result<String, JsValue> {
     crate::compile(source)
@@ -6,9 +13,23 @@ pub fn render_svg(source: &str) -> Result<String, JsValue> {
         .map_err(|e| JsValue::from_str(&e.with_source(source)))
 }
 #[wasm_bindgen]
+pub fn render_svg_with_options(source: &str, options_json: &str) -> Result<String, JsValue> {
+    let options = parse_options(options_json)?;
+    crate::compile_with(source, &options, None)
+        .map(|d| d.to_svg())
+        .map_err(|e| JsValue::from_str(&e.with_source(source)))
+}
+#[wasm_bindgen]
 pub fn layout_json(source: &str) -> Result<String, JsValue> {
     let d = crate::compile(source).map_err(|e| JsValue::from_str(&e.with_source(source)))?;
     serde_json::to_string(&d.layout).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+#[wasm_bindgen]
+pub fn layout_json_with_options(source: &str, options_json: &str) -> Result<String, JsValue> {
+    let options = parse_options(options_json)?;
+    let d = crate::compile_with(source, &options, None)
+        .map_err(|e| JsValue::from_str(&e.with_source(source)))?;
+    serde_json::to_string(&d.layout).map_err(js_error)
 }
 #[wasm_bindgen]
 pub fn edit_source(source: &str, operations_json: &str) -> Result<String, JsValue> {
@@ -29,6 +50,13 @@ impl WasmDocument {
     pub fn new(source: &str) -> Result<WasmDocument, JsValue> {
         Ok(Self {
             inner: crate::Document::new(source).map_err(|e| js_error(e.with_source(source)))?,
+        })
+    }
+    pub fn new_with_options(source: &str, options_json: &str) -> Result<WasmDocument, JsValue> {
+        let options = parse_options(options_json)?;
+        Ok(Self {
+            inner: crate::Document::with_options(source, options)
+                .map_err(|e| js_error(e.with_source(source)))?,
         })
     }
     pub fn source(&self) -> String {

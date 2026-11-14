@@ -992,28 +992,6 @@ fn place_inner(
 // branch. Prefer the same offset from that leaf instead of a random elbow.
 fn fan_caption(f: &Feature, scene: &SceneGraph, l: &Layout) -> Option<Candidate> {
     let edge = scene.edge(&f.id)?;
-    let w = feature_width(f, scene);
-    let h = text_height(&f.text);
-    if let Some(anchor) = crate::bundles::caption_anchor(scene, l, edge, w)
-        .or_else(|| crate::duplex::caption_anchor(scene, l, edge, w))
-        .or_else(|| crate::gather::caption_anchor(scene, l, edge, w))
-        .or_else(|| crate::records::caption_anchor(scene, l, edge, w))
-    {
-        return Some(Candidate {
-            cost: -1000.,
-            label: LabelPlacement {
-                feature: f.id.clone(),
-                text: f.text.clone(),
-                bounds: Rect::new(anchor.x, anchor.y - h / 2. - 6., w, h),
-                anchor,
-                knockout: false,
-                callout: false,
-                orthogonal_leader: false,
-                horizontal: true,
-                slide: 0.5,
-            },
-        });
-    }
     let fan = scene.nodes.len() >= 4 && scene.edges.len() + 1 == scene.nodes.len();
     let fan_out = fan
         && scene
@@ -1031,12 +1009,7 @@ fn fan_caption(f: &Feature, scene: &SceneGraph, l: &Layout) -> Option<Candidate>
             .edges
             .iter()
             .all(|e| e.source.node == edge.source.node && e.target.node == edge.target.node);
-    let mesh = crate::presentation::mesh_layers(scene).is_some()
-        && scene.edges.iter().all(|e| {
-            l.ports[&port_key(e, true)].side == Side::E
-                && l.ports[&port_key(e, false)].side == Side::W
-        });
-    if !fan_out && !fan_in && !record_bundle && !mesh {
+    if !fan_out && !fan_in && !record_bundle {
         return None;
     }
     let leaf = if fan_out {
@@ -1045,7 +1018,7 @@ fn fan_caption(f: &Feature, scene: &SceneGraph, l: &Layout) -> Option<Candidate>
         &edge.source.node
     };
     let body = l.nodes[leaf];
-    let branch_y = if record_bundle || mesh {
+    let branch_y = if record_bundle {
         l.ports[&port_key(edge, true)].point.y
     } else {
         body.y
