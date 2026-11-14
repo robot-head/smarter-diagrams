@@ -81,6 +81,13 @@ impl Invariant {
 pub fn satisfy(variables: usize, clauses: &[Vec<i32>]) -> Result<Option<Vec<bool>>, Error> {
     satisfy_budget(variables, clauses, 2_000_000)
 }
+pub(crate) fn satisfy_bounded(
+    variables: usize,
+    clauses: &[Vec<i32>],
+    search_budget: usize,
+) -> Result<Option<Vec<bool>>, Error> {
+    satisfy_budget(variables, clauses, search_budget)
+}
 fn satisfy_budget(
     variables: usize,
     clauses: &[Vec<i32>],
