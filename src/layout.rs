@@ -655,6 +655,93 @@ fn named_port_corridor_width(
     (port_w + edge_w + lanes_w + 2. * o.stub + 2. * o.margin).min(280.)
 }
 
+fn has_labeled_parallel_bundle(scene: &SceneGraph) -> bool {
+    let mut pair_counts: BTreeMap<(usize, usize), (usize, usize)> = BTreeMap::new();
+    for e in &scene.edges {
+        let (Some(a), Some(b)) = (scene.index(&e.source.node), scene.index(&e.target.node))
+        else {
+            continue;
+        };
+        if a == b {
+            continue;
+        }
+        let key = (a.min(b), a.max(b));
+        let entry = pair_counts.entry(key).or_insert((0, 0));
+        entry.0 += 1;
+        if !crate::labels::connection_text(scene, e).trim().is_empty() {
+            entry.1 += 1;
+        }
+    }
+    pair_counts
+        .values()
+        .any(|&(total, labeled)| total >= 2 && labeled >= 2)
+}
+
+fn parallel_bundle_corridor_width(
+    scene: &SceneGraph,
+    ra: Rect,
+    rb: Rect,
+    a: usize,
+    b: usize,
+    left_is_a: bool,
+    o: &LayoutOptions,
+) -> Option<f64> {
+    if a == b {
+        return None;
+    }
+    let mut pair_count = 0usize;
+    let mut widths = Vec::new();
+    for e in &scene.edges {
+        let (Some(sa), Some(sb)) = (scene.index(&e.source.node), scene.index(&e.target.node))
+        else {
+            continue;
+        };
+        if !((sa == a && sb == b) || (sa == b && sb == a)) {
+            continue;
+        }
+        pair_count += 1;
+        let text = crate::labels::connection_text(scene, e);
+        if !text.trim().is_empty() {
+            widths.push(crate::labels::text_width(&text));
+        }
+    }
+    if pair_count < 2 || widths.len() < 2 {
+        return None;
+    }
+    widths.sort_by(|x, y| y.total_cmp(x));
+    let top2 = widths[0] + widths[1];
+    let (left_idx, rl, right_idx, rr) = if left_is_a {
+        (a, ra, b, rb)
+    } else {
+        (b, rb, a, ra)
+    };
+    let face_inset = |idx: usize, r: Rect, side: Side| -> f64 {
+        let corner = o.corner.min(r.h / 4.);
+        let max_half = (r.h * 0.5 - corner).max(0.);
+        let half_span = ((pair_count.saturating_sub(1)) as f64 * 0.5 * o.port_spacing).min(max_half);
+        let mid = r.h * 0.5;
+        let att_top = crate::shapes::attachment(
+            &scene.nodes[idx].shape,
+            r,
+            side,
+            (mid - half_span).clamp(0., r.h),
+        );
+        let att_bot = crate::shapes::attachment(
+            &scene.nodes[idx].shape,
+            r,
+            side,
+            (mid + half_span).clamp(0., r.h),
+        );
+        match side {
+            Side::E => (r.right() - att_top.x).max(r.right() - att_bot.x).max(0.),
+            Side::W => (att_top.x - r.left()).max(att_bot.x - r.left()).max(0.),
+            _ => 0.,
+        }
+    };
+    let shape_side_inset = face_inset(left_idx, rl, Side::E) + face_inset(right_idx, rr, Side::W);
+    Some((top2 + 2. * o.stub + 2. * o.margin + 48. + shape_side_inset).min(320.))
+}
+
 fn guide_corridor_gaps(plan: &TopologyPlan, members: &[usize], step: f64) -> Vec<f64> {
     let mut gaps = vec![0.; members.len().saturating_sub(1)];
     if plan.edge_guides.is_empty() || members.len() < 2 {
@@ -806,11 +893,13 @@ fn build_plan_rects(
                 cross_gap
             };
             let named_port_corridors = (0..n).any(|i| has_named_multiport(scene, i));
+            let has_labeled_parallel = has_labeled_parallel_bundle(scene);
             let is_default_lr = single_fold
                 && plan.search_states == 0
                 && plan.side_hints.is_empty()
                 && plan.edge_guides.is_empty()
-                && !named_port_corridors;
+                && !named_port_corridors
+                && !has_labeled_parallel;
             if is_default_lr {
                 let mut rows = BTreeMap::new();
                 for i in 0..n {
@@ -822,7 +911,7 @@ fn build_plan_rects(
                 return rects;
             }
             let mut gap_after = vec![min_gap.max(72. * spacing); cols.len().saturating_sub(1)];
-            if !single_fold || spacing > 1. || named_port_corridors {
+            if !single_fold || spacing > 1. || named_port_corridors || has_labeled_parallel {
                 let mut corridor_edge_counts = vec![0usize; cols.len().saturating_sub(1)];
                 for e in &scene.edges {
                     let (Some(a), Some(b)) =
@@ -874,6 +963,20 @@ fn build_plan_rects(
                             *g = g.max(corridor_w * spacing);
                         }
                     }
+                    if let Some(par_w) = parallel_bundle_corridor_width(
+                        scene,
+                        rects[a],
+                        rects[b],
+                        a,
+                        b,
+                        ca < cb,
+                        o,
+                    ) {
+                        let per_hop = (par_w / span).max(min_gap);
+                        for g in &mut gap_after[lo..hi] {
+                            *g = g.max(per_hop * spacing);
+                        }
+                    }
                 }
             }
             let mut col_x = vec![0f64; cols.len()];
@@ -922,7 +1025,33 @@ fn build_plan_rects(
                     }
                 }
                 if fi > 0 {
-                    fold_cursor_y += col_max_half_up + (2. * o.stub + 2. * o.margin + 32.) * spacing;
+                    let prev_f = folds[fi - 1];
+                    let mut cross_pair_counts: BTreeMap<(usize, usize), usize> = BTreeMap::new();
+                    let mut has_cross_fold_caption = false;
+                    for e in &scene.edges {
+                        let (Some(a), Some(b)) =
+                            (scene.index(&e.source.node), scene.index(&e.target.node))
+                        else {
+                            continue;
+                        };
+                        let crosses = (plan.fold_row[a] == prev_f && plan.fold_row[b] == f)
+                            || (plan.fold_row[b] == prev_f && plan.fold_row[a] == f);
+                        if crosses {
+                            *cross_pair_counts.entry((a.min(b), a.max(b))).or_default() += 1;
+                            if !crate::labels::connection_text(scene, e).trim().is_empty() {
+                                has_cross_fold_caption = true;
+                            }
+                        }
+                    }
+                    let has_cross_fold_parallel =
+                        cross_pair_counts.values().any(|&count| count >= 2);
+                    let fold_gap = if has_cross_fold_parallel {
+                        let extra_caption_gap = if has_cross_fold_caption { 28. } else { 0. };
+                        (2. * o.stub + 2. * o.margin + 48.).max(96.) + extra_caption_gap
+                    } else {
+                        2. * o.stub + 2. * o.margin + 32.
+                    };
+                    fold_cursor_y += col_max_half_up + fold_gap * spacing;
                 }
                 for (i, ry) in fold_rel_y {
                     let ci = cols.binary_search(&col_idx[i]).unwrap();
@@ -1106,6 +1235,7 @@ fn scanline_overlapping_pairs(rects: &[Rect], nodes: &[usize]) -> Vec<(usize, us
 struct Stage1bEnv<'a> {
     scene: &'a SceneGraph,
     o: &'a LayoutOptions,
+    spacing: f64,
     requests: &'a [PortRequest],
     plan_hints: &'a [Option<(Side, Side)>],
     pins: &'a [(Option<f64>, Option<f64>)],
@@ -1672,6 +1802,67 @@ fn solve_stage1b(
         }
     }
 
+    if env.previous.is_none() {
+        let has_locked_w_ancestor = |mut idx: usize| -> bool {
+            while let Some(parent_id) = env.scene.nodes[idx].parent.as_deref() {
+                let Some(pi) = env.scene.index(parent_id) else {
+                    break;
+                };
+                if env.w_locked[pi] {
+                    return true;
+                }
+                idx = pi;
+            }
+            false
+        };
+        let mut checked_pairs: BTreeSet<(usize, usize)> = BTreeSet::new();
+        for e in &env.scene.edges {
+            let (Some(a), Some(b)) = (
+                env.scene.index(&e.source.node),
+                env.scene.index(&e.target.node),
+            ) else {
+                continue;
+            };
+            if a == b || !checked_pairs.insert((a.min(b), a.max(b))) {
+                continue;
+            }
+            let same_row = (rects[a].y - rects[b].y).abs() <= (rects[a].h + rects[b].h) * 0.5 + 32.;
+            if !same_row || (rects[a].x - rects[b].x).abs() <= 1e-6 {
+                continue;
+            }
+            if env.pins[a].0.is_some()
+                || env.pins[b].0.is_some()
+                || env.relatives[a].0.is_some()
+                || env.relatives[b].0.is_some()
+                || has_locked_w_ancestor(a)
+                || has_locked_w_ancestor(b)
+            {
+                continue;
+            }
+            let (left, right) = if rects[a].x < rects[b].x {
+                (a, b)
+            } else {
+                (b, a)
+            };
+            if let Some(req_gap) = parallel_bundle_corridor_width(
+                env.scene,
+                rects[left],
+                rects[right],
+                left,
+                right,
+                true,
+                env.o,
+            ) {
+                let scaled_gap = req_gap * env.spacing;
+                let (rx, rc) = x_vars[right].min_edge_terms(rects[right].w * 0.5);
+                let (lx, lc) = x_vars[left].max_edge_terms(rects[left].w * 0.5);
+                if let Some(c) = linear_ge_constraint(&rx, rc, &lx, lc + scaled_gap, false) {
+                    base_cx.push(c);
+                }
+            }
+        }
+    }
+
     // Build gentle L1 transverse alignment terms for unpinned/slot-anchored fresh layouts,
     // without collapsing rank spacing or multi-neighbor hubs.
     let sides: BTreeMap<_, _> = env
@@ -1880,7 +2071,11 @@ fn solve_stage1b(
             }
             let sa = sides[&port_key(e, true)];
             let sb = sides[&port_key(e, false)];
-            if matches!((sa, sb), (Side::E, Side::W) | (Side::W, Side::E)) {
+            let same_row =
+                (rects[a].y - rects[b].y).abs() <= (rects[a].h + rects[b].h) * 0.5 + 32.;
+            let same_col =
+                (rects[a].x - rects[b].x).abs() <= (rects[a].w + rects[b].w) * 0.5 + 32.;
+            if same_row && matches!((sa, sb), (Side::E, Side::W) | (Side::W, Side::E)) {
                 if env.pins[a].1.is_none()
                     && env.pins[b].1.is_none()
                     && let (AxisVar::Leaf(va), AxisVar::Leaf(vb)) = (y_vars[a], y_vars[b])
@@ -1907,7 +2102,7 @@ fn solve_stage1b(
                     );
                 }
             }
-            if matches!((sa, sb), (Side::N, Side::S) | (Side::S, Side::N)) {
+            if same_col && matches!((sa, sb), (Side::N, Side::S) | (Side::S, Side::N)) {
                 if env.pins[a].0.is_none()
                     && env.pins[b].0.is_none()
                     && let (AxisVar::Leaf(va), AxisVar::Leaf(vb)) = (x_vars[a], x_vars[b])
@@ -2570,8 +2765,46 @@ fn score_candidate_preview(
         0.
     };
 
+    let constraint_side = |c: &PortConstraint| -> Option<Side> {
+        match *c {
+            PortConstraint::Free => None,
+            PortConstraint::FixedSide { side }
+            | PortConstraint::FixedOrder { side, .. }
+            | PortConstraint::FixedRatio { side, .. }
+            | PortConstraint::FixedPos { side, .. } => Some(side),
+        }
+    };
+    let port_axis_mismatches = route_list
+        .iter()
+        .filter(|(e, _)| {
+            let (Some(a), Some(b)) = (scene.index(&e.source.node), scene.index(&e.target.node))
+            else {
+                return false;
+            };
+            if a == b || plan.fold_row[a] != plan.fold_row[b] || plan.ranks[a] == plan.ranks[b] {
+                return false;
+            }
+            let (Some(sa), Some(sb)) = (
+                constraint_side(&e.source.constraint),
+                constraint_side(&e.target.constraint),
+            ) else {
+                return false;
+            };
+            match plan.axis {
+                FlowAxis::TopToBottom => {
+                    matches!(sa, Side::E | Side::W) && matches!(sb, Side::E | Side::W)
+                }
+                FlowAxis::LeftToRight => {
+                    matches!(sa, Side::N | Side::S) && matches!(sb, Side::N | Side::S)
+                }
+                FlowAxis::QuadrantCross => false,
+            }
+        })
+        .count();
+
     2000. * crossings as f64
         + 800. * estimated_callouts as f64
+        + 1600. * port_axis_mismatches as f64
         + wire_length
         + 24. * bends as f64
         + aspect_penalty
@@ -2601,14 +2834,16 @@ struct CandidateInput<'a> {
     spacing: f64,
 }
 
-fn widen_named_port_corridors(
+fn widen_column_corridors(
     scene: &SceneGraph,
     rects: &mut [Rect],
     o: &LayoutOptions,
     spacing: f64,
 ) {
     let n = rects.len();
-    if n < 2 || !(0..n).any(|i| has_named_multiport(scene, i)) {
+    let has_named = (0..n).any(|i| has_named_multiport(scene, i));
+    let has_parallel = has_labeled_parallel_bundle(scene);
+    if n < 2 || (!has_named && !has_parallel) {
         return;
     }
     let mut xs: Vec<f64> = rects.iter().map(|r| r.x).collect();
@@ -2629,9 +2864,7 @@ fn widen_named_port_corridors(
         else {
             continue;
         };
-        if !(has_named_multiport(scene, a) || has_named_multiport(scene, b)) {
-            continue;
-        }
+        let named_pair = has_named && (has_named_multiport(scene, a) || has_named_multiport(scene, b));
         let ca = col_of(rects[a].x);
         let cb = col_of(rects[b].x);
         if ca == cb {
@@ -2642,19 +2875,31 @@ fn widen_named_port_corridors(
         } else {
             (b, a, cb, ca)
         };
+        if hi_c != lo_c + 1 {
+            continue;
+        }
         let cur_gap = rects[right_idx].left() - rects[left_idx].right();
-        let face_edges = scene
-            .edges
-            .iter()
-            .filter(|x| {
-                (scene.index(&x.source.node) == Some(a)
-                    || scene.index(&x.target.node) == Some(a))
-                    || (scene.index(&x.source.node) == Some(b)
-                        || scene.index(&x.target.node) == Some(b))
-            })
-            .count();
-        let req_gap = named_port_corridor_width(scene, e, a, b, face_edges, o) * spacing;
-        if cur_gap < req_gap && hi_c == lo_c + 1 {
+        let mut req_gap = 0f64;
+        if named_pair {
+            let face_edges = scene
+                .edges
+                .iter()
+                .filter(|x| {
+                    (scene.index(&x.source.node) == Some(a)
+                        || scene.index(&x.target.node) == Some(a))
+                        || (scene.index(&x.source.node) == Some(b)
+                            || scene.index(&x.target.node) == Some(b))
+                })
+                .count();
+            req_gap = req_gap.max(named_port_corridor_width(scene, e, a, b, face_edges, o) * spacing);
+        }
+        if has_parallel
+            && let Some(par_w) =
+                parallel_bundle_corridor_width(scene, rects[a], rects[b], a, b, ca < cb, o)
+        {
+            req_gap = req_gap.max(par_w * spacing);
+        }
+        if cur_gap < req_gap {
             extra_after[lo_c] = extra_after[lo_c].max(req_gap - cur_gap);
         }
     }
@@ -2859,12 +3104,15 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
         &locks.h_locked,
         o,
     )?;
+    let has_custom_corridor =
+        (0..n).any(|i| has_named_multiport(scene, i)) || has_labeled_parallel_bundle(scene);
     let has_custom_plan = plan.is_some_and(|p| {
         p.axis != FlowAxis::LeftToRight
             || p.fold_row.iter().any(|&f| f > 0)
             || !p.side_hints.is_empty()
             || !p.edge_guides.is_empty()
             || p.search_states > 0
+            || has_custom_corridor
     });
     if previous.is_none()
         && !locks.has_pos_pin
@@ -2912,7 +3160,7 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
             compact_unlabeled_fan_column(scene, &mut rects, o);
         }
         if !locks.has_pos_pin && !has_containers {
-            widen_named_port_corridors(scene, &mut rects, o, spacing);
+            widen_column_corridors(scene, &mut rects, o, spacing);
         }
         if !has_custom_plan && spacing > 1. {
             for r in &mut rects {
@@ -3173,6 +3421,7 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
         let env = Stage1bEnv {
             scene,
             o,
+            spacing,
             requests: &requests,
             plan_hints,
             pins: &pins,
@@ -3217,6 +3466,7 @@ fn solve_candidate_layout(input: &CandidateInput<'_>) -> Result<(Layout, bool, b
                 let env2 = Stage1bEnv {
                     scene,
                     o,
+                    spacing,
                     requests: &requests,
                     plan_hints,
                     pins: &pins,
@@ -6318,6 +6568,75 @@ mod tests {
         assert!(
             gap_guided >= gap_plain + 2. * opts.lane_spacing - 1e-6,
             "expected guided gap >= plain + 2*lane_spacing, got plain={gap_plain}, guided={gap_guided}"
+        );
+    }
+
+    #[test]
+    fn cross_fold_parallel_bundle_does_not_collapse_fold_rows() {
+        let opts = LayoutOptions::default();
+        let src = "a -> b -> c: validate access;\nb -> d: validate access;\nb -> d: retry;\nc -> d;";
+        let scene = lower(&parse(src));
+        let annotations: Vec<Vec<Annotation>> = scene
+            .nodes
+            .iter()
+            .map(|nd| effective_annotations(&scene, &nd.id, &nd.annotations, opts.variant.as_deref()))
+            .collect();
+        let locks = parse_pin_locks(&annotations, &opts).unwrap();
+        let base_sizes = compute_base_sizes(&scene, &locks, &opts).unwrap();
+        let mut side_hints = vec![None; scene.edges.len()];
+        for (idx, e) in scene.edges.iter().enumerate() {
+            if e.source.node == "b" && e.target.node == "d" {
+                side_hints[idx] = Some((Side::E, Side::W));
+            }
+        }
+        let plan = crate::topology::TopologyPlan {
+            axis: crate::topology::FlowAxis::LeftToRight,
+            ranks: vec![0, 1, 1, 2],
+            order: vec![0, 0, 1, 1],
+            fold_row: vec![0, 0, 1, 1],
+            edge_guides: BTreeMap::new(),
+            side_hints,
+            search_states: 1,
+        };
+        let input = CandidateInput {
+            scene: &scene,
+            options: &opts,
+            annotations: &annotations,
+            locks: &locks,
+            base_sizes: &base_sizes,
+            plan: Some(&plan),
+            previous: None,
+            spacing: 1.,
+        };
+        let expected_gap = (2. * opts.stub + 2. * opts.margin + 48.).max(96.) + 28.;
+        let built = build_plan_rects(&scene, &base_sizes, &plan, &opts, 1.);
+        assert!(
+            built[3].top() - built[1].bottom() >= expected_gap - 1e-3,
+            "build_plan_rects should reserve fold gap >= {expected_gap}, got b={:?}, d={:?}",
+            built[1],
+            built[3]
+        );
+        let (out, _, _) = solve_candidate_layout(&input).unwrap();
+        let rb = out.nodes["b"];
+        let rd = out.nodes["d"];
+        assert!(
+            (rd.y - rb.y).abs() >= expected_gap + rb.h * 0.5,
+            "cross-fold parallel bundle should not collapse b and d rows: b={rb:?}, d={rd:?}"
+        );
+    }
+
+    #[test]
+    fn labeled_parallel_bundle_reserves_wide_polygon_corridor() {
+        let opts = LayoutOptions::default();
+        let src = "a [shape: diamond]; b [shape: cache];\na -> b: retry;\na -> b: ack;\na -> b: read through;";
+        let scene = lower(&parse(src));
+        let out = layout(&scene, &opts, None).unwrap();
+        let ra = out.nodes["a"];
+        let rb = out.nodes["b"];
+        let req = parallel_bundle_corridor_width(&scene, ra, rb, 0, 1, true, &opts).unwrap();
+        assert!(
+            rb.left() - ra.right() >= req - 1e-3,
+            "expected corridor gap >= {req}, got a={ra:?}, b={rb:?}"
         );
     }
 }
