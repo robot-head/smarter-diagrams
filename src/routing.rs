@@ -270,16 +270,32 @@ fn route_crossings_and_overlaps(
     }
     (crossings, overlaps, crossed, cross_pts)
 }
-fn route_total_length(routes: &std::collections::BTreeMap<String, Route>) -> f64 {
-    routes
-        .values()
-        .map(|r| {
-            r.points
-                .windows(2)
-                .map(|p| p[0].distance(p[1]))
-                .sum::<f64>()
+fn is_perimeter_wrap(l: &Layout, e: &Edge, r: &Route) -> bool {
+    let c = coalesced(&r.points);
+    if c.len() < 8 {
+        return false;
+    }
+    let a = &l.ports[&port_key(e, true)];
+    let b = &l.ports[&port_key(e, false)];
+    let direct_manhattan = a.point.manhattan_distance(b.point);
+    polyline_length(&r.points) > 2.8 * direct_manhattan.max(120.) + 180.
+}
+fn perimeter_wrap_count(scene: &SceneGraph, l: &Layout) -> usize {
+    scene
+        .edges
+        .iter()
+        .filter(|e| {
+            l.routes
+                .get(&e.id)
+                .is_some_and(|r| is_perimeter_wrap(l, e, r))
         })
-        .sum()
+        .count()
+}
+fn polyline_length(points: &[Point]) -> f64 {
+    points.windows(2).map(|p| p[0].distance(p[1])).sum()
+}
+fn route_total_length(routes: &std::collections::BTreeMap<String, Route>) -> f64 {
+    routes.values().map(|r| polyline_length(&r.points)).sum()
 }
 #[allow(clippy::too_many_arguments)]
 fn route_single_edge(
@@ -453,6 +469,7 @@ fn route_single_edge(
             &congestion,
             o,
             history,
+            None,
         )?;
         let two = search_with_history(
             q,
@@ -463,11 +480,15 @@ fn route_single_edge(
             &congestion,
             o,
             history,
+            None,
         )?;
         one.push(q);
         one.extend(two.into_iter().skip(1));
         one
     } else {
+        let endpoint_bounds = endpoint_obstacles(scene, l, e, 0.)
+            .into_iter()
+            .reduce(Rect::union);
         search_with_history(
             a.stub,
             b.stub,
@@ -477,6 +498,7 @@ fn route_single_edge(
             &congestion,
             o,
             history,
+            endpoint_bounds,
         )
         .or_else(|error| balanced.clone().ok_or(error))?
     };
@@ -964,7 +986,10 @@ fn swap_edge_ports(
                             && g_cross <= cur_g_cross
                             && new_stub_c < old_stub_c
                             && new_tot_c < old_tot_c;
+                        let wrap_ok =
+                            perimeter_wrap_count(scene, &trial) <= perimeter_wrap_count(scene, l);
                         if (g_better || stub_better)
+                            && wrap_ok
                             && best_trial
                                 .as_ref()
                                 .is_none_or(|(_, bgo, bgc, btc, bsc, blen)| {
@@ -1084,11 +1109,14 @@ fn swap_edge_ports(
                                 let (g_cross, g_ovlp, _, _) =
                                     route_crossings_and_overlaps(scene, &run);
                                 let g_len = route_total_length(&run.routes);
-                                if (g_ovlp < cur_g_ovlp
-                                    || (g_ovlp == cur_g_ovlp
-                                        && (g_cross < cur_g_cross
-                                            || (g_cross == cur_g_cross
-                                                && g_len < cur_g_len - 32.))))
+                                let cur_wraps = perimeter_wrap_count(scene, l);
+                                let run_wraps = perimeter_wrap_count(scene, &run);
+                                if run_wraps <= cur_wraps
+                                    && (g_ovlp < cur_g_ovlp
+                                        || (g_ovlp == cur_g_ovlp
+                                            && (g_cross < cur_g_cross
+                                                || (g_cross == cur_g_cross
+                                                    && g_len < cur_g_len - 32.))))
                                     && best_slide.as_ref().is_none_or(|(_, bo, bc, bl)| {
                                         (g_ovlp, g_cross) < (*bo, *bc)
                                             || ((g_ovlp, g_cross) == (*bo, *bc)
@@ -1117,7 +1145,7 @@ fn swap_edge_ports(
     }
     total_swaps
 }
-fn route_conflict_counts(l: &Layout, edge_id: &str, pts: &[Point]) -> (usize, usize) {
+pub(crate) fn route_conflict_counts(l: &Layout, edge_id: &str, pts: &[Point]) -> (usize, usize) {
     let c = coalesced(pts);
     let mut cross = 0;
     let mut ovlp = 0;
@@ -1432,6 +1460,79 @@ pub fn route_all(
                     l.reused_routes = 0;
                 }
             }
+        }
+    }
+    if prior.is_none() && o.weights.crossing <= 2500. {
+        let mut local_o = o.clone();
+        local_o.weights.crossing = o.weights.crossing.min(360.);
+        let mut collapsed = false;
+        for &idx in &ordered_indices {
+            let e = &scene.edges[idx];
+            if effective_annotations(scene, &e.id, &e.annotations, o.variant.as_deref())
+                .iter()
+                .any(|a| a.name == "route")
+            {
+                continue;
+            }
+            let Some(old_route) = l.routes.get(&e.id).cloned() else {
+                continue;
+            };
+            if !is_perimeter_wrap(l, e, &old_route) {
+                continue;
+            }
+            let c = coalesced(&old_route.points);
+            let route_len = polyline_length(&old_route.points);
+            let a = &l.ports[&port_key(e, true)];
+            let b = &l.ports[&port_key(e, false)];
+            let direct_manhattan = a.point.manhattan_distance(b.point);
+            let (old_cross, _) = route_conflict_counts(l, &e.id, &old_route.points);
+            l.routes.remove(&e.id);
+            let accepted = match route_single_edge(
+                scene,
+                &local_o,
+                None,
+                l,
+                e,
+                &used_ports,
+                &pass1_history,
+                false,
+            ) {
+                Ok((cand, _)) => {
+                    let (new_cross, new_ovlp) = route_conflict_counts(l, &e.id, &cand.points);
+                    let new_len = polyline_length(&cand.points);
+                    let cand_c = coalesced(&cand.points);
+                    let allow_new_cross = new_cross <= old_cross
+                        || old_cross > 0
+                        || best_cross > 0
+                        || collapsed
+                        || route_len > 1050.;
+                    let cross_ok = new_cross <= old_cross + 1
+                        || (new_cross <= old_cross + 2
+                            && new_len + 600. < route_len
+                            && cand_c.len() + 4 <= c.len()
+                            && new_len <= 1.8 * direct_manhattan.max(120.));
+                    if route_is_valid(scene, l, e, &cand, o.margin)
+                        && new_ovlp == 0
+                        && allow_new_cross
+                        && cross_ok
+                        && cand_c.len() + 2 <= c.len()
+                        && new_len + 320. < route_len
+                    {
+                        l.routes.insert(e.id.clone(), cand);
+                        collapsed = true;
+                        true
+                    } else {
+                        false
+                    }
+                }
+                Err(_) => false,
+            };
+            if !accepted {
+                l.routes.insert(e.id.clone(), old_route);
+            }
+        }
+        if collapsed {
+            (best_cross, best_ovlp, _, _) = route_crossings_and_overlaps(scene, l);
         }
     }
     if best_cross > 0 || best_ovlp > 0 {
@@ -1864,7 +1965,30 @@ fn search(
         routed,
         o,
         &CongestionHistory::default(),
+        None,
     )
+}
+fn outside_corridor_len(p: Point, v: Point, corr: (f64, f64, f64, f64)) -> f64 {
+    let (cl, cr, ct, cb) = corr;
+    if (p.y - v.y).abs() < 1e-9 {
+        let len = (p.x - v.x).abs();
+        if p.y < ct - 1e-9 || p.y > cb + 1e-9 {
+            return len;
+        }
+        let sx0 = p.x.min(v.x);
+        let sx1 = p.x.max(v.x);
+        let inside = (sx1.min(cr) - sx0.max(cl)).max(0.);
+        (len - inside).max(0.)
+    } else {
+        let len = (p.y - v.y).abs();
+        if p.x < cl - 1e-9 || p.x > cr + 1e-9 {
+            return len;
+        }
+        let sy0 = p.y.min(v.y);
+        let sy1 = p.y.max(v.y);
+        let inside = (sy1.min(cb) - sy0.max(ct)).max(0.);
+        (len - inside).max(0.)
+    }
 }
 #[allow(clippy::too_many_arguments)]
 fn search_with_history(
@@ -1876,6 +2000,7 @@ fn search_with_history(
     routed: &Layout,
     o: &LayoutOptions,
     history: &CongestionHistory,
+    endpoint_bounds: Option<Rect>,
 ) -> Result<Vec<Point>, Error> {
     if obstacles
         .iter()
@@ -1885,8 +2010,21 @@ fn search_with_history(
             "a port stub lies inside an obstacle; increase node separation".into(),
         ));
     }
-    let base_cross = o.weights.crossing.max(2000.0);
+    let base_cross = o.weights.crossing;
     let segs = build_existing_segments(routed, base_cross, history);
+    let corridor_bounds = (!segs.is_empty() && o.weights.crossing <= 2500.).then(|| {
+        let mut min_x = start.x.min(target.x);
+        let mut max_x = start.x.max(target.x);
+        let mut min_y = start.y.min(target.y);
+        let mut max_y = start.y.max(target.y);
+        if let Some(ep) = endpoint_bounds {
+            min_x = min_x.min(ep.left());
+            max_x = max_x.max(ep.right());
+            min_y = min_y.min(ep.top());
+            max_y = max_y.max(ep.bottom());
+        }
+        (min_x - 72., max_x + 72., min_y - 72., max_y + 72.)
+    });
     // A clear straight segment with no crossing/overlap/T-junction attains the lower bound.
     let straight_dir = if (start.y - target.y).abs() < 1e-7 {
         Some(if target.x >= start.x { 0 } else { 2 })
@@ -2170,6 +2308,12 @@ fn search_with_history(
                     &step_ctx,
                     lane_segs.iter().map(|&k| &segs[k]),
                 );
+            }
+            if let Some(corr) = corridor_bounds {
+                let outside_px = outside_corridor_len(p, v, corr);
+                if outside_px > 0. {
+                    cost += 14.0 * (outside_px / o.grid.max(1.));
+                }
             }
             let g = q.g + cost;
             let state = j * 4 + nd;
@@ -3594,5 +3738,30 @@ mod detour_tests {
         assert!(retain_detour(&d.scene, &blocked, e, &prior, 8.).is_none());
         prior.routes.insert(e.id.clone(), path(&prior, e, -1000.));
         assert!(retain_detour(&d.scene, &d.layout, e, &prior, 8.).is_none());
+    }
+
+    #[test]
+    fn sparse_mesh_5eed1203_avoids_perimeter_wraps_and_overlaps() {
+        let src = include_str!("../tests/fixtures/quality/5eed1203-sparse-mesh.diagram");
+        let d = crate::compile(src).unwrap();
+        let (_, ovlp, _, _) = route_crossings_and_overlaps(&d.scene, &d.layout);
+        assert_eq!(ovlp, 0, "expected 0 collinear overlaps");
+        let max_detour = d
+            .layout
+            .routes
+            .values()
+            .filter_map(|r| {
+                let c = coalesced(&r.points);
+                if c.len() < 2 {
+                    return None;
+                }
+                let direct = c[0].manhattan_distance(c[c.len() - 1]);
+                (direct > 1e-6).then(|| polyline_length(&c) / direct)
+            })
+            .fold(0.0f64, f64::max);
+        assert!(
+            max_detour < 3.5,
+            "expected max coalesced route-to-port-Manhattan detour < 3.5, got {max_detour:.2}"
+        );
     }
 }

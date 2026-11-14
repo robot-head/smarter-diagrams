@@ -988,6 +988,8 @@ fn place_inner(
             })
         });
         let is_port = f.id.contains('#') && scene.edge(&f.id).is_none();
+        let core_left = extent.left();
+        let core_right = extent.right();
         if !is_port
             && (valid_cands.len() < 6 || shares_corridor)
             && f.position.is_none()
@@ -996,7 +998,8 @@ fn place_inner(
         {
             for mut c in nearby_callouts(f, scene) {
                 if is_valid_candidate(&c) {
-                    c.cost += crossed_penalty(&c);
+                    c.cost += crossed_penalty(&c)
+                        + horizontal_overhang_penalty(c.label.bounds, core_left, core_right);
                     valid_cands.push(c);
                 }
             }
@@ -1020,7 +1023,8 @@ fn place_inner(
                         prior.is_none(),
                         (port_box, leader_node_pad),
                     ) {
-                        c.cost += crossed_penalty(&c);
+                        c.cost += crossed_penalty(&c)
+                            + horizontal_overhang_penalty(c.label.bounds, core_left, core_right);
                         valid_cands.push(c);
                     }
                 }
@@ -1034,7 +1038,8 @@ fn place_inner(
         if f.position.is_none() && f.slot.as_deref() != Some("inline") && valid_cands.len() < 2 {
             for mut c in pocket_candidates(f, scene, l) {
                 if is_valid_candidate(&c) {
-                    c.cost += crossed_penalty(&c);
+                    c.cost += crossed_penalty(&c)
+                        + horizontal_overhang_penalty(c.label.bounds, core_left, core_right);
                     valid_cands.push(c);
                 }
             }
@@ -1090,7 +1095,10 @@ fn place_inner(
                             horizontal: true,
                             slide: 0.5,
                         },
-                        cost: 10000. + o.weights.pill + 4. * dist,
+                        cost: 10000.
+                            + o.weights.pill
+                            + 4. * dist
+                            + horizontal_overhang_penalty(bounds, core_left, core_right),
                     };
                     if best.as_ref().is_some_and(|b| b.cost <= c.cost) {
                         continue;
@@ -1134,7 +1142,12 @@ fn place_inner(
                                     horizontal,
                                     slide: t,
                                 },
-                                cost: 12000. + if knockout { o.weights.pill } else { 0. },
+                                cost: 12000.
+                                    + if knockout {
+                                        o.weights.pill
+                                    } else {
+                                        horizontal_overhang_penalty(bounds, core_left, core_right)
+                                    },
                             };
                             if is_valid_candidate(&c) {
                                 best = Some(c);
@@ -1373,10 +1386,35 @@ fn fan_caption(f: &Feature, scene: &SceneGraph, l: &Layout) -> Option<Candidate>
     }
     None
 }
+fn core_x_span(l: &Layout) -> (f64, f64) {
+    let mut left = f64::INFINITY;
+    let mut right = f64::NEG_INFINITY;
+    for r in l.nodes.values() {
+        left = left.min(r.left());
+        right = right.max(r.right());
+    }
+    for route in l.routes.values() {
+        for p in &route.points {
+            left = left.min(p.x);
+            right = right.max(p.x);
+        }
+    }
+    if left.is_finite() {
+        (left, right)
+    } else {
+        (0., 0.)
+    }
+}
+fn horizontal_overhang_penalty(bounds: Rect, core_left: f64, core_right: f64) -> f64 {
+    let left_over = (core_left - 16. - bounds.left()).max(0.);
+    let right_over = (bounds.right() - (core_right + 16.)).max(0.);
+    0.8 * (left_over + right_over)
+}
 fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> Vec<Candidate> {
     let w = feature_width(f, scene);
     let h = text_height(&f.text);
     let is_port = f.id.contains('#') && scene.edge(&f.id).is_none();
+    let (core_left, core_right) = core_x_span(l);
     let lengths: Vec<_> = f.route.windows(2).map(|p| p[0].distance(p[1])).collect();
     let total = lengths.iter().sum::<f64>().max(1.);
     let mut arc = 0.;
@@ -1395,7 +1433,7 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
             }
             let low = ((along / 2. + 4.) / len).min(0.5);
             let high = 1. - low;
-            let samples = if let Some(t) = f.slide {
+            let clamped_samples = if let Some(t) = f.slide {
                 vec![((t * total - arc) / len).clamp(low, high)]
             } else {
                 let mut s = Vec::new();
@@ -1416,27 +1454,46 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
                 }
                 s
             };
+            let tier1_samples = if f.slide.is_none() && len >= 48. {
+                let mut s = Vec::new();
+                for cand in [0.5, 0.35, 0.65, 0.25, 0.75]
+                    .into_iter()
+                    .chain(clamped_samples.iter().copied())
+                {
+                    if s.iter().all(|prev: &f64| (*prev - cand).abs() >= 1e-4) {
+                        s.push(cand);
+                    }
+                }
+                s
+            } else {
+                clamped_samples.clone()
+            };
             let has_start_arrow = i == 0 && edge_kind == Some(EdgeKind::Bidirectional);
             let has_end_arrow =
                 i + 1 == seg_count && edge_kind.is_some_and(|k| k != EdgeKind::Undirected);
             let pill_start_margin = if has_start_arrow { 16. } else { 12. };
             let pill_end_margin = if has_end_arrow { 16. } else { 12. };
             let explicit_inline = f.slot.as_deref() == Some("inline");
-            for t in samples {
-                let anchor = Point::new(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
-                for (side, extra) in [-1., 1., 0.].into_iter().flat_map(|side| {
-                    [0., 4., 8., 14.]
-                        .into_iter()
-                        .filter(move |extra| side != 0. || *extra == 0.)
-                        .map(move |extra| (side, extra))
-                }) {
-                    if let Some(slot) = &f.slot
-                        && ((slot == "above" && side != -1.)
-                            || (slot == "below" && side != 1.)
-                            || (slot == "inline" && side != 0.))
-                    {
-                        continue;
-                    }
+            for (side, extra) in [-1., 1., 0.].into_iter().flat_map(|side| {
+                [0., 4., 8., 16., 26.]
+                    .into_iter()
+                    .filter(move |extra| side != 0. || *extra == 0.)
+                    .map(move |extra| (side, extra))
+            }) {
+                if let Some(slot) = &f.slot
+                    && ((slot == "above" && side != -1.)
+                        || (slot == "below" && side != 1.)
+                        || (slot == "inline" && side != 0.))
+                {
+                    continue;
+                }
+                let samples = if side == 0. {
+                    &clamped_samples
+                } else {
+                    &tier1_samples
+                };
+                for &t in samples {
+                    let anchor = Point::new(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
                     let mut tight_pill = false;
                     if side == 0. && !explicit_inline {
                         // RFC-001 Tier 2 centered inline pill: require enough segment length and
@@ -1445,13 +1502,13 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
                             && t * len >= along / 2. + pill_start_margin - 1e-6
                             && (1. - t) * len >= along / 2. + pill_end_margin - 1e-6;
                         if !roomy {
-                            // Short segments may still carry a compact pill (8px margins,
-                            // arrowheads keep 14px) at a small premium over roomy pills; it
+                            // Short segments may still carry a compact pill (6px margins,
+                            // arrowheads keep 12px) at a small premium over roomy pills; it
                             // only wins where adjacent Tier 1 slots are blocked, and still
                             // outranks every Tier 3 callout.
-                            let pill_margin = 8.;
-                            let start = if has_start_arrow { 14. } else { pill_margin };
-                            let end = if has_end_arrow { 14. } else { pill_margin };
+                            let pill_margin = 6.;
+                            let start = if has_start_arrow { 12. } else { pill_margin };
+                            let end = if has_end_arrow { 12. } else { pill_margin };
                             if len < along + 2. * pill_margin
                                 || t * len < along / 2. + start - 1e-6
                                 || (1. - t) * len < along / 2. + end - 1e-6
@@ -1481,13 +1538,18 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
                         slide_cost.unwrap_or(0.)
                             + o.weights.pill
                             + o.weights.centeredness * centered
-                            + if tight_pill { 24. } else { 0. }
+                            + if tight_pill { 10. } else { 0. }
                     } else {
                         // Tier 1 (0..45): flush external adjacent slot along segment.
                         slide_cost.unwrap_or(4.)
                             + extra * 1.25
                             + o.weights.centeredness * centered
                             + if side > 0. { 1. } else { 0. }
+                            + if f.position.is_none() {
+                                horizontal_overhang_penalty(bounds, core_left, core_right)
+                            } else {
+                                0.
+                            }
                     };
                     out.push(Candidate {
                         label: LabelPlacement {
@@ -1634,6 +1696,7 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
         return out;
     }
     // Tier 3 (180 + 4.0 * dist): short callout leader <= 160px, preferring <= 96px.
+    let tier3_start = out.len();
     if f.slot.as_deref() != Some("inline") {
         for arc in [0.5, 0.35, 0.65] {
             let anchor = crate::render::at_arc(&f.route, arc);
@@ -1673,7 +1736,11 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
             }
         }
     }
-    let _ = l;
+    if f.position.is_none() {
+        for c in &mut out[tier3_start..] {
+            c.cost += horizontal_overhang_penalty(c.label.bounds, core_left, core_right);
+        }
+    }
     out
 }
 fn is_vertical_at_arc(route: &[Point], arc: f64) -> bool {
@@ -1878,8 +1945,17 @@ fn candidate_penalty(
             .count();
         pen += owner_escapes as f64 * 500.;
     }
-    if f.position.is_none() && c.label.callout {
-        let path = leader_path(&c.label);
+    if f.position.is_none()
+        && (c.label.callout || (!c.label.knockout && scene.edge(&f.id).is_some()))
+    {
+        let tether = [c.label.anchor, c.label.bounds.center()];
+        let path_storage;
+        let path: &[Point] = if c.label.callout {
+            path_storage = leader_path(&c.label);
+            &path_storage
+        } else {
+            &tether
+        };
         let foreign_crossings = l
             .routes
             .iter()
@@ -1894,21 +1970,23 @@ fn candidate_penalty(
             })
             .count();
         pen += foreign_crossings as f64 * 600.;
-        let container_punches = scene
-            .nodes
-            .iter()
-            .filter(|n| {
-                n.container && {
-                    let r = l.nodes[&n.id];
-                    path.windows(2)
-                        .any(|lp| r.contains(lp[0]) != r.contains(lp[1]))
-                }
-            })
-            .count();
-        pen += container_punches as f64 * 240.;
-        if prior_none {
-            let leader_len: f64 = path.windows(2).map(|p| p[0].distance(p[1])).sum();
-            pen += 0.8 * leader_len;
+        if c.label.callout {
+            let container_punches = scene
+                .nodes
+                .iter()
+                .filter(|n| {
+                    n.container && {
+                        let r = l.nodes[&n.id];
+                        path.windows(2)
+                            .any(|lp| r.contains(lp[0]) != r.contains(lp[1]))
+                    }
+                })
+                .count();
+            pen += container_punches as f64 * 240.;
+            if prior_none {
+                let leader_len: f64 = path.windows(2).map(|p| p[0].distance(p[1])).sum();
+                pen += 0.8 * leader_len;
+            }
         }
     }
     pen
@@ -2190,6 +2268,7 @@ fn retry_component(
     by_feature: &mut [Vec<usize>],
     all: &mut Vec<Candidate>,
 ) -> Vec<usize> {
+    let (core_left, core_right) = core_x_span(l);
     let attempts: [(&[f64], f64, f64); 2] = [
         (&[36., 56., 80., 96., 120., 144., 158.], 8., 4.),
         (&[28., 44., 64., 88., 112., 136., 152., 159.], 2., 0.),
@@ -2221,7 +2300,8 @@ fn retry_component(
                     .iter()
                     .all(|&sel| !conflict(&all[sel].label, &c.label))
                 {
-                    c.cost += candidate_penalty(&c, f, scene, l, prior_none);
+                    c.cost += candidate_penalty(&c, f, scene, l, prior_none)
+                        + horizontal_overhang_penalty(c.label.bounds, core_left, core_right);
                     by_feature[fi].push(all.len());
                     all.push(c);
                     added += 1;
@@ -2801,6 +2881,13 @@ fn polish(labels: &mut [LabelPlacement], scene: &SceneGraph, l: &Layout, o: &Lay
     }
 }
 
+pub(crate) fn interior_micro_jog_count(pts: &[Point], threshold: f64) -> usize {
+    let c = crate::routing::coalesced(pts);
+    (1..c.len().saturating_sub(2))
+        .filter(|&k| c[k].distance(c[k + 1]) < threshold)
+        .count()
+}
+
 /// Polish safe floating route lanes after discrete label selection. The line search is followed
 /// by exact obstacle/label checks, so a smooth approximation never weakens hard geometry.
 pub fn polish_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
@@ -2954,15 +3041,45 @@ pub fn polish_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
         }
         energy
     });
+    let threshold = o.grid.max(1.) - 1e-6;
+    let mut edge_lanes: std::collections::BTreeMap<&str, Vec<usize>> =
+        std::collections::BTreeMap::new();
+    for (li, lane) in lanes.iter().enumerate() {
+        edge_lanes.entry(lane.edge.as_str()).or_default().push(li);
+    }
     let mut candidate = l.clone();
-    for (lane, delta) in lanes.iter().zip(result) {
-        let route = candidate.routes.get_mut(&lane.edge).unwrap();
-        for point in &mut route.points[lane.index..=lane.index + 1] {
-            if lane.horizontal {
-                point.y += delta;
-            } else {
-                point.x += delta;
+    for (edge_id, idxs) in edge_lanes {
+        let Some(orig_route) = l.routes.get(edge_id) else {
+            continue;
+        };
+        let Some(edge) = scene.edges.iter().find(|e| e.id == edge_id) else {
+            continue;
+        };
+        let before_count = interior_micro_jog_count(&orig_route.points, threshold);
+        let mut accepted = None;
+        for scale in [1.0, 0.5, 0.25] {
+            let mut trial = orig_route.clone();
+            for &li in &idxs {
+                let lane = &lanes[li];
+                let delta = result[li] * scale;
+                for point in &mut trial.points[lane.index..=lane.index + 1] {
+                    if lane.horizontal {
+                        point.y += delta;
+                    } else {
+                        point.x += delta;
+                    }
+                }
             }
+            if interior_micro_jog_count(&trial.points, threshold) <= before_count
+                && crate::routing::route_is_valid(scene, &candidate, edge, &trial, o.margin)
+                && crate::routing::route_conflict_counts(&candidate, edge_id, &trial.points).1 == 0
+            {
+                accepted = Some(trial);
+                break;
+            }
+        }
+        if let Some(trial) = accepted {
+            candidate.routes.insert(edge_id.to_string(), trial);
         }
     }
     if crate::layout::validate(scene, &candidate, o).is_err() {
@@ -3212,5 +3329,199 @@ n0 -> n6: ack
             "place on 28-edge DAG took {:?}, expected < 200ms",
             elapsed
         );
+    }
+
+    #[test]
+    fn polish_channels_preserves_micro_jog_counts_and_fuzz_dag_4_has_zero_lint_jogs() {
+        let o = LayoutOptions::default();
+        let threshold = o.grid.max(1.) - 1e-6;
+        let no_polish = LayoutOptions {
+            polish_steps: 0,
+            ..o.clone()
+        };
+        let fixtures = [
+            (
+                "examples/ports.diagram",
+                include_str!("../examples/ports.diagram"),
+            ),
+            (
+                "examples/multi-slot-records.diagram",
+                include_str!("../examples/multi-slot-records.diagram"),
+            ),
+            (
+                "tests/fixtures/quality/09-many-record-slots.diagram",
+                include_str!("../tests/fixtures/quality/09-many-record-slots.diagram"),
+            ),
+            (
+                "tests/fixtures/quality/5eed1203-sparse-mesh.diagram",
+                include_str!("../tests/fixtures/quality/5eed1203-sparse-mesh.diagram"),
+            ),
+        ];
+        for (name, src) in fixtures {
+            let pre = crate::compile_with(src, &no_polish, None).unwrap();
+            let post = crate::compile(src).unwrap();
+            let mut polished = pre.layout.clone();
+            let mut lbls = pre.layout.labels.clone();
+            polish(&mut lbls, &pre.scene, &pre.layout, &o);
+            polished.labels = lbls;
+            polish_channels(&pre.scene, &o, &mut polished);
+            for (eid, post_route) in &post.layout.routes {
+                let pre_count = pre
+                    .layout
+                    .routes
+                    .get(eid)
+                    .map_or(0, |r| interior_micro_jog_count(&r.points, threshold));
+                let post_count = interior_micro_jog_count(&post_route.points, threshold);
+                assert!(
+                    post_count <= pre_count,
+                    "{name} edge {eid}: post_polish ({post_count}) > pre_polish ({pre_count})"
+                );
+                let direct_count = polished
+                    .routes
+                    .get(eid)
+                    .map_or(0, |r| interior_micro_jog_count(&r.points, threshold));
+                assert!(
+                    direct_count <= pre_count,
+                    "{name} edge {eid}: direct polish_channels ({direct_count}) > pre_polish ({pre_count})"
+                );
+            }
+        }
+
+        // Exact `fuzz-dag-4` generated by `scripts/layout-audit.cjs:51-62` (seed `0x5eedc0de`).
+        let fuzz_dag_4 = "\
+n0: \"API 0\" [shape: cache]
+n1: \"Worker 1\" [shape: rect]
+n2: \"Event log 2\" [shape: queue]
+n3: \"地域ゲートウェイ 3\" [shape: diamond]
+n4: \"Cache 4\" [shape: cache]
+n5: \"Validate request 5\" [shape: diamond]
+n6: \"地域ゲートウェイ 6\" [shape: diamond]
+n7: \"地域ゲートウェイ 7\" [shape: rect]
+n0 -> n1: send
+n1 -> n2: retry
+n2 -> n3: retry
+n3 -> n4: read through
+n4 -> n5: read through
+n5 -> n6: ack
+n6 -> n7: read through
+n1 -> n4: validate organization access
+n1 -> n6: validate organization access
+n1 -> n7: 
+n4 -> n7: read through
+n5 -> n7: validate organization access
+";
+        let d_fuzz = crate::compile(fuzz_dag_4).unwrap();
+        let jog_findings: Vec<_> = crate::lint::lint(&d_fuzz)
+            .into_iter()
+            .filter(|f| f.code == "micro-jog")
+            .collect();
+        assert!(
+            jog_findings.is_empty(),
+            "expected 0 <12px micro-jog findings on fuzz-dag-4, got {jog_findings:?}"
+        );
+    }
+
+    #[test]
+    fn polish_channels_synthetic_guard_blocks_new_micro_jogs() {
+        let src = "\
+a @pin(grid: 0, 0)
+b @pin(grid: 24, 0)
+c @pin(grid: 0, 12)
+d @pin(grid: 24, 12)
+e @pin(grid: 0, 24)
+f @pin(grid: 24, 24)
+a.E -> b.W
+c.E -> d.W
+e.E -> f.W: push
+";
+        let mut diag = crate::compile(src).unwrap();
+        let o = LayoutOptions::default();
+        let threshold = o.grid.max(1.) - 1e-6;
+        let ab_pts = &diag.layout.routes["a->b"].points;
+        let a_port = ab_pts[0];
+        let b_port = *ab_pts.last().unwrap();
+        let x0 = a_port.x;
+        let x1 = b_port.x;
+        let xm = ((x0 + 16.) + (x1 - 16.)) * 0.5;
+        let y0 = a_port.y;
+        // Guarded route: `16.0px` vertical and return steps (`0` micro-jogs); any downward shift
+        // on `y0 - 32.` shrinks `|(y0 - 32.) - (y0 - 16.)| = 16.0` below `threshold`.
+        diag.layout.routes.insert(
+            "a->b".into(),
+            Route {
+                edge: "a->b".into(),
+                points: vec![
+                    Point::new(x0, y0),
+                    Point::new(x0 + 16., y0),
+                    Point::new(x0 + 16., y0 - 32.),
+                    Point::new(xm, y0 - 32.),
+                    Point::new(xm, y0 - 16.),
+                    Point::new(x1 - 16., y0 - 16.),
+                    Point::new(x1 - 16., y0),
+                    Point::new(x1, y0),
+                ],
+            },
+        );
+        // Safe peer route: `32.0px` vertical step (`0` micro-jogs) that can move freely without
+        // creating a `< 16px` segment.
+        let cd_pts = &diag.layout.routes["c->d"].points;
+        let c_port = cd_pts[0];
+        let d_port = *cd_pts.last().unwrap();
+        let cxm = ((c_port.x + 16.) + (d_port.x - 16.)) * 0.5;
+        let cy0 = c_port.y;
+        diag.layout.routes.insert(
+            "c->d".into(),
+            Route {
+                edge: "c->d".into(),
+                points: vec![
+                    Point::new(c_port.x, cy0),
+                    Point::new(c_port.x + 16., cy0),
+                    Point::new(c_port.x + 16., cy0 - 32.),
+                    Point::new(cxm, cy0 - 32.),
+                    Point::new(cxm, cy0),
+                    Point::new(d_port.x - 16., cy0),
+                    Point::new(d_port.x, cy0),
+                ],
+            },
+        );
+        // Add two foreign labels derived from `e->f` (`6.5px` above each route's `i=2` lane) so
+        // `polish_channels` runs L-BFGS actively and pushes both lanes downward while passing hard
+        // `6.0px` label clearance.
+        let push_label = diag
+            .layout
+            .labels
+            .iter()
+            .find(|l| l.feature == "e->f")
+            .cloned()
+            .unwrap();
+        let mut lbl_a = push_label.clone();
+        lbl_a.bounds = Rect::new((x0 + 16. + xm) * 0.5, y0 - 48.5, 48., 20.);
+        let mut lbl_c = push_label;
+        lbl_c.bounds = Rect::new((c_port.x + 16. + cxm) * 0.5, cy0 - 48.5, 48., 20.);
+        diag.layout.labels.retain(|l| l.feature != "e->f");
+        diag.layout.labels.push(lbl_a);
+        diag.layout.labels.push(lbl_c);
+        assert!(crate::layout::validate(&diag.scene, &diag.layout, &o).is_ok());
+        assert_eq!(
+            interior_micro_jog_count(&diag.layout.routes["a->b"].points, threshold),
+            0
+        );
+        polish_channels(&diag.scene, &o, &mut diag.layout);
+        let pts_ab = &diag.layout.routes["a->b"].points;
+        assert_eq!(
+            interior_micro_jog_count(pts_ab, threshold),
+            0,
+            "polish_channels introduced a <16px interior micro-jog: {pts_ab:?}"
+        );
+        assert!(
+            (pts_ab[2].y - (y0 - 32.)).abs() < 1e-9,
+            "expected guarded segment to hold exact 16px step instead of shrinking: {pts_ab:?}"
+        );
+        let pts_cd = &diag.layout.routes["c->d"].points;
+        assert!(
+            pts_cd[2].y > cy0 - 32. + 1e-3,
+            "expected unguarded 32px peer lane to polish downward cleanly: {pts_cd:?}"
+        );
+        assert_eq!(interior_micro_jog_count(pts_cd, threshold), 0);
     }
 }
