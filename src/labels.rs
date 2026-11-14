@@ -43,7 +43,7 @@ fn envelope(r: Rect) -> AABB<[f64; 2]> {
 }
 fn clearance(label: &LabelPlacement) -> Rect {
     label.bounds.inflate(if label.knockout && !label.callout {
-        5.
+        3.
     } else {
         2.
     })
@@ -791,72 +791,10 @@ fn place_inner(
                 }
             }
         }
-        let crossed_penalty = |c: &Candidate| {
-            let mut pen = if f
-                .crossed
-                .iter()
-                .any(|id| l.nodes[id].intersects(c.label.bounds))
-            {
-                48.
-            } else {
-                0.
-            };
-            if f.position.is_none() && scene.edge(&f.id).is_some() {
-                let owner_escapes = f
-                    .ignore
-                    .iter()
-                    .filter(|id| {
-                        scene.node(id).is_some_and(|n| n.container)
-                            && !l.nodes[*id].inflate(-4.).encloses(c.label.bounds)
-                    })
-                    .count();
-                pen += owner_escapes as f64 * 500.;
-            }
-            if f.position.is_none() && c.label.callout {
-                let path = leader_path(&c.label);
-                let foreign_crossings = l
-                    .routes
-                    .iter()
-                    .filter(|(oid, oroute)| {
-                        *oid != &f.id
-                            && path.windows(2).any(|lp| {
-                                oroute
-                                    .points
-                                    .windows(2)
-                                    .any(|rp| segments_intersect(lp[0], lp[1], rp[0], rp[1]))
-                            })
-                    })
-                    .count();
-                pen += foreign_crossings as f64 * 600.;
-                let container_punches = scene
-                    .nodes
-                    .iter()
-                    .filter(|n| {
-                        n.container && {
-                            let r = l.nodes[&n.id];
-                            path.windows(2)
-                                .any(|lp| r.contains(lp[0]) != r.contains(lp[1]))
-                        }
-                    })
-                    .count();
-                pen += container_punches as f64 * 240.;
-                if prior.is_none() {
-                    let leader_len: f64 = path.windows(2).map(|p| p[0].distance(p[1])).sum();
-                    pen += 0.8 * leader_len;
-                }
-            }
-            pen
-        };
+        let crossed_penalty =
+            |c: &Candidate| candidate_penalty(c, f, scene, l, prior.is_none());
         let is_valid_candidate = |c: &Candidate| {
-            let stable_leader = prior.is_none()
-                || !leader_path(&c.label).windows(2).any(|p| {
-                    scene.nodes.iter().any(|n| {
-                        !f.ignore.contains(&n.id)
-                            && !f.crossed.contains(&n.id)
-                            && segment_hits(p[0], p[1], l.nodes[&n.id].inflate(4.))
-                    })
-                });
-            stable_leader && valid(&c.label, f, scene, l, &node_index)
+            candidate_valid(c, f, scene, l, &node_index, prior.is_none(), (8., 4.))
         };
         let mut ids = Vec::new();
         for mut c in candidates {
@@ -906,6 +844,34 @@ fn place_inner(
                     c.cost += crossed_penalty(&c);
                     ids.push(all.len());
                     all.push(c);
+                }
+            }
+        }
+        if f.position.is_none()
+            && f.slot.as_deref() != Some("inline")
+            && (ids.is_empty() || (ids.len() < 2 && f.slot.is_none() && f.slide.is_none()))
+        {
+            for (radii, port_box, leader_node_pad) in [
+                (&[28., 44., 64., 88., 112., 136., 152., 159.][..], 8., 4.),
+                (&[28., 44., 64., 88., 112., 136., 152., 159.][..], 2., 0.),
+            ] {
+                for mut c in dense_callout_ring(f, scene, radii) {
+                    if candidate_valid(
+                        &c,
+                        f,
+                        scene,
+                        l,
+                        &node_index,
+                        prior.is_none(),
+                        (port_box, leader_node_pad),
+                    ) {
+                        c.cost += crossed_penalty(&c);
+                        ids.push(all.len());
+                        all.push(c);
+                    }
+                }
+                if !ids.is_empty() {
+                    break;
                 }
             }
         }
@@ -1029,7 +995,20 @@ fn place_inner(
             }
         }
         component.sort_by_key(|i| by_feature[*i].len());
-        let solution = select_component(&component, &by_feature, &all, &conflicts);
+        let mut solution = select_component(&component, &by_feature, &all, &conflicts);
+        if solution.len() != component.len() {
+            solution = retry_component(
+                &component,
+                &features,
+                scene,
+                l,
+                &node_index,
+                prior.is_none(),
+                &selected,
+                &mut by_feature,
+                &mut all,
+            );
+        }
         if solution.len() != component.len() {
             return Err(Error::Layout(
                 "no feasible label position for complete caption assignment".into(),
@@ -1242,8 +1221,10 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
             arc += len;
         }
     }
-    // Restrict port captions strictly to 4 tight Imhof corner quadrants (4..14px
-    // outside port along face normal, inside owning container).
+    // Restrict port captions primarily to 4 tight Imhof corner quadrants (4..14px
+    // outside port along face normal, inside owning container), adding outward
+    // normal stagger and short Tier 3 callouts when tightly stacked port routes
+    // block every adjacent offset.
     if is_port && f.route.len() == 2 {
         let wall = f.route[0];
         let anchor = f.route[1];
@@ -1251,51 +1232,115 @@ fn generate(f: &Feature, o: &LayoutOptions, l: &Layout, scene: &SceneGraph) -> V
         let dy_axis = anchor.y - wall.y;
         let nx = if dx_axis.abs() > 1e-6 { dx_axis.signum() } else { 0. };
         let ny = if dy_axis.abs() > 1e-6 { dy_axis.signum() } else { 0. };
-        for (origin, origin_cost, extras) in [
-            (wall, 0., &[0., 16., 32., 48.][..]),
-            (anchor, 12., &[0., 16., 32.][..]),
+        let owner_pen = |b: Rect| {
+            let escapes = f
+                .ignore
+                .iter()
+                .filter(|id| {
+                    scene.node(id).is_some_and(|n| n.container)
+                        && !l.nodes[*id].inflate(-2.).encloses(b)
+                })
+                .count();
+            escapes as f64 * 500.
+        };
+        for (origin, origin_cost, normal_extras) in [
+            (wall, 0., &[0., 20., 40., 68., 100., 136.][..]),
+            (anchor, 14., &[0., 24., 52., 84.][..]),
         ] {
-            for &extra in extras {
-                for gap in [6., 4., 10., 14.] {
-                    for (dx, dy, qcost) in [(1., -1., 0.), (-1., -1., 1.), (1., 1., 2.), (-1., 1., 3.)] {
-                        let inward = (nx != 0. && dx * nx < 0.) || (ny != 0. && dy * ny < 0.);
-                        if inward && origin_cost > 0. {
-                            continue;
+            for &n_extra in normal_extras {
+                let along_steps: &[f64] = if origin_cost == 0. && n_extra == 0. {
+                    &[0., 16., 32., 48., 72., 96., 120.]
+                } else if n_extra <= 40. {
+                    &[0., 16., 32., 48.]
+                } else {
+                    &[0., 24.]
+                };
+                for &along in along_steps {
+                    for gap in [6., 8., 10., 12., 14.] {
+                        for (dx, dy, qcost) in
+                            [(1., -1., 0.), (-1., -1., 1.), (1., 1., 2.), (-1., 1., 3.)]
+                        {
+                            let inward = (nx != 0. && dx * nx < 0.) || (ny != 0. && dy * ny < 0.);
+                            if inward && (origin_cost > 0. || n_extra > 0.) {
+                                continue;
+                            }
+                            let x_gap = if nx != 0. {
+                                gap + n_extra
+                            } else {
+                                6. + along
+                            };
+                            let y_gap = if ny != 0. {
+                                gap + n_extra
+                            } else {
+                                6. + along
+                            };
+                            let bounds = Rect::new(
+                                origin.x + dx * (w / 2. + x_gap),
+                                origin.y + dy * (h / 2. + y_gap),
+                                w,
+                                h,
+                            );
+                            if (n_extra > 0. || along > 16.)
+                                && bounds.center().distance(anchor) > 158.
+                            {
+                                continue;
+                            }
+                            let inward_penalty = if inward { 24. } else { 0. };
+                            out.push(Candidate {
+                                label: LabelPlacement {
+                                    feature: f.id.clone(),
+                                    text: f.text.clone(),
+                                    bounds,
+                                    anchor,
+                                    knockout: false,
+                                    callout: false,
+                                    orthogonal_leader: false,
+                                    horizontal: true,
+                                    slide: 0.5,
+                                },
+                                cost: origin_cost
+                                    + inward_penalty
+                                    + qcost
+                                    + (gap - 6.).abs() * 0.5
+                                    + n_extra * 0.45
+                                    + along * 0.6
+                                    + owner_pen(bounds),
+                            });
                         }
-                        let x_gap = if nx != 0. { gap } else { 6. + extra };
-                        let y_gap = if ny != 0. { gap } else { 6. + extra };
-                        let bounds = Rect::new(
-                            origin.x + dx * (w / 2. + x_gap),
-                            origin.y + dy * (h / 2. + y_gap),
-                            w,
-                            h,
-                        );
-                        let inside_owner = f.ignore.iter().all(|id| {
-                            !scene.node(id).is_some_and(|n| n.container)
-                                || l.nodes[id].inflate(-2.).encloses(bounds)
-                        });
-                        let owner_penalty = if inside_owner { 0. } else { 500. };
-                        let inward_penalty = if inward { 24. } else { 0. };
-                        out.push(Candidate {
-                            label: LabelPlacement {
-                                feature: f.id.clone(),
-                                text: f.text.clone(),
-                                bounds,
-                                anchor,
-                                knockout: false,
-                                callout: false,
-                                orthogonal_leader: false,
-                                horizontal: true,
-                                slide: 0.5,
-                            },
-                            cost: origin_cost
-                                + inward_penalty
-                                + qcost
-                                + (gap - 6.).abs() * 0.5
-                                + extra
-                                + owner_penalty,
-                        });
                     }
+                }
+            }
+        }
+        // Fallback Tier 3 short callout candidates only if all non-callout slots collide.
+        for radius in [36., 56., 80., 104., 128., 156.] {
+            for k in 0..12 {
+                let angle = (k as f64) * std::f64::consts::TAU / 12.;
+                let dx = angle.cos();
+                let dy = angle.sin();
+                let bounds = Rect::new(anchor.x + dx * radius, anchor.y + dy * radius, w, h);
+                let dist = bounds.center().distance(anchor);
+                if dist > 160. {
+                    continue;
+                }
+                for (orthogonal, extra_cost) in [(false, 0.), (true, 2.)] {
+                    out.push(Candidate {
+                        label: LabelPlacement {
+                            feature: f.id.clone(),
+                            text: f.text.clone(),
+                            bounds,
+                            anchor,
+                            knockout: false,
+                            callout: true,
+                            orthogonal_leader: orthogonal,
+                            horizontal: dx.abs() >= dy.abs(),
+                            slide: 0.5,
+                        },
+                        cost: 240.
+                            + extra_cost
+                            + 4. * dist
+                            + if dist > 96. { 40. } else { 0. }
+                            + owner_pen(bounds),
+                    });
                 }
             }
         }
@@ -1395,12 +1440,248 @@ fn nearby_callouts(f: &Feature, scene: &SceneGraph) -> Vec<Candidate> {
     }
     out
 }
+fn candidate_penalty(
+    c: &Candidate,
+    f: &Feature,
+    scene: &SceneGraph,
+    l: &Layout,
+    prior_none: bool,
+) -> f64 {
+    let mut pen = if f
+        .crossed
+        .iter()
+        .any(|id| l.nodes[id].intersects(c.label.bounds))
+    {
+        48.
+    } else {
+        0.
+    };
+    if f.position.is_none() {
+        let inset = if scene.edge(&f.id).is_some() { -4. } else { -2. };
+        let owner_escapes = f
+            .ignore
+            .iter()
+            .filter(|id| {
+                scene.node(id).is_some_and(|n| n.container)
+                    && !l.nodes[*id].inflate(inset).encloses(c.label.bounds)
+            })
+            .count();
+        pen += owner_escapes as f64 * 500.;
+    }
+    if f.position.is_none() && c.label.callout {
+        let path = leader_path(&c.label);
+        let foreign_crossings = l
+            .routes
+            .iter()
+            .filter(|(oid, oroute)| {
+                *oid != &f.id
+                    && path.windows(2).any(|lp| {
+                        oroute
+                            .points
+                            .windows(2)
+                            .any(|rp| segments_intersect(lp[0], lp[1], rp[0], rp[1]))
+                    })
+            })
+            .count();
+        pen += foreign_crossings as f64 * 600.;
+        let container_punches = scene
+            .nodes
+            .iter()
+            .filter(|n| {
+                n.container && {
+                    let r = l.nodes[&n.id];
+                    path.windows(2)
+                        .any(|lp| r.contains(lp[0]) != r.contains(lp[1]))
+                }
+            })
+            .count();
+        pen += container_punches as f64 * 240.;
+        if prior_none {
+            let leader_len: f64 = path.windows(2).map(|p| p[0].distance(p[1])).sum();
+            pen += 0.8 * leader_len;
+        }
+    }
+    pen
+}
+fn candidate_valid(
+    c: &Candidate,
+    f: &Feature,
+    scene: &SceneGraph,
+    l: &Layout,
+    index: &RTree<Indexed>,
+    prior_none: bool,
+    (port_box, leader_node_pad): (f64, f64),
+) -> bool {
+    let stable_leader = prior_none
+        || !leader_path(&c.label).windows(2).any(|p| {
+            scene.nodes.iter().any(|n| {
+                !f.ignore.contains(&n.id)
+                    && !f.crossed.contains(&n.id)
+                    && segment_hits(p[0], p[1], l.nodes[&n.id].inflate(leader_node_pad))
+            })
+        });
+    stable_leader && valid_with_port_box(&c.label, f, scene, l, index, port_box)
+}
+fn dense_callout_ring(f: &Feature, scene: &SceneGraph, radii: &[f64]) -> Vec<Candidate> {
+    let w = feature_width(f, scene);
+    let h = text_height(&f.text);
+    let is_port = f.id.contains('#') && scene.edge(&f.id).is_none();
+    let mut out = Vec::new();
+    let anchors: Vec<(f64, Point)> = if is_port && f.route.len() == 2 {
+        vec![(0.5, f.route[1])]
+    } else {
+        [0.5, 0.35, 0.65, 0.2, 0.8]
+            .into_iter()
+            .map(|arc| (arc, crate::render::at_arc(&f.route, arc)))
+            .collect()
+    };
+    for (arc, anchor) in anchors {
+        for &radius in radii {
+            for k in 0..12 {
+                let angle = (k as f64) * std::f64::consts::TAU / 12.;
+                let dx = angle.cos();
+                let dy = angle.sin();
+                let bounds = Rect::new(anchor.x + dx * radius, anchor.y + dy * radius, w, h);
+                let dist = bounds.center().distance(anchor);
+                if dist > 160. {
+                    continue;
+                }
+                for (orthogonal, extra_cost) in [(false, 0.), (true, 2.)] {
+                    out.push(Candidate {
+                        label: LabelPlacement {
+                            feature: f.id.clone(),
+                            text: f.text.clone(),
+                            bounds,
+                            anchor,
+                            knockout: false,
+                            callout: true,
+                            orthogonal_leader: orthogonal,
+                            horizontal: dx.abs() >= dy.abs(),
+                            slide: arc,
+                        },
+                        cost: 200.
+                            + extra_cost
+                            + 4. * dist
+                            + if dist > 96. { 40. } else { 0. }
+                            + (arc - 0.5).abs() * 12.,
+                    });
+                }
+            }
+        }
+    }
+    out
+}
+#[allow(clippy::too_many_arguments)]
+fn retry_component(
+    component: &[usize],
+    features: &[Feature],
+    scene: &SceneGraph,
+    l: &Layout,
+    node_index: &RTree<Indexed>,
+    prior_none: bool,
+    already_selected: &[usize],
+    by_feature: &mut [Vec<usize>],
+    all: &mut Vec<Candidate>,
+) -> Vec<usize> {
+    let attempts: [(&[f64], f64, f64); 2] = [
+        (&[36., 56., 80., 96., 120., 144., 158.], 8., 4.),
+        (&[28., 44., 64., 88., 112., 136., 152., 159.], 2., 0.),
+    ];
+    for (radii, port_box, leader_node_pad) in attempts {
+        for &fi in component {
+            let f = &features[fi];
+            if f.position.is_some() {
+                continue;
+            }
+            for mut c in dense_callout_ring(f, scene, radii) {
+                if candidate_valid(
+                    &c,
+                    f,
+                    scene,
+                    l,
+                    node_index,
+                    prior_none,
+                    (port_box, leader_node_pad),
+                ) && already_selected
+                    .iter()
+                    .all(|&sel| !conflict(&all[sel].label, &c.label))
+                {
+                    c.cost += candidate_penalty(&c, f, scene, l, prior_none);
+                    by_feature[fi].push(all.len());
+                    all.push(c);
+                }
+            }
+            let min_cost = by_feature[fi]
+                .iter()
+                .map(|id| all[*id].cost)
+                .reduce(f64::min)
+                .unwrap_or(0.);
+            if min_cost < 0. {
+                for &id in &by_feature[fi] {
+                    all[id].cost -= min_cost;
+                }
+            }
+            for &id in &by_feature[fi] {
+                if all[id].cost < 0. {
+                    all[id].cost = 0.;
+                }
+            }
+            by_feature[fi].sort_by(|a, b| all[*a].cost.total_cmp(&all[*b].cost));
+        }
+        let mut comp_entries = Vec::new();
+        for &fi in component {
+            for &id in &by_feature[fi] {
+                comp_entries.push(Indexed {
+                    id,
+                    bounds: footprint(&all[id].label),
+                });
+            }
+        }
+        let mut owner = std::collections::BTreeMap::new();
+        for &fi in component {
+            for &id in &by_feature[fi] {
+                owner.insert(id, fi);
+            }
+        }
+        let comp_index = RTree::bulk_load(comp_entries);
+        let mut local_conflicts = vec![BTreeSet::new(); all.len()];
+        for &fi in component {
+            for &id in &by_feature[fi] {
+                let fp = footprint(&all[id].label);
+                for hit in comp_index.locate_in_envelope_intersecting(&envelope(fp)) {
+                    if owner.get(&hit.id) != Some(&fi)
+                        && conflict(&all[id].label, &all[hit.id].label)
+                    {
+                        local_conflicts[id].insert(hit.id);
+                    }
+                }
+            }
+        }
+        let mut sorted = component.to_vec();
+        sorted.sort_by_key(|fi| by_feature[*fi].len());
+        let sol = select_component(&sorted, by_feature, all, &local_conflicts);
+        if sol.len() == component.len() {
+            return sol;
+        }
+    }
+    Vec::new()
+}
 fn valid(
     label: &LabelPlacement,
     f: &Feature,
     scene: &SceneGraph,
     l: &Layout,
     index: &RTree<Indexed>,
+) -> bool {
+    valid_with_port_box(label, f, scene, l, index, 8.)
+}
+fn valid_with_port_box(
+    label: &LabelPlacement,
+    f: &Feature,
+    scene: &SceneGraph,
+    l: &Layout,
+    index: &RTree<Indexed>,
+    port_box: f64,
 ) -> bool {
     let r = clearance(label);
     for hit in index.locate_in_envelope_intersecting(&envelope(footprint(label))) {
@@ -1442,9 +1723,10 @@ fn valid(
             return false;
         }
     }
-    if l.ports
-        .values()
-        .any(|p| r.intersects(Rect::new(p.point.x, p.point.y, 8., 8.)))
+    if port_box > 0.
+        && l.ports
+            .values()
+            .any(|p| r.intersects(Rect::new(p.point.x, p.point.y, port_box, port_box)))
     {
         return false;
     }
@@ -1585,7 +1867,7 @@ fn select_component(
             Vec::new()
         },
         cost,
-        budget: 40000,
+        budget: 150000,
     };
     search.visit(component, 0., &mut Vec::new());
     search.best
@@ -2117,5 +2399,25 @@ a#p3 -> b#q3
         .unwrap();
         assert!(crate::layout::validate(&diag.scene, &diag.layout, &LayoutOptions::default()).is_ok());
         assert!(diag.layout.labels.iter().all(|l| !l.callout));
+    }
+
+    #[test]
+    fn stacked_ports_and_16px_record_lanes_assign_completely() {
+        let records = crate::compile(include_str!(
+            "../tests/fixtures/quality/09-many-record-slots.diagram"
+        ))
+        .unwrap();
+        assert!(crate::layout::validate(&records.scene, &records.layout, &LayoutOptions::default()).is_ok());
+        assert!(
+            records.layout.labels.iter().all(|l| !l.callout),
+            "16px-pitched record slots must avoid callouts: {:?}",
+            records.layout.labels
+        );
+
+        let duplex = crate::compile(include_str!(
+            "../tests/fixtures/quality/10-many-named-ports.diagram"
+        ))
+        .unwrap();
+        assert!(crate::layout::validate(&duplex.scene, &duplex.layout, &LayoutOptions::default()).is_ok());
     }
 }
