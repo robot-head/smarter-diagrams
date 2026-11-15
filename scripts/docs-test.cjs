@@ -22,7 +22,7 @@ const url = path => new URL(path, base).href;
   }
   assert(ready, `Site unavailable: ${base.href}`);
   await page.goto(base.href);
-  await page.getByRole('heading', { name: 'Your first diagram' }).waitFor();
+  await page.getByRole('heading', { name: 'Diagram compiler for software engineers' }).waitFor();
   fs.mkdirSync('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/docs-home.png', fullPage: true });
 
@@ -100,7 +100,7 @@ const url = path => new URL(path, base).href;
   await page.setViewportSize({width:1440,height:1000});
   console.log(`Examples: ${diagrams} language/gallery choices passed glyph, leader, contrast, silhouette, arrow, description, comparison, grid, and mobile zoom/pan checks.`);
 
-  await page.goto(base.href);
+  await page.goto(url('guide/getting-started.html'));
 
   await page.getByRole('button', { name: /search/i }).first().click();
   await page.locator('#localsearch-input').fill('UnpinEntities');

@@ -41,8 +41,11 @@ export default defineConfig({
   lastUpdated: true,
   sitemap: { hostname: 'https://robot-head.github.io/smarter-diagrams/' },
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/smarter-diagrams/logo.svg' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/smarter-diagrams/favicon.svg' }],
     ['link', { rel: 'alternate icon', href: '/smarter-diagrams/favicon.ico' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
+    ['link', { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@400..700&family=JetBrains+Mono:wght@400;500&display=swap' }],
     ['script', { src: '/smarter-diagrams/demo/theme.js' }],
   ],
   markdown: {
@@ -94,6 +97,7 @@ export default defineConfig({
   },
   themeConfig: {
     logo: '/logo.svg',
+    logoLink: { link: '/smarter-diagrams/', target: '_self' },
     siteTitle: 'Smarter Diagrams',
     nav: [
       { text: 'Examples', link: '/examples' },
@@ -105,7 +109,7 @@ export default defineConfig({
       { text: 'Rust API', link: 'https://robot-head.github.io/smarter-diagrams/api/smarter_diagrams/index.html', target: '_blank', rel: 'noopener' },
     ],
     sidebar: [
-      { text: 'Start here', items: [{ text: 'Overview', link: '/' }, { text: 'Examples gallery', link: '/examples' }, { text: 'Domain demonstrations', link: '/guide/demonstrations' }, { text: 'Hugo fenced blocks', link: '/guide/hugo' }, { text: 'Playground', link: '/playground' }] },
+      { text: 'Start here', items: [{ text: 'Overview', link: '/', target: '_self' }, { text: 'Examples gallery', link: '/examples' }, { text: 'Domain demonstrations', link: '/guide/demonstrations' }, { text: 'Hugo fenced blocks', link: '/guide/hugo' }, { text: 'Playground', link: '/playground' }] },
       { text: 'Build with the library', collapsed: false, items: guide },
       { text: 'Diagram language', collapsed: false, items: language },
       { text: 'Executable diagrams', collapsed: true, items: runtime },

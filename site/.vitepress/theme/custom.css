@@ -1,9 +1,18 @@
 :root {
   --vp-layout-max-width: 1520px;
-  --vp-c-brand-1: #146c5f;
-  --vp-c-brand-2: #117a6b;
-  --vp-c-brand-3: #168c7b;
-  --vp-c-brand-soft: rgba(20, 108, 95, 0.10);
+  --vp-font-family-base: "Host Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --vp-font-family-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --vp-c-brand-1: #1a4be0;
+  --vp-c-brand-2: #153ec2;
+  --vp-c-brand-3: #1a4be0;
+  --vp-c-brand-soft: rgba(26, 75, 224, 0.10);
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-alt: #f4f4f4;
+  --vp-c-bg-soft: #f4f4f4;
+  --vp-c-text-1: #111111;
+  --vp-c-text-2: #555555;
+  --vp-c-text-3: #767676;
+  --vp-c-divider: #e4e4e7;
   --vp-home-hero-name-color: var(--vp-c-text-1);
   --vp-home-hero-name-background: none;
   --vp-home-hero-image-background-image: none;
@@ -11,10 +20,17 @@
 }
 
 .dark {
-  --vp-c-brand-1: #64d7bc;
-  --vp-c-brand-2: #54c8af;
-  --vp-c-brand-3: #168c7b;
-  --vp-c-brand-soft: rgba(100, 215, 188, 0.12);
+  --vp-c-brand-1: #7aa2ff;
+  --vp-c-brand-2: #5c89f5;
+  --vp-c-brand-3: #1a4be0;
+  --vp-c-brand-soft: rgba(122, 162, 255, 0.14);
+  --vp-c-bg: #111318;
+  --vp-c-bg-alt: #171b22;
+  --vp-c-bg-soft: #171b22;
+  --vp-c-text-1: #f4f4f5;
+  --vp-c-text-2: #b4bac4;
+  --vp-c-text-3: #8c95a4;
+  --vp-c-divider: #262c36;
   --vp-home-hero-name-color: var(--vp-c-text-1);
   --vp-home-hero-name-background: none;
 }
