@@ -50,6 +50,27 @@ for (const file of files(path.join(root, 'site')).filter(file => file.endsWith('
     snippets++;
   }
 }
+const decodeHtml = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+const indexHtml = fs.readFileSync(path.join(root, 'site/public/index.html'), 'utf8');
+for (const banned of ['data-ui=', 'data-ui-load', 'ui-win', 'ui-pipe', 'ui-term', 'assets/diagrams/mount.js', 'sd check', '.dgm']) {
+  if (indexHtml.includes(banned)) throw Error(`site/public/index.html must not contain fabricated UI or invalid reference: ${banned}`);
+}
+let homeDiagrams = 0, homeRust = 0;
+for (const match of indexHtml.matchAll(/<(code|textarea)\b[^>]*\bdata-diagram-source\b[^>]*>([\s\S]*?)<\/\1>/gi)) {
+  checkDiagram(`${decodeHtml(match[2]).trim()}\n`, `site/public/index.html#${homeDiagrams + 1}`);
+  homeDiagrams++;
+}
+if (homeDiagrams < 5) throw Error(`site/public/index.html must embed at least 5 compiled data-diagram-source blocks, found ${homeDiagrams}`);
+for (const match of indexHtml.matchAll(/<code\b[^>]*\bdata-rust-source\b[^>]*>([\s\S]*?)<\/code>/gi)) {
+  const source = `${decodeHtml(match[1]).trim()}\n`;
+  const wrapped = /^fn main\(/m.test(source) ? source : `fn main() -> Result<(), Box<dyn std::error::Error>> {\n${source}\nOk(())\n}`;
+  const snippetPath = path.join(binDir, `snippet_${snippets}.rs`);
+  fs.writeFileSync(snippetPath, wrapped);
+  rustSnippets.push({ name: `snippet_${snippets}`, label: `site/public/index.html#rust-${homeRust + 1}` });
+  snippets++;
+  homeRust++;
+}
+if (homeRust < 1) throw Error('site/public/index.html must embed at least 1 typechecked data-rust-source snippet');
 if (rustSnippets.length > 0) {
   fs.writeFileSync(
     path.join(output, 'Cargo.toml'),

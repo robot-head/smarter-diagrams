@@ -23,8 +23,31 @@ const url = path => new URL(path, base).href;
   assert(ready, `Site unavailable: ${base.href}`);
   await page.goto(base.href);
   await page.getByRole('heading', { name: 'Diagram compiler for software engineers' }).waitFor();
+  await page.waitForFunction(() => document.querySelector('#home-editor-status')?.textContent.includes('revision'));
+  await page.waitForFunction(() => document.querySelector('#home-sim-metrics')?.textContent.includes('workers'));
+  assert.equal(await page.locator('[data-ui],[data-ui-load],.ui-win,.ui-pipe,.ui-term,[data-placeholder]').count(), 0, 'homepage must contain no fake UI or placeholder markers');
   fs.mkdirSync('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/docs-home.png', fullPage: true });
+  const initialHomeSource = await page.locator('#home-editor-source').inputValue();
+  const homeNode = page.locator('#home-editor-canvas [data-node="gateway"]');
+  await homeNode.scrollIntoViewIfNeeded();
+  const homeBox = await homeNode.boundingBox();
+  const homeScale = await homeNode.evaluate(el => el.ownerSVGElement.getScreenCTM().a);
+  await page.mouse.move(homeBox.x + homeBox.width / 2, homeBox.y + homeBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(homeBox.x + homeBox.width / 2, homeBox.y + homeBox.height / 2 + 64 * homeScale, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForFunction(orig => document.querySelector('#home-editor-source')?.value !== orig, initialHomeSource);
+  const draggedSource = await page.locator('#home-editor-source').inputValue();
+  assert(draggedSource.includes('@pin('), 'homepage node drag must insert @pin coordinates');
+  assert(draggedSource.includes('# Production ingress'), 'homepage node drag must preserve leading comments');
+  assert.match(await page.locator('#home-editor-diff').textContent(), /@pin\(/, 'homepage CST diff must show @pin edit');
+  await page.click('#home-editor-undo');
+  assert.equal(await page.locator('#home-editor-source').inputValue(), initialHomeSource, 'homepage undo must restore original source');
+  const initialMetrics = await page.locator('#home-sim-metrics').textContent();
+  await page.click('#home-sim-step');
+  await page.waitForFunction(prev => document.querySelector('#home-sim-metrics')?.textContent !== prev, initialMetrics);
+  assert.match(await page.locator('#home-sim-metrics').textContent(), /workers/);
 
   // Crawl the rendered documentation and same-site static assets. rustdoc has
   // its own generated cross-reference graph; inspect its principal entries below.
