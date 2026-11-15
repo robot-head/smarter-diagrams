@@ -1,0 +1,57 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    ":enablePreCommit",
+    "customManagers:dockerfileVersions",
+    "customManagers:githubActionsVersions",
+    "customManagers:makefileVersions"
+  ],
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "ignoreTests": false,
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "automerge": true
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
+  "postUpdateOptions": ["gomodTidy"],
+  "git-submodules": {
+    "enabled": true
+  },
+  "nix": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Cover indirect Go module dependencies",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "enabled": true
+    },
+    {
+      "description": "Group wasm-bindgen crate and CI wasm-bindgen-cli updates together",
+      "matchPackageNames": ["wasm-bindgen", "wasm-bindgen/wasm-bindgen"],
+      "groupName": "wasm-bindgen"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track pinned wasm-bindgen CLI release in GitHub Pages workflow",
+      "managerFilePatterns": ["/^\\.github/workflows/pages(-build)?\\.yml$/"],
+      "matchStrings": [
+        "https://github\\.com/wasm-bindgen/wasm-bindgen/releases/download/(?<currentValue>\\d+\\.\\d+\\.\\d+)/wasm-bindgen-\\d+\\.\\d+\\.\\d+-x86_64-unknown-linux-musl\\.tar\\.gz"
+      ],
+      "autoReplaceStringTemplate": "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/{{{newValue}}}/wasm-bindgen-{{{newValue}}}-x86_64-unknown-linux-musl.tar.gz",
+      "depNameTemplate": "wasm-bindgen/wasm-bindgen",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    }
+  ]
+}

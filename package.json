@@ -17,7 +17,8 @@
     "test:hugo": "node scripts/hugo-plugin-test.cjs",
     "test:neovim": "node scripts/neovim-plugin-test.cjs",
     "test:kroki": "node scripts/kroki-test.cjs",
-    "test:licenses": "node scripts/license-check.cjs"
+    "test:licenses": "node scripts/license-check.cjs",
+    "test:config": "node scripts/config-test.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1",
