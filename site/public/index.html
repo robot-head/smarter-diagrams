@@ -422,10 +422,13 @@ main > section.hero--collage {
   color: var(--p-muted);
   padding: 0 4px;
 }
-#home-editor-canvas {
+#home-editor-canvas,
+.diagram-viewport {
   position: relative;
   min-height: 320px;
   overflow: auto;
+  overscroll-behavior: auto;
+  touch-action: none;
   border-radius: 10px;
   border: 1px solid var(--sd-card-border);
   background: var(--sd-bg, #ffffff);
@@ -441,14 +444,57 @@ main > section.hero--collage {
   height: auto;
   display: block;
 }
+#home-editor-canvas,
 #home-editor-canvas svg {
   user-select: none;
   -webkit-user-select: none;
-  touch-action: auto;
+  -webkit-touch-callout: none;
+  touch-action: none;
 }
-#home-editor-canvas.touch-edit svg { touch-action: none; }
 #home-editor-canvas [data-node] { cursor: grab; }
 #home-editor-canvas [data-node]:active { cursor: grabbing; }
+.snap-options {
+  position: relative;
+  font-size: 13px;
+}
+.snap-options summary {
+  cursor: pointer;
+  height: 34px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--sd-card-border);
+  border-radius: 8px;
+  background: var(--sd-card-bg);
+  color: var(--p-ink);
+  white-space: nowrap;
+}
+.snap-panel {
+  position: fixed;
+  z-index: 20;
+  min-width: 210px;
+  padding: 12px;
+  border: 1px solid var(--sd-card-border);
+  border-radius: 10px;
+  background: var(--sd-card-bg);
+  color: var(--p-ink);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+#home-editor-controls .snap-panel label,
+.snap-panel label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  color: var(--p-ink);
+}
+.snap-panel small {
+  display: block;
+  color: var(--p-muted);
+}
+.snap-panel select {
+  max-width: 100px;
+}
 .sd-canvas-foot {
   font-size: 13px;
   color: var(--p-muted);
@@ -1214,6 +1260,14 @@ function updateDiff() {
 function showEditorSvg(svgMarkup, bounds) {
   const left = canvasEl.scrollLeft, top = canvasEl.scrollTop;
   const svgNode = patchSvg(canvasEl, svgMarkup);
+  if (activeTheme === 'auto') {
+    for (const prop of [...svgNode.style]) {
+      if (prop.startsWith('--sd-') || prop === 'background' || prop.startsWith('background-')) {
+        svgNode.style.removeProperty(prop);
+      }
+    }
+    svgNode.style.removeProperty('background');
+  }
   view.attach(svgNode, bounds);
   if (!view.fitted) canvasEl.scrollTo(left, top);
   canvasEl.style.background = activeTheme === 'auto' ? '' : (svgNode.style.background || svgNode.style.getPropertyValue('--sd-bg') || '');
@@ -1370,6 +1424,12 @@ function syncSimulationUi() {
   simEventsEl.replaceChildren(...eventButtons);
 
   const sim = snap.simulation;
+  const apiRate = sim?.traits?.api?.rate;
+  if (Number.isFinite(apiRate)) {
+    const roundedRate = Math.round(apiRate);
+    if (Number(simRateEl.value) !== roundedRate) simRateEl.value = String(roundedRate);
+    simRateValEl.textContent = `${roundedRate}/s`;
+  }
   if (sim?.nodes) {
     const tiles = [];
     for (const [id, q] of Object.entries(sim.nodes)) {
