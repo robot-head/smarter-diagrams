@@ -1,7 +1,19 @@
-name: Rust
-on: [push, pull_request]
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  check:
+  rust:
+    name: Rust & Native
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,5 +26,56 @@ jobs:
       - run: cargo clippy --locked --all-features --all-targets -- -D warnings
       - run: cargo test --locked --all-features
       - run: cargo build --locked --profile wasm --lib --target wasm32-unknown-unknown --features wasm
-      - run: node --check extensions/vscode/extension.js
       - run: cargo bench --bench pipeline
+
+  checks:
+    name: Config, Licenses & Extensions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --check extensions/vscode/extension.js
+      - run: npm run test:config
+      - run: npm run test:licenses
+      - run: npm run test:kroki
+
+  pages:
+    name: Documentation & Pages Build
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/pages-build.yml
+    with:
+      upload_artifact: false
+
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [rust, checks, pages]
+    steps:
+      - name: Check upstream CI jobs
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          node -e '
+            const needs = JSON.parse(process.env.NEEDS_JSON);
+            const entries = Object.entries(needs);
+            if (entries.length === 0) {
+              console.error("No upstream jobs found in needs");
+              process.exit(1);
+            }
+            let failed = false;
+            for (const [job, info] of entries) {
+              console.log(`${job}: ${info.result}`);
+              if (info.result !== "success" && info.result !== "skipped") {
+                failed = true;
+              }
+            }
+            if (failed) {
+              console.error("Gate failed: an upstream job did not pass or skip.");
+              process.exit(1);
+            }
+          '
