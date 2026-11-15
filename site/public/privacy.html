@@ -11,6 +11,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@400..700&family=JetBrains+Mono:wght@400..500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/system.css">
+<link rel="stylesheet" href="./demo/diagram-palette.css">
+<script src="./demo/theme.js"></script>
 <style>
 :root {
   --p-bg: #ffffff; --p-surface: #f4f4f4; --p-ink: #111111; --p-muted: #6b6b6b;
@@ -18,6 +20,10 @@
   --font-display: "Host Grotesk", system-ui, sans-serif;
   --font-text: "Host Grotesk", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+:root[data-theme="dark"] {
+  --p-bg: #141820; --p-surface: #1b2029; --p-ink: #f4f4f5; --p-muted: #92a6bf;
+  --p-accent: #7aa2ff; --p-accent-ink: #111318; --p-action: #7aa2ff; --p-action-ink: #111318;
 }
 .privacy-main { padding-block: clamp(56px, 8vw, 96px); }
 .privacy-doc { max-width: 68ch; display: grid; gap: var(--s-5); }

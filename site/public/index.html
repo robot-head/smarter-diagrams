@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Smarter Diagrams: Diagram compiler for software engineers</title>
-<meta name="description" content="Text-authored architecture diagrams compiled to deterministic orthogonal SVG in Rust and WebAssembly, with lossless Git diffs, queue simulation, and LSP support.">
+<meta name="description" content="Text-authored architecture, schema, and statechart diagrams compiled to deterministic orthogonal SVG in Rust and WebAssembly, with lossless Git diffs, queue simulation, and LSP support.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Smarter Diagrams · Declarative diagram compiler">
 <meta property="og:description" content="Author system topologies in plain text, refine geometry on a canvas without losing comments, and run queue simulations in Rust and WebAssembly.">
@@ -23,12 +23,35 @@
 <link rel="stylesheet" href="assets/backgrounds/backgrounds.css">
 <link rel="stylesheet" href="assets/layout/layout.css">
 <link rel="stylesheet" href="assets/icons/icon.css">
+<link rel="stylesheet" href="assets/ui/base.css">
+<link rel="stylesheet" href="./demo/diagram-palette.css">
+<script src="./demo/theme.js"></script>
 <style>
 :root {
-  --p-bg: #ffffff; --p-surface: #f4f4f4; --p-ink: #111111; --p-muted: #6b6b6b;
-  --p-accent: #1a4be0; --p-accent-ink: #ffffff; --p-action: #1a4be0; --p-action-ink: #ffffff;
-  --p-inv-bg: #111111; --p-inv-surface: #1e1e1e; --p-inv-ink: #ffffff; --p-inv-muted: #9a9a9a;
-  --p-inv-accent: #ffffff; --p-inv-accent-ink: #111111; --p-inv-action: #ffffff; --p-inv-action-ink: #111111;
+  --p-bg: #ffffff;
+  --p-surface: #f4f6f9;
+  --p-ink: #111111;
+  --p-muted: #5b6472;
+  --p-accent: #1a4be0;
+  --p-accent-ink: #ffffff;
+  --p-action: #1a4be0;
+  --p-action-ink: #ffffff;
+  --p-inv-bg: #0f141c;
+  --p-inv-surface: #18202c;
+  --p-inv-ink: #f4f4f5;
+  --p-inv-muted: #9aa8bd;
+  --p-inv-accent: #7aa2ff;
+  --p-inv-accent-ink: #111318;
+  --p-inv-action: #7aa2ff;
+  --p-inv-action-ink: #111318;
+  --sd-card-bg: #ffffff;
+  --sd-card-border: rgba(17, 24, 39, 0.12);
+  --sd-code-surface: #f7f9fc;
+  --sd-diff-add-bg: rgba(22, 163, 74, 0.14);
+  --sd-diff-add-fg: #14532d;
+  --sd-diff-del-bg: rgba(220, 38, 38, 0.12);
+  --sd-diff-del-fg: #7f1d1d;
+  --sd-ink: #1c2a3a;
   --font-display: "Host Grotesk", system-ui, sans-serif;
   --font-text: "Host Grotesk", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -36,14 +59,33 @@
   --display-tracking: -0.035em;
   --display-tracking-xl: -0.04em;
 }
+:root[data-theme="dark"] {
+  --p-bg: #141820;
+  --p-surface: #1b2029;
+  --p-ink: #f4f4f5;
+  --p-muted: #92a6bf;
+  --p-accent: #7aa2ff;
+  --p-accent-ink: #111318;
+  --p-action: #7aa2ff;
+  --p-action-ink: #111318;
+  --p-inv-bg: #0c1016;
+  --p-inv-surface: #151c26;
+  --p-inv-ink: #f4f4f5;
+  --p-inv-muted: #92a6bf;
+  --p-inv-accent: #7aa2ff;
+  --p-inv-accent-ink: #111318;
+  --p-inv-action: #7aa2ff;
+  --p-inv-action-ink: #111318;
+  --sd-card-bg: #1b2029;
+  --sd-card-border: rgba(146, 166, 191, 0.24);
+  --sd-code-surface: #11161e;
+  --sd-diff-add-bg: rgba(105, 212, 172, 0.16);
+  --sd-diff-add-fg: #6ee7b7;
+  --sd-diff-del-bg: rgba(255, 156, 159, 0.15);
+  --sd-diff-del-fg: #fda4af;
+  --sd-ink: #f4f4f5;
+}
 </style>
-<link rel="stylesheet" href="assets/ui/base.css">
-<link rel="stylesheet" href="assets/ui/window/fragment.css">
-<link rel="stylesheet" href="assets/ui/diff-review/fragment.css">
-<link rel="stylesheet" href="assets/ui/code/fragment.css">
-<link rel="stylesheet" href="assets/ui/pipeline-board/fragment.css">
-<link rel="stylesheet" href="assets/ui/terminal-run/fragment.css">
-<link rel="stylesheet" href="assets/diagrams/diagram.css">
 <script>document.documentElement.classList.add('m-enter');setTimeout(()=>document.documentElement.classList.add('m-enter-done'),700)</script>
 <script src="assets/backgrounds/backgrounds.js"></script>
 <script>document.documentElement.classList.add('mo-js');setTimeout(()=>document.documentElement.classList.add('mo-safe'),2500)</script>
@@ -51,18 +93,77 @@
 <link rel="modulepreload" href="assets/moments/lib.js">
 <link rel="modulepreload" href="assets/moments/pinned-chapters/moment.js">
 <style>
-/* Secondary button uses a crisp ink outline and opaque white fill so it stays legible over any halo tint */
+:root[data-theme="dark"] .ic-ink { filter: invert(1); }
+:root[data-theme="dark"] .ground-inverse .ic-ink { filter: invert(1); }
+.ground-inverse .ic-ink { filter: invert(1); }
+
 html[data-buttons="tonal"] .btn--secondary {
-  background: #ffffff;
-  color: #111111;
-  border: 1.5px solid #4a5058;
+  background: var(--sd-card-bg);
+  color: var(--p-ink);
+  border: 1.5px solid var(--sd-card-border);
 }
 html[data-buttons="tonal"] .btn--secondary:hover {
-  background: #eef2f8;
-  border-color: #111111;
+  background: var(--p-surface);
+  border-color: var(--p-accent);
 }
 
-/* Active in-page section indicator matching system nav active line */
+.nav__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.nav__logo img {
+  width: 24px;
+  height: 24px;
+  display: block;
+  flex-shrink: 0;
+}
+.nav.nav--centre .nav__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.nav.nav--centre .nav__links {
+  gap: clamp(8px, 1.4vw, 22px);
+}
+.nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.sd-icon-btn,
+.sd-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--sd-card-border);
+  background: var(--sd-card-bg);
+  color: var(--p-ink);
+  font: 500 13px/1 var(--font-text);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.sd-icon-link {
+  width: 36px;
+  padding: 0;
+}
+.sd-icon-btn:hover,
+.sd-icon-link:hover {
+  border-color: var(--p-accent);
+}
+.sd-icon-btn[aria-pressed="true"] {
+  background: var(--p-surface);
+  border-color: var(--p-accent);
+}
+
 .nav__link[aria-current="location"] {
   color: var(--ink);
   font-weight: 500;
@@ -78,7 +179,6 @@ html[data-buttons="tonal"] .btn--secondary:hover {
   background: var(--accent);
 }
 
-/* Keep navbar cleanly aligned within container bounds at 390px and 320px */
 @media (max-width: 639px) {
   .nav__bar { gap: 6px; }
   .nav__logo {
@@ -88,466 +188,570 @@ html[data-buttons="tonal"] .btn--secondary:hover {
     flex-shrink: 1;
     min-width: 0;
   }
-  .nav:not(.is-open) .nav__actions .btn {
-    height: 44px;
-    padding-inline: 10px;
-    font-size: 13px;
-    letter-spacing: -0.01em;
-  }
-}
-@media (max-width: 374px) {
-  .nav:not(.is-open) .nav__actions { display: none; }
+  .nav:not(.is-open) .nav__actions .btn { display: none; }
+  .sd-icon-btn { height: 34px; padding: 0 9px; font-size: 12px; }
+  .sd-icon-link { width: 34px; height: 34px; }
 }
 
-/* Keep hero h1 strictly above h2 at every breakpoint while staying <= 3 lines at 1024px */
-.hero--collage {
-  --ly-h1: clamp(38px, 2.4vw + 22px, 60px);
-  padding-bottom: var(--padb);
+/* Override fixed 100svh section heights on non-chapter sections so interactive tools never clip */
+main > section[id],
+footer[id] {
+  scroll-margin-top: 84px;
 }
-.hero--collage h1 {
-  font-size: var(--ly-h1);
+@media (min-width: 1280px) {
+  main > section:not(#layout) {
+    height: auto;
+    min-height: 0;
+  }
+}
+main > section:not(#layout) {
+  padding-block: clamp(48px, 6vw, 88px);
+}
+main > section.hero--collage {
+  --ly-h1: clamp(32px, 2.3vw + 18px, 54px);
+  padding-top: clamp(112px, 11vw, 144px) !important;
+  padding-bottom: clamp(48px, 6vw, 84px) !important;
+}
+.hero--collage h1 { font-size: var(--ly-h1); }
+.hero__proof {
+  margin-top: var(--s-4);
+  font: 500 13px/1.5 var(--font-mono);
+  color: var(--p-muted);
 }
 @media (min-width: 1024px) and (max-width: 1279px) {
   .hero--collage .hero__text { grid-column: 1 / span 6; }
   .hero--collage .hero__art { grid-column: 7 / -1; }
 }
+
 .hero__art {
-  background:
-    radial-gradient(70% 60% at 18% 12%, color-mix(in oklab, var(--ground-surface) 82%, white), transparent 70%),
-    radial-gradient(60% 50% at 90% 100%, color-mix(in oklab, var(--ground-bg) 82%, var(--ground-accent)), transparent 70%),
-    var(--ground-bg);
-}
-.hero__art > .ly-piece--main .ui-win,
-.sd-app .ui-win {
-  width: 100%;
-  max-width: none;
-  --u-accent: var(--p-accent);
-  --u-accent-text: var(--p-accent);
-  --u-tint: color-mix(in oklab, var(--p-accent) 10%, var(--u-bg));
-  --u-fill-2: transparent;
-}
-.hero__art .ui-win__nav.is-on,
-.sd-app .ui-win__nav.is-on {
   background: transparent;
-  box-shadow: inset 2px 0 0 var(--p-accent);
+  padding: 0;
+  overflow: visible;
+  height: auto;
+  min-height: 0;
 }
-.hero__art .ui-win__main { padding-right: var(--ly-cut-room); }
-.hero__art > .ly-piece--note {
-  left: var(--s-6);
-  bottom: var(--s-6);
-  width: 312px;
-  z-index: 2;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #111111;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / .08), 0 18px 44px -20px rgb(0 0 0 / .36);
+.sd-hero-card,
+.sd-panel-box {
+  background: var(--sd-card-bg);
+  color: var(--p-ink);
+  border: 1px solid var(--sd-card-border);
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  box-shadow: 0 12px 32px -20px rgb(0 0 0 / 0.25);
 }
-.sd-note__head {
+.sd-card-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 6px;
+  flex-wrap: wrap;
 }
-.sd-note__title {
-  margin: 0;
-  font: 600 14px/1.3 var(--font-text);
-  letter-spacing: -0.01em;
-  color: #111111;
+.sd-pill-label {
+  font: 500 12px/1 var(--font-mono);
+  color: var(--p-muted);
 }
-.sd-note__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 99px;
-  font: 500 12px/1 var(--font-text);
-  background: #e6f2ec;
-  color: #135c39;
-}
-.sd-note__line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  font-size: 13px;
-  color: #3d4247;
-  border-top: 1px solid rgb(0 0 0 / .06);
-}
-.sd-note__line:first-of-type { border-top: 0; }
-.sd-note__line i {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  flex: none;
-  display: grid;
-  place-items: center;
-  background: #e7eeff;
-  color: #1a4be0;
-  font: 600 11px/1 var(--font-mono);
-}
-.sd-note__line b { font-weight: 500; color: #111111; }
-.hero__proof { font-size: var(--t-body); color: var(--muted); }
-.sd-kind-tag {
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  font: 600 11px/1 var(--font-mono);
-  background: color-mix(in oklab, var(--p-accent) 10%, var(--u-bg));
-  color: var(--p-accent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--p-accent) 18%, transparent);
-}
-@media (max-width: 1023px) {
-  .hero__art > .ly-piece--note { left: var(--s-4); bottom: var(--s-4); width: 280px; }
-}
-
-/* Section 2: lossless editor on base white ground with full-height bg-field stage */
-#editor > .wrap {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-}
-.sd-editor-stage {
-  position: relative;
-  flex: 1 1 auto;
-  display: grid;
-  align-content: center;
-  border-radius: var(--r-lg);
-  padding: var(--s-6);
-  background-color: var(--ground-bg);
+.sd-hero-svg-frame {
+  background: var(--sd-bg, #ffffff);
+  border: 1px solid var(--sd-card-border);
+  border-radius: 10px;
+  padding: 10px;
   overflow: hidden;
-  border: 1px solid var(--line);
 }
-.sd-app {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
-  gap: var(--s-5);
-  align-items: stretch;
-  min-width: 0;
-}
-.sd-app > .ui {
+.sd-hero-svg-frame img {
+  display: block;
   width: 100%;
-  max-width: none;
-  min-width: 0;
-  --u-accent: var(--p-accent);
-  --u-accent-text: var(--p-accent);
+  height: auto;
 }
-.sd-app .ui-win__body { min-height: 280px; }
+.sd-code-block {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--sd-card-border);
+  background: var(--sd-code-surface);
+  color: var(--p-ink);
+  font: 12.5px/1.55 var(--font-mono);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.section-head {
+  display: grid;
+  gap: var(--s-2);
+  max-width: 68ch;
+  margin-bottom: clamp(18px, 2.5vw, 28px);
+}
+.section-eyebrow {
+  font: 600 12px/1 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--p-accent);
+}
+.ground-inverse .section-eyebrow {
+  color: var(--p-inv-accent);
+}
+.section-head h2 {
+  font-size: clamp(28px, 2.2vw + 16px, 42px);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.section-head p {
+  color: var(--p-muted);
+  line-height: 1.55;
+}
+.ground-inverse .section-head p {
+  color: var(--p-inv-muted);
+}
+
+/* Section #editor: live Wasm playground + diff */
+.sd-editor-shell {
+  display: grid;
+  grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
 @media (max-width: 1023px) {
-  .sd-editor-stage { padding: var(--s-4); }
-  .sd-app { grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .sd-editor-shell { grid-template-columns: 1fr; }
 }
-@media (max-width: 639px) {
-  .sd-app > .ui-win { display: none; }
-}
-
-/* Section 3: pinned-chapters stage */
-.sd-chapter-stage {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  min-height: 260px;
-  padding: var(--s-5);
-  border-radius: var(--r-md);
-  background:
-    radial-gradient(75% 65% at 20% 10%, color-mix(in oklab, var(--ground-surface) 80%, white), transparent 70%),
-    var(--ground-bg);
-}
-.sd-chapter-stage > .dg {
-  width: 100%;
-  min-height: 220px;
-  height: 100%;
-  --dg-accent: var(--p-accent);
-}
-.sd-chapter-stage > .ui-code {
-  width: min(100%, 440px);
-  max-width: 100%;
-  --u-accent: var(--p-accent);
-}
-.sd-chapter-stage .ui-code__pre {
-  font-size: 12.5px;
-  line-height: 19px;
-}
-#layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__step {
-  border-top: 0;
-  padding-top: 0;
-}
-@media (min-width: 1024px) {
-  #layout {
-    --padt: 112px;
-    --padb: 96px;
-  }
-  #layout[data-moment="pinned-chapters"] .mo-pc__grid {
-    align-items: stretch;
-    padding-top: var(--padt, 112px);
-    padding-bottom: var(--padb, 96px);
-  }
-  #layout[data-moment="pinned-chapters"] .mo-pc__text { align-self: start; }
-  #layout[data-moment="pinned-chapters"] .mo-pc__visuals.frame {
-    height: 100%;
-    min-height: clamp(480px, 70svh, 700px);
-  }
-}
-@media (min-width: 640px) and (max-width: 1023px) {
-  #layout[data-moment="pinned-chapters"]:not(.is-live) {
-    min-height: 100svh;
-    padding-top: 96px;
-    padding-bottom: 96px;
-  }
-  #layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__grid {
-    flex: 1 1 auto;
-    align-content: start;
-  }
-  #layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__text {
-    height: 100%;
-    gap: var(--s-3);
-  }
-  #layout[data-moment="pinned-chapters"]:not(.is-live) .section-head { margin-bottom: var(--s-2); }
-  #layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__steps { gap: var(--s-3); }
-  #layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__step { gap: var(--s-1); }
-  #layout[data-moment="pinned-chapters"]:not(.is-live) .sd-chapter-stage {
-    height: clamp(180px, 21svh, 256px);
-    min-height: 180px;
-    aspect-ratio: auto;
-    padding: var(--s-3);
-  }
-  #layout[data-moment="pinned-chapters"]:not(.is-live) .sd-chapter-stage > .dg {
-    min-height: 156px;
-    height: 100%;
-  }
-  #layout[data-moment="pinned-chapters"]:not(.is-live) .ui-code__tabs {
-    height: 32px;
-  }
-  #layout[data-moment="pinned-chapters"]:not(.is-live) .ui-code__pre {
-    padding: 6px 0;
-    font-size: 11px;
-    line-height: 1.38;
-  }
-  #layout[data-moment="pinned-chapters"]:not(.is-live) .ui-code__hint { display: none; }
-}
-@media (max-width: 639px) {
-  #layout[data-moment="pinned-chapters"]:not(.is-live) {
-    min-height: calc(var(--hm, 2) * 100lvh);
-    padding-block: var(--padt) var(--padb);
-  }
-  #layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__steps { gap: var(--s-6); }
-  .sd-chapter-stage { padding: var(--s-3); min-height: 220px; }
-  .sd-chapter-stage > .dg { min-height: 200px; }
-  .sd-chapter-stage .ui-code__pre { font-size: 11.5px; line-height: 18px; }
-}
-
-/* Section 4: inverse runtime band with daylight-framed dark simulation board */
-#runtime > .wrap {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-}
-#runtime .grid--middle.fill {
-  flex: 1 1 auto;
-}
-#runtime .frame--lit {
-  position: relative;
-  min-height: clamp(460px, 68svh, 660px);
-  height: 100%;
-  overflow: clip;
-  border-color: transparent;
-}
-#runtime .frame--lit > .stage {
-  --fx-bg: #14171d;
-  --fx-surface: #1b1f27;
-  --fx-ink: #ffffff;
-  --fx-muted: #b0b8c4;
-  --fx-accent: #7ea3ff;
-  --fx-accent-ink: #111111;
-}
-#runtime .stage > .at-rise {
-  display: grid;
-  gap: 14px;
-  --ax: 16px;
-  --ay: 16px;
-  --fit-max: 596px;
-}
-#runtime .ui-pipe,
-#runtime .sd-runtime-spec {
-  width: 100%;
-  max-width: none;
-}
-#runtime .sd-runtime-spec .ui-code__pre {
-  font-size: 12px;
-  line-height: 18px;
-}
-#runtime .ui-pipe__tool { background: #ffffff; }
-@media (min-width: 640px) {
-  #runtime {
-    padding-top: 96px;
-    padding-bottom: 96px;
-  }
-}
-@media (min-width: 640px) and (max-width: 1023px) {
-  #runtime .grid--middle.fill {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: var(--s-5);
-  }
-  #runtime .frame--lit {
-    flex: 0 0 auto;
-    height: auto;
-    min-height: 0;
-  }
-  #runtime .stage > .at-rise {
-    gap: 16px;
-    --ax: 20px;
-    --ay: 24px;
-    --fit-max: 660px;
-  }
-}
-@media (max-width: 639px) {
-  #runtime .grid--middle.fill {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-4);
-  }
-  #runtime .frame--lit {
-    flex: 1 1 auto;
-    min-height: 280px;
-  }
-  #runtime .stage > .at-rise {
-    --ax: 14px;
-    --ay: 14px;
-  }
-  #runtime .sd-runtime-spec {
-    display: none;
-  }
-}
-
-/* Section 5: open tooling cards (1 screen on desktop/tablet via display:contents, 2 screens via .g2m on phone) */
-@media (min-width: 640px) {
-  #tooling {
-    padding-top: 96px;
-    padding-bottom: 96px;
-  }
-  #tooling > .wrap {
-    display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    column-gap: var(--gutter);
-    row-gap: var(--card-gap);
-    align-content: start;
-  }
-  #tooling .sd-tooling-group { display: contents; }
-  #tooling .section-head {
-    grid-column: 1 / -1;
-    margin-bottom: var(--s-4);
-  }
-  #tooling .card { grid-column: 1 / -1; }
-}
-@media (min-width: 1024px) {
-  #tooling > .wrap { align-content: space-between; }
-  #tooling .card { grid-column: auto / span 4; }
-  #tooling .panel { --p-h: 280px; }
-}
-@media (min-width: 640px) and (max-width: 1023px) {
-  #tooling > .wrap { row-gap: var(--s-3); }
-  #tooling .section-head { margin-bottom: var(--s-2); }
-  #tooling .card {
-    display: grid;
-    grid-template-columns: minmax(0, 6.4fr) minmax(0, 5.6fr);
-    grid-auto-rows: min-content;
-    column-gap: var(--s-5);
-    align-content: start;
-    --c-pad: 18px;
-  }
-  #tooling .card > :not(.panel) { grid-column: 1; }
-  #tooling .card > .panel {
-    grid-column: 2;
-    grid-row: 1 / span 4;
-    --p-h: clamp(180px, 19svh, 232px);
-    margin: 0;
-  }
-}
-#tooling .panel {
-  --p-h: 248px;
-  background:
-    radial-gradient(80% 70% at 20% 0%, color-mix(in oklab, var(--ground-surface) 80%, white), transparent 70%),
-    var(--ground-bg);
-}
-@media (max-width: 639px) {
-  #tooling .sd-tooling-group { gap: var(--s-4); }
-  #tooling .sd-tooling-group--a > .card { flex: 1 1 auto; }
-  #tooling .sd-tooling-group--a .panel { --p-h: 224px; }
-  #tooling .sd-tooling-group--b .card { --c-pad: 16px; }
-  #tooling .sd-tooling-group--b .panel { --p-h: 172px; }
-  #tooling .sd-tooling-group--b .stage > .at-rise { --ay: 12px; }
-  #tooling .sd-eco-panel { padding: 12px; }
-  #tooling .sd-eco-grid { gap: 8px; }
-  #tooling .sd-eco-grid .ic-tile { --tile: 34px; }
-  #tooling .card > .panel { margin-top: var(--s-3); }
-}
-#tooling .panel .dg {
-  width: 100%;
-  height: 100%;
-  --dg-accent: var(--p-accent);
-}
-#tooling .stage > .at-rise {
-  --ax: 20px;
-  --ay: 24px;
-  --fit-max: 420px;
-}
-#tooling .ui-term {
-  width: 100%;
-  max-width: none;
-}
-#tooling .ui-term__screen {
-  font-size: 12px;
-}
-.sd-eco-panel {
-  padding: 16px;
-  background: var(--u-bg, #ffffff);
-}
-.sd-eco-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  place-items: center;
-  gap: 10px;
-}
-
-/* Closing footer rhythm + grid-aligned legal links */
-footer#contact {
-  padding-top: var(--padt);
-}
-@media (min-width: 640px) {
-  footer#contact { padding-top: 96px; }
-}
-.sd-legal-copy {
+.sd-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-2) var(--s-5);
+  gap: 8px;
+}
+.sd-btn-sm,
+#home-editor-controls button,
+.sd-select {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 1px solid var(--sd-card-border);
+  background: var(--sd-card-bg);
+  color: var(--p-ink);
+  font: 500 13px/1 var(--font-text);
+  cursor: pointer;
+}
+.sd-btn-sm:hover,
+#home-editor-controls button:hover,
+.sd-select:hover {
+  border-color: var(--p-accent);
+}
+.sd-btn-sm.is-primary {
+  background: var(--p-accent);
+  color: var(--p-accent-ink);
+  border-color: var(--p-accent);
+}
+#home-editor-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+#home-editor-controls output {
+  font: 500 12px/1 var(--font-mono);
+  color: var(--p-muted);
+  min-width: 44px;
+  text-align: center;
+}
+#home-editor-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--p-muted);
+  cursor: pointer;
+}
+#home-editor-controls button[aria-pressed="true"] {
+  background: var(--p-accent);
+  color: var(--p-accent-ink);
+  border-color: var(--p-accent);
+}
+.sd-field-label {
+  font: 600 12px/1.2 var(--font-mono);
+  color: var(--p-muted);
+}
+#home-editor-source {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 176px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--sd-card-border);
+  background: var(--sd-code-surface);
+  color: var(--p-ink);
+  font: 12.5px/1.55 var(--font-mono);
+  resize: vertical;
+  tab-size: 2;
+}
+#home-editor-status {
+  margin: 0;
+  font: 500 12px/1.4 var(--font-mono);
+  color: var(--p-muted);
+  min-height: 1.4em;
+}
+.sd-diff-pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--sd-card-border);
+  background: var(--sd-code-surface);
+  color: var(--p-ink);
+  font: 12px/1.5 var(--font-mono);
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.sd-diff-add {
+  display: block;
+  background: var(--sd-diff-add-bg);
+  color: var(--sd-diff-add-fg);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.sd-diff-del {
+  display: block;
+  background: var(--sd-diff-del-bg);
+  color: var(--sd-diff-del-fg);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.sd-diff-ctx {
+  display: block;
+  color: var(--p-muted);
+  padding: 0 4px;
+}
+#home-editor-canvas,
+.diagram-viewport {
+  position: relative;
+  min-height: 320px;
+  overflow: auto;
+  overscroll-behavior: auto;
+  touch-action: none;
+  border-radius: 10px;
+  border: 1px solid var(--sd-card-border);
+  background: var(--sd-bg, #ffffff);
+  padding: 14px;
+  display: block;
 }
 @media (max-width: 639px) {
-  footer#contact > .wrap { row-gap: var(--s-3); }
-  footer#contact .closing__cta { gap: var(--s-3); }
-  footer#contact .closing__links { gap: var(--s-3); padding-top: var(--s-4); }
-  footer#contact .closing__links > .grid { row-gap: var(--s-3); }
-  footer#contact .closing__links .span-4 { display: none; }
-  footer#contact .closing__links .footer__col { grid-column: auto / span 6; }
-  footer#contact .closing__links .footer__col h3 { margin-bottom: var(--s-1); }
-  footer#contact .footer__legal {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--s-3);
-    padding-top: var(--s-3);
-  }
-  footer#contact .socials a { justify-content: center; }
+  #home-editor-canvas { min-height: 200px; }
+}
+#home-editor-canvas svg,
+#home-editor-canvas img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+#home-editor-canvas,
+#home-editor-canvas svg {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+#home-editor-canvas [data-node] { cursor: grab; }
+#home-editor-canvas [data-node]:active { cursor: grabbing; }
+.snap-options {
+  position: relative;
+  font-size: 13px;
+}
+.snap-options summary {
+  cursor: pointer;
+  height: 34px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--sd-card-border);
+  border-radius: 8px;
+  background: var(--sd-card-bg);
+  color: var(--p-ink);
+  white-space: nowrap;
+}
+.snap-panel {
+  position: fixed;
+  z-index: 20;
+  min-width: 210px;
+  padding: 12px;
+  border: 1px solid var(--sd-card-border);
+  border-radius: 10px;
+  background: var(--sd-card-bg);
+  color: var(--p-ink);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+#home-editor-controls .snap-panel label,
+.snap-panel label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  color: var(--p-ink);
+}
+.snap-panel small {
+  display: block;
+  color: var(--p-muted);
+}
+.snap-panel select {
+  max-width: 100px;
+}
+.sd-canvas-foot {
+  font-size: 13px;
+  color: var(--p-muted);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Section #layout: pinned chapters & crisp SVG containment */
+.sd-chapters-wrap {
+  display: grid;
+  gap: clamp(20px, 3vw, 32px);
+}
+.sd-chapter-row {
+  display: grid;
+  grid-template-columns: minmax(280px, 5fr) minmax(0, 7fr);
+  gap: 20px;
+  align-items: center;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--sd-card-border);
+  background: var(--sd-card-bg);
+}
+@media (max-width: 960px) {
+  .sd-chapter-row { grid-template-columns: 1fr; }
+}
+.sd-chapter-copy {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.sd-chapter-copy h3 {
+  font-size: 20px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+.sd-chapter-copy p {
+  margin: 0;
+  color: var(--p-muted);
+  line-height: 1.5;
+  font-size: 15px;
+}
+.sd-chapter-stage {
+  background: var(--sd-bg, #ffffff);
+  border: 1px solid var(--sd-card-border);
+  border-radius: 10px;
+  padding: 12px;
+  min-width: 0;
+}
+.sd-chapter-stage .mo-pc__visual > img {
+  object-fit: contain;
+  width: 100%;
+  height: auto;
+  max-height: 380px;
+  aspect-ratio: auto;
+  display: block;
+}
+
+/* Section #runtime: inverse dark surface with live WasmStatechart */
+#runtime.ground-inverse {
+  background: var(--p-inv-bg);
+  color: var(--p-inv-ink);
+}
+.sd-sim-card {
+  background: var(--p-inv-surface);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+.sd-sim-stage {
+  --sd-flow: #7aa2ff;
+  --sd-flow-text: #111318;
+  --sd-bg: #121720;
+  --sd-surface: #0c1016;
+  --sd-fg: #f4f4f5;
+  --sd-ink: #f4f4f5;
+  --sd-edge: #b1c0d3;
+  --sd-muted: #92a6bf;
+  --sd-node: #253347;
+  --sd-border: #91abc7;
+  --sd-database: #263c56;
+  --sd-cap: #324e6d;
+  --sd-database-border: #92b6dc;
+  --sd-actor: #233e34;
+  --sd-actor-border: #84bca2;
+  --sd-cache: #443721;
+  --sd-cache-border: #d6b573;
+  --sd-decision: #433521;
+  --sd-decision-border: #dbb875;
+  --sd-queue: #25354d;
+  --sd-queue-line: #8daadd;
+  --sd-container: #1b2432;
+  --sd-plane: #253244;
+  --sd-zone-text: #b8d7f5;
+  --sd-story: #88abff;
+  --sd-added: #69d4ac;
+  --sd-removed: #f2bc5c;
+  --sd-modified: #88abff;
+  --sd-status: #7aa2ff;
+  --sd-overload: #ffb198;
+  --sd-overload-fill: #492b25;
+  --sd-cut: #ff9c9f;
+  background: var(--sd-bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 12px;
+  overflow: auto;
+}
+#home-sim-canvas svg,
+#home-sim-canvas img {
+  display: block;
+  width: 100%;
+  max-height: 350px;
+  height: auto;
+}
+.sd-inv-btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f4f4f5;
+  font: 500 13px/1 var(--font-text);
+  cursor: pointer;
+}
+.sd-inv-btn:hover:not(:disabled) {
+  border-color: var(--p-inv-accent);
+  background: rgba(122, 162, 255, 0.16);
+}
+.sd-inv-btn.is-primary {
+  background: var(--p-inv-accent);
+  color: var(--p-inv-accent-ink);
+  border-color: var(--p-inv-accent);
+}
+.sd-inv-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.sd-range-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 500 13px/1 var(--font-mono);
+  color: var(--p-inv-muted);
+}
+.sd-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sd-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font: 500 12px/1.3 var(--font-mono);
+  background: rgba(122, 162, 255, 0.16);
+  border: 1px solid rgba(122, 162, 255, 0.35);
+  color: #dbe7ff;
+}
+.sd-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+.sd-metric-tile {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font: 12.5px/1.5 var(--font-mono);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: #e2e8f0;
+}
+.sd-metric-tile strong { color: #ffffff; }
+.sd-metric-tile .sd-hot { color: #ffb198; font-weight: 600; }
+.sd-details summary {
+  cursor: pointer;
+  font: 500 13px/1.4 var(--font-mono);
+  color: var(--p-inv-muted);
+}
+.sd-details .sd-code-block {
+  margin-top: 10px;
+  background: #0c1016;
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* Section #tooling: 3 real integration cards */
+.sd-tooling-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+@media (max-width: 1023px) {
+  .sd-tooling-grid { grid-template-columns: 1fr; }
+}
+.card--open {
+  background: var(--sd-card-bg);
+  color: var(--p-ink);
+  border: 1px solid var(--sd-card-border);
+  border-radius: 14px;
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.card--open h3 {
+  font-size: 20px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+.card--open p {
+  margin: 0;
+  color: var(--p-muted);
+  line-height: 1.5;
+  font-size: 15px;
+}
+.sd-eco-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.ic-tile {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--sd-card-border);
+  background: var(--sd-code-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.sd-card-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.sd-legal-copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+}
+@media (max-width: 1023px) {
+  footer#contact .closing__links { text-align: left; }
+  footer#contact .socials a { justify-content: flex-start; }
 }
 </style>
 </head>
@@ -555,14 +759,17 @@ footer#contact {
 <header class="nav nav--centre">
   <div class="wrap nav__bar">
     <a class="skip-link" href="#main">Skip to main content</a>
-    <a class="nav__logo" href="#top"><span class="mark" data-mark="arc" aria-hidden="true"></span>Smarter Diagrams</a>
+    <a class="nav__logo" href="#top"><img src="./logo.svg" alt="" width="24" height="24"><span>Smarter Diagrams</span></a>
     <nav class="nav__links" aria-label="Main">
       <div class="nav__item"><a class="nav__link" href="#editor">Editor</a></div>
       <div class="nav__item"><a class="nav__link" href="#layout">Layout</a></div>
       <div class="nav__item"><a class="nav__link" href="#runtime">Simulation</a></div>
       <div class="nav__item"><a class="nav__link" href="#tooling">Integrations</a></div>
+      <div class="nav__item"><a class="nav__link" href="./examples.html">Examples</a></div>
     </nav>
     <div class="nav__actions">
+      <button id="theme-toggle" class="sd-icon-btn" type="button" aria-label="Toggle dark theme" aria-pressed="false" title="Toggle color theme">Theme</button>
+      <a class="sd-icon-link" href="https://github.com/robot-head/smarter-diagrams" aria-label="GitHub repository"><img class="ic ic-20 ic-ink" src="assets/icons/github.svg" alt="" width="20" height="20"></a>
       <a class="btn btn--primary" href="./guide/getting-started.html">Read the guide</a>
     </div>
     <button class="nav__toggle" type="button" aria-expanded="false" aria-label="Menu">
@@ -577,49 +784,29 @@ footer#contact {
       <div class="hero-text grid hero__grid">
         <div class="hero__text span-5">
           <h1 id="hero-h">Diagram compiler for software engineers</h1>
-          <p class="hero__lead">Author system diagrams in plain text with Rust and WebAssembly. Drag nodes on canvas without breaking Git diffs, simulate queues, and export crisp SVG.</p>
+          <p class="hero__lead">Author architecture, schema, and statechart diagrams in plain text with Rust and WebAssembly. Drag nodes on canvas without breaking Git diffs, simulate queues, and export crisp SVG.</p>
           <div class="btn-row">
             <a class="btn btn--primary" href="./playground.html">Open the playground</a>
             <a class="btn btn--secondary" href="./examples.html">See examples</a>
           </div>
-          <p class="hero__proof">Lossless rowan CST · 2.4 ms layout at 100 nodes · MIT license</p>
+          <p class="hero__proof">Lossless rowan CST · 2.4 ms layout at 100 nodes · 299 KB Brotli Wasm · MIT license</p>
         </div>
-        <div class="hero__art span-6 start-7" role="img" aria-label="Smarter Diagrams compiler window listing architecture diagrams and live compilation passes">
-          <div class="ly-piece ly-piece--main ui ui-panel ui-win" data-ui="window" data-open="Compiled" data-work="Routing" data-done="Compiled" aria-hidden="true">
-            <div class="ui-win__bar">
-              <span class="ui-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="ui-win__crumb"><b>workspace</b> <i>/</i> <b>topologies</b></span>
-              <span class="ui-spacer"></span>
-              <span class="ui-win__search"><svg class="ui-icon" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><span class="ui-win__ph">Filter</span><span class="ui-kbd">/</span></span>
+        <div class="hero__art span-6 start-7">
+          <div class="sd-hero-card">
+            <div class="sd-card-bar">
+              <span class="sd-pill-label">examples/peer-feedback.diagram → deterministic SVG</span>
+              <a class="link" href="./demo/?example=peer-feedback">Open in playground</a>
             </div>
-            <div class="ui-win__body">
-              <div class="ui-win__side">
-                <span class="ui-win__nav is-on"><svg class="ui-icon" viewBox="0 0 16 16"><path d="M2.5 9h3l1 1.5h3l1-1.5h3"/><path d="M2.5 9 4 3.5h8L13.5 9v3.5h-11z"/></svg>Diagrams<em>21</em></span>
-                <span class="ui-win__nav"><svg class="ui-icon" viewBox="0 0 16 16"><path d="m3.5 8.4 2.8 2.8 6.2-6.4"/></svg>Verified<em>18</em></span>
-                <span class="ui-win__nav"><svg class="ui-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/></svg>Simulated<em>4</em></span>
-                <span class="ui-win__label">Views</span>
-                <span class="ui-win__nav"><span class="ui-win__hash">#</span>overview</span>
-                <span class="ui-win__nav"><span class="ui-win__hash">#</span>incident</span>
-              </div>
-              <div class="ui-win__main">
-                <div class="ui-win__cols"><span>Model</span><span>Detail</span><span>State</span><span>Time</span></div>
-                <ul class="ui-win__rows">
-                  <li class="ui-win__row" data-row><span class="sd-kind-tag">DG</span><span class="ui-win__who">gateway</span><span class="ui-win__sub">12 nodes</span><span class="ui-win__st" data-st>Compiled</span><span class="ui-win__age">0.3ms</span></li>
-                  <li class="ui-win__row" data-row><span class="sd-kind-tag">SC</span><span class="ui-win__who">reconcile</span><span class="ui-win__sub">K8s FSM</span><span class="ui-win__st" data-st>Compiled</span><span class="ui-win__age">0.6ms</span></li>
-                  <li class="ui-win__row" data-row><span class="sd-kind-tag">DB</span><span class="ui-win__who">orders_pg</span><span class="ui-win__sub">sql_table</span><span class="ui-win__st is-you" data-st>Edited</span><span class="ui-win__age">0.4ms</span></li>
-                  <li class="ui-win__row" data-row><span class="sd-kind-tag">NM</span><span class="ui-win__who">nmts_mesh</span><span class="ui-win__sub">550 nodes</span><span class="ui-win__st is-done" data-st>Compiled</span><span class="ui-win__age">2.8ms</span></li>
-                </ul>
-              </div>
+            <div class="sd-hero-svg-frame">
+              <img src="./generated/peer-feedback.svg" data-light-src="./generated/peer-feedback.svg" data-dark-src="./generated/peer-feedback-dark.svg" alt="Compiled peer-feedback architecture diagram showing Client routing validate organization access requests to West and East API clusters with work queues and workers" width="978" height="460">
             </div>
-          </div>
-          <div class="ly-piece ly-piece--note" aria-hidden="true" data-ly-steps="700">
-            <div class="sd-note__head">
-              <div class="sd-note__title">Diagram pipeline</div>
-              <span class="sd-note__badge" data-step data-step-at="3">0.31 ms</span>
-            </div>
-            <div class="sd-note__line" data-step><i>1</i><span><b>Rowan CST</b> keeps comments intact</span></div>
-            <div class="sd-note__line" data-step><i>2</i><span><b>Brandes-Kopf</b> aligns orthogonal tiers</span></div>
-            <div class="sd-note__line" data-step><i>3</i><span><b>A* router</b> separates parallel edges</span></div>
+            <pre class="sd-code-block"><code data-diagram-source>client: Client
+left: West { api: API; queue: Work queue [shape: queue]; worker: Worker; api -&gt; queue -&gt; worker: jobs }
+right: East { api: API; queue: Work queue [shape: queue]; worker: Worker; api -&gt; queue -&gt; worker: jobs }
+client -&gt; left.api: validate organization access
+client -&gt; right.api: validate organization access
+left.worker -&gt; right.queue: send
+right.worker -&gt; left.queue: retry</code></pre>
           </div>
         </div>
       </div>
@@ -629,272 +816,279 @@ footer#contact {
   <section class="section" id="editor" aria-labelledby="editor-h">
     <div class="wrap">
       <div class="section-head">
-        <h2 id="editor-h">Diagram editor with lossless Git diffs</h2>
-        <p>Drag nodes in the Wasm playground or LSP to write grid pins straight into the CST while preserving comments and styling.</p>
+        <span class="section-eyebrow">Live Wasm Playground</span>
+        <h2 id="editor-h">Edit source or drag nodes — Git diffs stay lossless</h2>
+        <p>Powered directly by the same <code>WasmDocument</code> compiler and <code>rowan</code> concrete syntax tree as the standalone playground. Drag any node on the canvas to insert or update <code>@pin</code> attributes while comments and blank lines stay untouched.</p>
       </div>
-      <div class="sd-editor-stage bg-field" aria-hidden="true">
-        <div class="ui app sd-app">
-          <div class="ui ui-panel ui-win" data-ui="window" data-open="Synced" data-work="Patching" data-done="Saved" data-ui-still>
-            <div class="ui-win__bar">
-              <span class="ui-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="ui-win__crumb"><b>services</b> <i>/</i> <b>gateway</b></span>
-              <span class="ui-spacer"></span>
-              <span class="ui-win__search"><svg class="ui-icon" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><span class="ui-win__ph">Files</span><span class="ui-kbd">/</span></span>
-            </div>
-            <div class="ui-win__body">
-              <div class="ui-win__side">
-                <span class="ui-win__nav is-on"><svg class="ui-icon" viewBox="0 0 16 16"><path d="M2.5 9h3l1 1.5h3l1-1.5h3"/><path d="M2.5 9 4 3.5h8L13.5 9v3.5h-11z"/></svg>Workspace<em>5</em></span>
-                <span class="ui-win__nav"><svg class="ui-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/></svg>History<em>14</em></span>
-                <span class="ui-win__label">Views</span>
-                <span class="ui-win__nav"><span class="ui-win__hash">#</span>ingress</span>
-                <span class="ui-win__nav"><span class="ui-win__hash">#</span>storage</span>
-              </div>
-              <div class="ui-win__main">
-                <div class="ui-win__cols"><span>File</span><span>Constraints</span><span>Diff</span><span>Edit</span></div>
-                <ul class="ui-win__rows">
-                  <li class="ui-win__row is-sel" data-row><span class="sd-kind-tag">DG</span><span class="ui-win__who">topology</span><span class="ui-win__sub">@pin(16, 4)</span><span class="ui-win__st is-you" data-st>Modified</span><span class="ui-win__age">now</span></li>
-                  <li class="ui-win__row" data-row><span class="sd-kind-tag">DG</span><span class="ui-win__who">checkout</span><span class="ui-win__sub">4 columns</span><span class="ui-win__st" data-st>Synced</span><span class="ui-win__age">4m</span></li>
-                  <li class="ui-win__row" data-row><span class="sd-kind-tag">DG</span><span class="ui-win__who">reconcile</span><span class="ui-win__sub">6 states</span><span class="ui-win__st" data-st>Synced</span><span class="ui-win__age">12m</span></li>
-                  <li class="ui-win__row" data-row><span class="sd-kind-tag">MD</span><span class="ui-win__who">arch.md</span><span class="ui-win__sub">2 blocks</span><span class="ui-win__st is-done" data-st>Clean</span><span class="ui-win__age">1h</span></li>
-                </ul>
-              </div>
-            </div>
+      <div class="sd-editor-shell">
+        <div class="sd-panel-box">
+          <div class="sd-toolbar">
+            <button id="home-editor-undo" class="sd-btn-sm" type="button">Undo</button>
+            <button id="home-editor-redo" class="sd-btn-sm" type="button">Redo</button>
+            <button id="home-editor-reset" class="sd-btn-sm" type="button">Reset</button>
+            <select id="home-editor-theme" class="sd-select" aria-label="Color theme">
+              <option value="auto">Theme: Auto (Site)</option>
+            </select>
           </div>
-
-          <div class="ui ui-panel ui-diff" data-ui="diff-review" data-ui-still>
-            <div class="ui-diff__head">
-              <svg class="ui-icon ui-diff__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 6.25 3.5 3.5 3.5-3.5"/></svg>
-              <span class="ui-diff__tool" aria-hidden="true"><img src="assets/icons/rust.svg" alt="" width="16" height="16" loading="lazy"></span>
-              <span class="ui-diff__repo">smarter-diagrams</span><i class="ui-diff__slash" aria-hidden="true">/</i>
-              <span class="ui-diff__path"><span class="ui-diff__dir">services/</span><b>topology.diagram</b></span>
-              <span class="ui-spacer"></span>
-              <span class="ui-diff__stat"><b class="is-add"><span class="ui-diff__was">+2</span><span class="ui-diff__now">+2</span></b><b class="is-del"><span class="ui-diff__was">&minus;1</span><span class="ui-diff__now">&minus;1</span></b><span class="ui-diff__bar" aria-hidden="true"><i class="is-add"></i><i class="is-add"></i><i class="is-del"></i></span></span>
-            </div>
-            <div class="ui-diff__hunk"><span>@@ -6,7 +6,8 @@</span> <em class="ui-diff__sig">node declarations · lossless CST patch</em></div>
-            <div class="ui-diff__lines">
-              <div class="ui-diff__ln"><i>6</i><i>6</i><span class="ui-diff__code" data-i="0"><span class="c"># Public edge routes traffic into bounded queue</span></span></div>
-              <div class="ui-diff__ln"><i>7</i><i>7</i><span class="ui-diff__code" data-i="0"><span class="k">gateway</span>: <span class="s">"API Gateway"</span> [port <span class="f">E: rpc</span>]</span></div>
-              <div class="ui-diff__ln is-del"><i>8</i><i></i><span class="ui-diff__code" data-i="0"><span class="k">worker</span>: <span class="s">"Job Worker"</span> <mark class="ui-diff__w">[shape: <span class="f">queue</span>]</mark></span></div>
-              <div class="ui-diff__ln is-add"><i></i><i>8</i><span class="ui-diff__code" data-i="0"><span class="k">worker</span>: <span class="s">"Job Worker"</span> <mark class="ui-diff__w">@pin(grid: 16, 4)</mark> [shape: <span class="f">queue</span>]</span></div>
-              <div class="ui-diff__ln is-target" data-diff-target><i>9</i><i>9</i><span class="ui-diff__code" data-i="0"><span class="k">ledger</span>: <span class="s">"PostgresCluster"</span> [shape: <span class="f">class</span>]</span></div>
-              <div class="ui-diff__sug" data-diff-sug><div class="ui-diff__ln is-add"><i></i><i>10</i><span class="ui-diff__code" data-i="0"><span class="k">align row</span> [<span class="f">gateway</span>, worker, ledger]</span></div></div>
-              <div class="ui-diff__ln"><i>10</i><i>11</i><span class="ui-diff__code" data-i="0"><span class="k">gateway.rpc</span> -&gt; <span class="k">worker.W</span>: <span class="s">"enqueue"</span> [style: <span class="f">dashed</span>]</span></div>
-            </div>
+          <label class="sd-field-label" for="home-editor-source">Diagram source (live Wasm input)</label>
+          <textarea id="home-editor-source" data-diagram-source spellcheck="false" rows="10"># Production ingress — drag any node on the canvas
+client: Client @sim(rate: 80, service_rate: 200)
+gateway: API gateway @sim(service_rate: 100, queue_cap: 200)
+worker: Worker @sim(service_rate: 50, queue_cap: 100, retry: exp_backoff(0.5, 0.2))
+db: Database @sim(service_rate: 80)
+client.E -&gt; gateway.W: HTTPS
+gateway.E -&gt; worker.W: jobs
+worker.E -&gt; db.W: writes
+flow request { client -&gt; gateway -&gt; worker -&gt; db }</textarea>
+          <p id="home-editor-status" role="status">Loading Rust/Wasm compiler…</p>
+          <span class="sd-field-label">Real-time CST Git diff</span>
+          <pre id="home-editor-diff" class="sd-diff-pre" aria-live="polite">No canvas edits yet — drag any node or edit source.</pre>
+        </div>
+        <div class="sd-panel-box">
+          <div id="home-editor-controls"></div>
+          <div id="home-editor-canvas" tabindex="0" aria-label="Interactive diagram canvas">
+            <img src="./generated/simulation.svg" data-light-src="./generated/simulation.svg" data-dark-src="./generated/simulation-dark.svg" alt="Production ingress queue pipeline connecting Client, API gateway, Worker, and Database" width="820" height="240">
+          </div>
+          <div class="sd-canvas-foot">
+            <span>Drag nodes to emit <code>@pin</code> · Double-click labels to reset · Escape cancels drag</span>
+            <a class="link" href="./playground.html">Open full playground</a>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="section" id="layout" data-moment="pinned-chapters" style="--hm: 2" aria-labelledby="layout-h">
-    <div class="wrap mo-pc__grid">
-      <div class="mo-pc__text">
-        <h2 id="layout-h">Diagram layout compiler</h2>
-        <p>Combine hierarchical tiers, explicit row alignment, typed record ports, and progressive views in one file.</p>
-        <ol class="mo-pc__steps">
-          <li class="mo-pc__step">
-            <h3>Orthogonal diagram routing</h3>
-            <p>Sugiyama layering, Brandes-Kopf alignment, and A* channels separate edges and labels.</p>
-            <div class="mo-pc__visual mo-pc__visual--lit sd-chapter-stage">
-              <div class="dg" data-diagram><script type="application/json">{
-                "layout": "hub",
-                "alt": "Smarter Diagrams compilation pipeline from CST parse to orthogonal SVG",
-                "ground": "rings",
-                "motion": { "cycle": 3.2 },
-                "center": { "label": "Layout Core", "icon": "rust" },
-                "spokes": [
-                  { "label": "Rowan CST", "kind": "pill", "kindCompact": "pill", "icon": "ui:layers" },
-                  { "label": "Brandes-Kopf", "kind": "pill", "kindCompact": "pill", "icon": "ui:cpu" },
-                  { "label": "A* Router", "kind": "pill", "kindCompact": "pill", "icon": "ui:git-branch" },
-                  { "label": "SVG Output", "kind": "pill", "kindCompact": "pill", "icon": "ui:check" }
-                ]
-              }</script></div>
-            </div>
-          </li>
-          <li class="mo-pc__step">
-            <h3>Class and schema diagrams</h3>
-            <p>Render typed UML compartments, SQL tables with pinned ports, and highlighted code blocks.</p>
-            <div class="mo-pc__visual mo-pc__visual--lit sd-chapter-stage">
-              <div class="ui ui-panel ui-code" data-ui="code" data-ui-still>
-                <div class="ui-code__tabs">
-                  <span class="ui-code__tab is-on"><i class="ui-code__lang">DG</i>cluster.dgm</span>
-                  <span class="ui-spacer"></span>
-                  <span class="ui-chip ui-chip--plain ui-code__chip">class</span>
-                </div>
-                <pre class="ui-code__pre"><code><span class="ui-code__ln" data-n="1"><span class="k">cr</span>: <span class="s">"PostgresCR"</span> [<span class="f">class</span>] {</span>
-<span class="ui-code__ln" data-n="2">  <span class="k">port</span> pods: <span class="f">"int32"</span></span>
-<span class="ui-code__ln is-mark" data-n="3">  <span class="k">port</span> state: <span class="f">"Ready"</span></span>
-<span class="ui-code__ln" data-n="4">}</span>
-<span class="ui-code__ln" data-n="5"><span class="k">q</span>: <span class="s">"```sql\nSELECT 1\n```"</span></span></code></pre>
-                <div class="ui-code__hint"><span class="ui-dot"></span><span>Typed fields align with ports.</span></div>
-              </div>
-            </div>
-          </li>
-          <li class="mo-pc__step">
-            <h3>Layered diagram views and lenses</h3>
-            <p>Reveal detail progressively with declarative views and elliptical boundary zones.</p>
-            <div class="mo-pc__visual mo-pc__visual--lit sd-chapter-stage">
-              <div class="ui ui-panel ui-code" data-ui="code" data-ui-still>
-                <div class="ui-code__tabs">
-                  <span class="ui-code__tab is-on"><i class="ui-code__lang">DG</i>views.dgm</span>
-                  <span class="ui-spacer"></span>
-                  <span class="ui-chip ui-chip--plain ui-code__chip">views</span>
-                </div>
-                <pre class="ui-code__pre"><code><span class="ui-code__ln" data-n="1"><span class="k">zone</span> mesh [<span class="f">api</span>, cache] {</span>
-<span class="ui-code__ln" data-n="2">  <span class="c"># Elliptical hull</span></span>
-<span class="ui-code__ln" data-n="3">}</span>
-<span class="ui-code__ln is-mark" data-n="4"><span class="k">view</span> edge [<span class="f">api</span>, db]</span>
-<span class="ui-code__ln" data-n="5"><span class="k">flow</span> edge: api -&gt; db</span></code></pre>
-                <div class="ui-code__hint"><span class="ui-dot"></span><span>Layer progressive views cleanly.</span></div>
-              </div>
-            </div>
-          </li>
-        </ol>
-        <p><a class="link" href="./language/basics.html">See language specs</a></p>
+  <section class="section" id="layout" data-moment="pinned-chapters" aria-labelledby="layout-h">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="section-eyebrow">Deterministic Orthogonal Layout</span>
+        <h2 id="layout-h">Queues, UML tables, zones, and highlighted code blocks</h2>
+        <p>Every homepage figure below is precompiled cleanly by <code>smarter-diagrams</code> with zero manual pixel drawing, with full light and dark palette support.</p>
       </div>
-      <div class="mo-pc__visuals frame"></div>
+      <div class="sd-chapters-wrap">
+        <article class="sd-chapter-row mo-pc__chapter is-live">
+          <div class="sd-chapter-copy">
+            <span class="sd-pill-label">01 · Fan-out &amp; Fan-in Routing</span>
+            <h3>Parallel worker queues without overlapping wires</h3>
+            <p class="mo-pc__p-in">Ranked Sugiyama tiers, Brandes-Kopf alignment, and A* orthogonal channel separation route 1-to-N dispatch and result collection cleanly.</p>
+            <pre class="sd-code-block"><code data-diagram-source>api: API
+queue: Work queue [shape: queue]
+store: Results [shape: database]
+w0: Worker 1 [shape: rect]
+w1: Worker 2 [shape: rect]
+w2: Worker 3 [shape: rect]
+w3: Worker 4 [shape: rect]
+w4: Worker 5 [shape: rect]
+api -&gt; queue: submit
+queue -&gt; w0: dispatch
+w0 -&gt; store: result
+queue -&gt; w1: dispatch
+w1 -&gt; store: result
+queue -&gt; w2: dispatch
+w2 -&gt; store: result
+queue -&gt; w3: dispatch
+w3 -&gt; store: result
+queue -&gt; w4: dispatch
+w4 -&gt; store: result</code></pre>
+          </div>
+          <div class="sd-chapter-stage">
+            <div class="mo-pc__visual">
+              <img src="./generated/dispatch-collect.svg" data-light-src="./generated/dispatch-collect.svg" data-dark-src="./generated/dispatch-collect-dark.svg" alt="Fan-out dispatch-collect diagram routing API requests through a Work queue to Workers 1 through 5 and storing results in a database" width="840" height="480" loading="lazy">
+            </div>
+          </div>
+        </article>
+
+        <article class="sd-chapter-row mo-pc__chapter">
+          <div class="sd-chapter-copy">
+            <span class="sd-pill-label">02 · Class Shapes &amp; Semantic Zones</span>
+            <h3>Typed ports and elliptical RBAC boundaries</h3>
+            <p class="mo-pc__p-in">Reusable <code>[shape: class]</code> nodes render title, stereotype, typed field compartments, and methods alongside smooth elliptical ownership zones.</p>
+            <pre class="sd-code-block"><code data-diagram-source>apiserver: "kube-apiserver" {
+  sts: "StatefulSet &amp; Svc"
+  cr: "PostgresCluster CR" [shape: class, stereotype: "CustomResource", methods: "+reconcile(ctx: Context): Result"] {
+    port spec: ClusterSpec [side: W, pos: 1]
+    port status: ClusterStatus [side: E, pos: 2]
+  }
+  etcd: "etcd Quorum" [shape: database]
+  sts -&gt; etcd: "store"
+  cr -&gt; etcd: "RAFT"
+}
+
+zone rbac "Controller RBAC scope" around [apiserver.sts, apiserver.cr] {
+  padding: 1.15g
+  tint: oklch(0.79 0.08 175 / 0.16)
+}</code></pre>
+          </div>
+          <div class="sd-chapter-stage">
+            <div class="mo-pc__visual">
+              <img src="./generated/kube-operator.svg" data-light-src="./generated/kube-operator.svg" data-dark-src="./generated/kube-operator-dark.svg" alt="Kubernetes operator reconciliation loop showing PostgresCluster CR class node, etcd Quorum, Informer, Workqueue, Reconciler, and Controller RBAC zone" width="960" height="560" loading="lazy">
+            </div>
+          </div>
+        </article>
+
+        <article class="sd-chapter-row mo-pc__chapter">
+          <div class="sd-chapter-copy">
+            <span class="sd-pill-label">03 · Fenced Code &amp; Themes</span>
+            <h3>Syntax-highlighted SQL &amp; Rust blocks with animated edges</h3>
+            <p class="mo-pc__p-in">Markdown triple-backtick fences inside labels are tokenized cleanly at compile time, paired with <code>marching-ants</code> streams, Catppuccin, Solarized, and Base16 palettes.</p>
+            <pre class="sd-code-block"><code data-diagram-source>client: "API Gateway" [shape: actor]
+broker: "Job Broker" [shape: queue]
+
+worker: """
+Job Worker
+```rust
+pub async fn run(q: &amp;Queue) -&gt; Result&lt;(), Err&gt; {
+    while let Some(job) = q.pop().await {
+        process(job, 250).await?;
+    }
+    Ok(())
+}
+```
+"""
+
+ledger: """
+PostgreSQL Outbox
+```sql
+SELECT id, payload, attempts
+FROM job_queue
+WHERE state = 'queued' -- active partition
+ORDER BY run_at ASC
+LIMIT 64;
+```
+""" [shape: database]
+
+client -&gt; broker: "enqueue"
+broker -&gt; worker: "stream" [style: marching-ants]
+worker -&gt; ledger: "claim batch" [style: marching-ants]
+
+align row [client, broker, worker, ledger]
+
+flow claim "Streaming claim loop" {
+  client -&gt; broker -&gt; worker -&gt; ledger
+}</code></pre>
+          </div>
+          <div class="sd-chapter-stage">
+            <div class="mo-pc__visual">
+              <img src="./generated/themes-and-code.svg" data-light-src="./generated/themes-and-code.svg" data-dark-src="./generated/themes-and-code-dark.svg" alt="API Gateway, Job Broker queue, Rust Job Worker code card, and SQL PostgreSQL Outbox node linked by animated dashed streaming edges" width="980" height="360" loading="lazy">
+            </div>
+          </div>
+        </article>
+      </div>
     </div>
   </section>
 
   <section class="section ground-inverse" id="runtime" aria-labelledby="runtime-h">
     <div class="wrap">
-      <div class="grid grid--middle fill">
-        <div class="split-col span-5">
-          <div class="section-head">
-            <h2 id="runtime-h">Queue and statechart diagram simulation</h2>
-            <p>Stress-test service queues in a Web Worker, step hierarchical statecharts, and export animated GIF or WebM loops.</p>
-          </div>
-          <div class="split-col__end">
-            <a class="link" href="./runtime/simulation.html">Explore diagram simulation</a>
-          </div>
+      <div class="section-head">
+        <span class="section-eyebrow">Executable Diagrams &amp; Statecharts</span>
+        <h2 id="runtime-h">Coupled queue &amp; circuit-breaker simulation in Wasm</h2>
+        <p>Driven live by <code>WasmStatechart</code> from <code>pkg-runtime</code>. Step discrete queueing traffic or raise ingress load until worker saturation reaches 85%, tripping the circuit breaker and severing upstream flow.</p>
+      </div>
+      <div class="sd-sim-card">
+        <div class="sd-toolbar">
+          <button id="home-sim-play" class="sd-inv-btn is-primary" type="button">Play</button>
+          <button id="home-sim-step" class="sd-inv-btn" type="button">Step</button>
+          <button id="home-sim-reset" class="sd-inv-btn" type="button">Reset</button>
+          <label class="sd-range-wrap" for="home-sim-rate">
+            <span>Ingress (api): <strong id="home-sim-rate-val">95/s</strong></span>
+            <input id="home-sim-rate" type="range" min="0" max="220" value="95">
+          </label>
+          <span class="sd-pill-label" style="color:var(--p-inv-muted)">Shift+click any edge in SVG to cut or restore link</span>
         </div>
-        <div class="frame frame--split frame--lit frame--fill span-6 start-7" aria-hidden="true">
-          <div class="stage">
-            <div class="at-rise fit">
-              <div class="ui ui-panel ui-code sd-runtime-spec" data-ui="code" data-ui-still>
-                <div class="ui-code__tabs">
-                  <span class="ui-code__tab is-on"><i class="ui-code__lang">SC</i>reconcile.dgm</span>
-                  <span class="ui-spacer"></span>
-                  <span class="ui-chip ui-chip--plain ui-code__chip">sim</span>
-                </div>
-                <pre class="ui-code__pre"><code><span class="ui-code__ln" data-n="1"><span class="k">queue</span> work_q [capacity: <span class="f">64</span>]</span>
-<span class="ui-code__ln is-mark" data-n="2"><span class="k">state</span> Sync -&gt; Ready [guard: <span class="f">ok</span>]</span>
-<span class="ui-code__ln" data-n="3"><span class="k">state</span> Retry -&gt; Backoff [limit: <span class="f">5</span>]</span>
-<span class="ui-code__ln" data-n="4"><span class="k">sim</span> work_q [rate: <span class="f">180rps</span>]</span>
-<span class="ui-code__ln" data-n="5"><span class="k">trace</span> db [warn: <span class="f">drift &gt; 12ms</span>]</span>
-<span class="ui-code__ln" data-n="6"><span class="k">export</span> gif [fps: <span class="f">24</span>, loop: <span class="f">true</span>]</span></code></pre>
-                <div class="ui-code__hint"><span class="ui-dot"></span><span>Worker simulation checks guards and latency.</span></div>
-              </div>
-              <div class="ui ui-panel ui-pipe" data-ui="pipeline-board" data-ui-still>
-                <div class="ui-pipe__head">
-                  <svg class="ui-icon ui-pipe__branch" viewBox="0 0 16 16" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.5"/><circle cx="4.5" cy="12.5" r="1.5"/><circle cx="11.5" cy="5" r="1.5"/><path d="M4.5 5v6M11.5 6.5c0 2.6-2.2 3.6-5.6 4.6"/></svg>
-                  <span class="ui-pipe__repo">runtime</span><i class="ui-pipe__slash">/</i><code class="ui-pipe__ref">queue</code>
-                  <span class="ui-spacer"></span>
-                  <span class="ui-pipe__total"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8.5" r="5.5"/><path d="M8 5.5v3l2 1.25M6.5 1.75h3"/></svg><span data-pipe-total>180 rps</span></span>
-                  <span class="ui-chip ui-chip--ink ui-chip--live ui-pipe__chip" data-pipe-chip data-done="Verified">Passed</span>
-                </div>
-                <div class="ui-pipe__commit">
-                  <span class="sd-kind-tag">SC</span>
-                  <span class="ui-pipe__msg">work_queue + cr_reconcile</span>
-                  <code class="ui-pipe__sha">2.4 ms</code>
-                </div>
-                <ol class="ui-pipe__steps">
-                  <li class="ui-pipe__step is-done" data-step="parse"><span class="ui-pipe__ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5"/></svg></span><span class="ui-pipe__name"><span class="ui-pipe__tool" aria-hidden="true"><img src="assets/icons/git.svg" alt="" width="16" height="16" loading="lazy"></span><span class="ui-pipe__nm">Parse</span></span><code class="ui-pipe__cmd">rowan AST</code><span class="ui-pipe__time" data-time>0.2 ms</span><span class="ui-pipe__bar"><i></i></span></li>
-                  <li class="ui-pipe__step is-done" data-step="sim"><span class="ui-pipe__ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5"/></svg></span><span class="ui-pipe__name"><span class="ui-pipe__tool" aria-hidden="true"><img src="assets/icons/rust.svg" alt="" width="16" height="16" loading="lazy"></span><span class="ui-pipe__nm">Queue</span></span><code class="ui-pipe__cmd">100% full</code><span class="ui-pipe__time" data-time>1.1 ms</span><span class="ui-pipe__bar"><i></i></span></li>
-                  <li class="ui-pipe__step is-done" data-step="sc"><span class="ui-pipe__ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5"/></svg></span><span class="ui-pipe__name"><span class="ui-pipe__tool" aria-hidden="true"><img src="assets/icons/kubernetes.svg" alt="" width="16" height="16" loading="lazy"></span><span class="ui-pipe__nm">Guards</span></span><code class="ui-pipe__cmd">Sync guard</code><span class="ui-pipe__time" data-time>0.4 ms</span><span class="ui-pipe__bar"><i></i></span></li>
-                  <li class="ui-pipe__step is-done" data-step="drift"><span class="ui-pipe__ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5"/></svg></span><span class="ui-pipe__name"><span class="ui-pipe__tool" aria-hidden="true"><img src="assets/icons/opentelemetry.svg" alt="" width="16" height="16" loading="lazy"></span><span class="ui-pipe__nm">Trace</span></span><code class="ui-pipe__cmd">0 hops</code><span class="ui-pipe__time" data-time>0.5 ms</span><span class="ui-pipe__bar"><i></i></span></li>
-                </ol>
-              </div>
-            </div>
-          </div>
+        <div class="sd-badges" id="home-sim-states" aria-live="polite">
+          <span class="sd-badge">Loading statechart runtime…</span>
         </div>
+        <div class="sd-badges" id="home-sim-events"></div>
+        <div class="sd-sim-stage" id="home-sim-canvas" aria-label="Live coupled queue and circuit-breaker diagram">
+          <img src="./generated/coupled-circuit-breaker-dark.svg" alt="Coupled API Gateway, Worker Pool, Database, and Circuit Breaker statechart diagram" width="790" height="598" loading="lazy">
+        </div>
+        <div class="sd-metrics-grid" id="home-sim-metrics" aria-live="polite"></div>
+        <details class="sd-details">
+          <summary>View coupled-circuit-breaker.diagram source</summary>
+          <pre class="sd-code-block"><code id="home-sim-source" data-diagram-source>api: "API Gateway" @sim(rate: 95, service_rate: 160)
+workers: "Worker Pool" @sim(workers: 2, service_rate: 18, queue_cap: 25, retry: exp_backoff(0.4, 0.25))
+db: "Database" [shape: database] @sim(service_rate: 80)
+
+api -&gt; workers: "dispatch"
+workers -&gt; db: "write"
+
+breaker [label: "Circuit Breaker", context: "trips=0"] {
+  b_init [shape: initial]
+  closed [label: "Closed"]
+  open [label: "Open"]
+  half_open [label: "Half-Open"]
+  b_init -&gt; closed
+  closed -&gt; open: "[workers.saturation &gt;= 0.85] / trips += 1; sever(api -&gt; workers)"
+  open -&gt; half_open: "probe / restore(api -&gt; workers); set_rate(api, 30)"
+  half_open -&gt; closed: "stabilized / set_rate(api, 55)"
+  half_open -&gt; open: "[workers.saturation &gt;= 0.85] / trips += 1; sever(api -&gt; workers)"
+}</code></pre>
+        </details>
       </div>
     </div>
   </section>
 
-  <section class="section g2m" id="tooling" aria-labelledby="tooling-h">
+  <section class="section" id="tooling" aria-labelledby="tooling-h">
     <div class="wrap">
-      <div class="group sd-tooling-group sd-tooling-group--a">
-        <div class="section-head section-head--split">
-          <div>
-            <h2 id="tooling-h">Diagram compiler integrations</h2>
-            <p>Compile in CI builds, Neovim buffers, Hugo sites, LSP workspaces, or Kroki gateways.</p>
-          </div>
-          <a class="link" href="./guide/lsp.html">See integrations</a>
-        </div>
-        <article class="card card--open">
-          <h3>Rust CLI and Wasm runtime</h3>
-          <p>Ship 299 KB Brotli core Wasm with static SVG, PNG, and GIF export.</p>
-          <div class="panel panel--inset" aria-hidden="true">
-            <div class="stage stage--fade-br">
-              <div class="at-rise fit">
-                <div class="ui ui-panel ui-term" data-ui="terminal-run" data-ui-still>
-                  <div class="ui-term__head">
-                    <span class="ui-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                    <span class="ui-term__title">smarter-diagrams</span>
-                    <span class="ui-meta">cli</span>
-                    <span class="ui-spacer"></span>
-                    <span class="ui-chip ui-chip--plain ui-term__branch">v0.4</span>
-                  </div>
-                  <div class="ui-term__screen">
-                    <div class="ui-term__track">
-                      <div class="ui-term__ln ui-term__cmd is-ran"><span class="ui-term__cwd">~</span><span class="ui-term__sig">$</span><span class="ui-term__typed">sd check --all</span></div>
-                      <div class="ui-term__ln ui-term__log"><svg class="ui-term__tick" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.4 2.8 2.8 6.2-6.4"/></svg><span class="ui-term__path">examples/*.dgm</span><span class="ui-term__n">21</span><span class="ui-term__t">19ms</span></div>
-                      <div class="ui-term__ln ui-term__log"><svg class="ui-term__tick" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.4 2.8 2.8 6.2-6.4"/></svg><span class="ui-term__path">wasm-core.br</span><span class="ui-term__n">299KB</span><span class="ui-term__t">MIT</span></div>
-                      <div class="ui-term__ln ui-term__done"><span class="ui-term__ok"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.3 2.4 2.4 4.6-5"/></svg></span><b>Clean</b><span class="ui-term__dim">70.5ms · 550</span></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </article>
+      <div class="section-head">
+        <span class="section-eyebrow">CLI, Rust Crate &amp; Ecosystem</span>
+        <h2 id="tooling-h">Same compiler from terminal, editor LSP, Hugo, and Kroki</h2>
+        <p>Every subcommand, theme preset, LSP capability, and Rust type signature below matches the shipped binary and workspace crates.</p>
       </div>
-
-      <div class="group sd-tooling-group sd-tooling-group--b">
+      <div class="sd-tooling-grid">
         <article class="card card--open">
-          <h3>Diagram editor and Kroki plugins</h3>
-          <p>Go to definition, preview via Neovim vim.ui.img, or inline Hugo blocks.</p>
-          <div class="panel panel--inset">
-            <div class="dg" data-diagram><script type="application/json">{
-              "layout": "hub",
-              "alt": "Smarter Diagrams editor, static site, and runtime integrations",
-              "ground": "rings",
-              "motion": { "cycle": 3.0 },
-              "center": { "label": "Smarter Diagrams", "icon": "rust" },
-              "spokes": [
-                { "label": "GitHub CI", "icon": "github" },
-                { "label": "VS Code LSP", "icon": "vscode" },
-                { "label": "Docker Kroki", "icon": "docker" },
-                { "label": "Kubernetes", "icon": "kubernetes" },
-                { "label": "PostgreSQL", "icon": "postgres" },
-                { "label": "OpenTelemetry", "icon": "opentelemetry" }
-              ]
-            }</script></div>
+          <h3>Command-line &amp; export</h3>
+          <p>Render deterministic SVG, PNG, PDF, GIF, or APNG animations, inspect views and steps, or validate CI sources with real CLI flags.</p>
+          <pre class="sd-code-block"><code>smarter-diagrams architecture.diagram -o architecture.svg
+smarter-diagrams themes-and-code.diagram --theme catppuccin-mocha -o out.svg
+smarter-diagrams simulation.diagram --format gif --frames 40 --fps 12 -o sim.gif
+smarter-diagrams architecture.diagram --format check
+smarter-diagrams lsp   # stdio LSP
+smarter-diagrams mcp   # Model Context Protocol</code></pre>
+          <div class="sd-card-links">
+            <a class="link" href="./guide/cli.html">CLI reference</a>
+            <a class="link" href="./reference/performance.html">NMTS &amp; 299 KB Wasm benchmarks</a>
           </div>
         </article>
 
         <article class="card card--open">
-          <h3>Diagram benchmarks and specs</h3>
-          <p>Laid out in 70.5 ms at 550 entities with MIT-compatible crates.</p>
-          <div class="panel panel--inset" aria-hidden="true">
-            <div class="stage">
-              <div class="at-rise fit">
-                <div class="ui ui-panel sd-eco-panel">
-                  <div class="sd-eco-grid" aria-label="Supported runtimes, tools, and schema integrations">
-                    <span class="ic-tile"><img class="ic ic-24 ic-ink" src="assets/icons/rust.svg" alt="Rust" width="24" height="24" loading="lazy"></span>
-                    <span class="ic-tile"><svg class="ic ic-svg ic-24" role="img" aria-label="WebAssembly" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M157.29 0H256v256H0V0h98.71c0 .46-.07.91-.07 1.38 0 16.21 13.14 29.36 29.36 29.36s29.36-13.15 29.36-29.36c0-.47-.05-.92-.07-1.38Zm58.33 228.6h17.6L206.56 138H179.8l-21.95 90.6h17.06l4.44-20.18h30.49l5.78 20.18Zm-93.4 0h16.84l21.61-90.6h-16.63l-13.24 62.45h-.21l-12.57-62.45h-15.87L88.16 199.66h-.21L76.34 138H59.39l19.53 90.6h17.17l13.44-61.69h.22l12.47 61.69Zm67.78-68.29h7.13l8.5 33.26H182.6l7.4-33.26Z"/></svg></span>
-                    <span class="ic-tile"><img class="ic ic-24" src="assets/icons/kubernetes.svg" alt="Kubernetes" width="24" height="24" loading="lazy"></span>
-                    <span class="ic-tile"><img class="ic ic-24" src="assets/icons/opentelemetry.svg" alt="OpenTelemetry" width="24" height="24" loading="lazy"></span>
-                    <span class="ic-tile"><img class="ic ic-24" src="assets/icons/postgres.svg" alt="PostgreSQL" width="24" height="24" loading="lazy"></span>
-                    <span class="ic-tile"><img class="ic ic-24 ic-ink" src="assets/icons/github.svg" alt="GitHub" width="24" height="23" loading="lazy"></span>
-                    <span class="ic-tile"><img class="ic ic-24" src="assets/icons/git.svg" alt="Git" width="24" height="24" loading="lazy"></span>
-                    <span class="ic-tile"><img class="ic ic-24" src="assets/icons/vscode.svg" alt="VS Code" width="24" height="24" loading="lazy"></span>
-                    <span class="ic-tile"><img class="ic ic-24 ic-land" src="assets/icons/docker.svg" alt="Docker" width="24" height="17" loading="lazy"></span>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <h3>Rust API &amp; Language Server</h3>
+          <p>Embed the lossless parser and layout solver directly in Rust, or run <code>smarter-diagrams lsp</code> in Neovim (with <code>vim.ui.img</code> preview) and VS Code.</p>
+          <pre class="sd-code-block"><code data-rust-source>let diagram = smarter_diagrams::compile("client -&gt; gateway: HTTPS\n")?;
+assert_eq!(diagram.scene.nodes.len(), 2);
+let svg = diagram.to_svg();
+assert!(svg.contains("&lt;svg"));</code></pre>
+          <div class="sd-card-links">
+            <a class="link" href="./api/smarter_diagrams/index.html">Rust API docs</a>
+            <a class="link" href="./guide/lsp.html">LSP guide</a>
+            <a class="link" href="./guide/editors.html">Neovim &amp; editors</a>
+          </div>
+        </article>
+
+        <article class="card card--open">
+          <h3>Hugo, Kroki &amp; themes</h3>
+          <p>Pre-render fenced <code>diagram</code> blocks in Hugo with zero client JS, or deploy <code>extensions/kroki</code> speaking Kroki REST &amp; JSON endpoints.</p>
+          <pre class="sd-code-block"><code># Hugo module (hugo.toml)
+path = "github.com/robot-head/smarter-diagrams/extensions/hugo"
+
+# Kroki companion HTTP gateway (:8008)
+curl -X POST http://127.0.0.1:8008/smarterdiagrams/svg \
+  -H 'Content-Type: text/plain' \
+  --data-binary 'client -&gt; api: HTTPS'</code></pre>
+          <div class="sd-eco-row" aria-label="Supported ecosystem tools">
+            <span class="ic-tile" title="Rust"><img class="ic ic-24 ic-ink" src="assets/icons/rust.svg" alt="Rust" width="24" height="24" loading="lazy"></span>
+            <span class="ic-tile" title="WebAssembly"><img class="ic ic-24" src="assets/icons/webassembly.svg" alt="WebAssembly" width="24" height="24" loading="lazy"></span>
+            <span class="ic-tile" title="Neovim"><img class="ic ic-24" src="assets/icons/neovim.svg" alt="Neovim" width="24" height="24" loading="lazy"></span>
+            <span class="ic-tile" title="VS Code"><img class="ic ic-24" src="assets/icons/vscode.svg" alt="VS Code" width="24" height="24" loading="lazy"></span>
+            <span class="ic-tile" title="Docker"><img class="ic ic-24 ic-land" src="assets/icons/docker.svg" alt="Docker" width="24" height="17" loading="lazy"></span>
+            <span class="ic-tile" title="Git"><img class="ic ic-24" src="assets/icons/git.svg" alt="Git" width="24" height="24" loading="lazy"></span>
+            <span class="ic-tile" title="Kubernetes"><img class="ic ic-24" src="assets/icons/kubernetes.svg" alt="Kubernetes" width="24" height="24" loading="lazy"></span>
+            <span class="ic-tile" title="PostgreSQL"><img class="ic ic-24" src="assets/icons/postgres.svg" alt="PostgreSQL" width="24" height="24" loading="lazy"></span>
+            <span class="ic-tile" title="OpenTelemetry"><img class="ic ic-24" src="assets/icons/opentelemetry.svg" alt="OpenTelemetry" width="24" height="24" loading="lazy"></span>
+          </div>
+          <div class="sd-card-links">
+            <a class="link" href="./guide/hugo.html">Hugo plugin</a>
+            <a class="link" href="./guide/kroki.html">Kroki service</a>
           </div>
         </article>
       </div>
@@ -906,8 +1100,8 @@ footer#contact {
   <div class="wrap">
     <div class="closing__cta close--type">
       <div class="section-head">
-        <h2>Compile diagrams from text</h2>
-        <p>Write plain source files once for Git reviews, static Hugo docs, Wasm editing, and simulation.</p>
+        <h2>Compile diagrams from plain text</h2>
+        <p>Write version-controlled sources once for Git code review, Hugo docs, live Wasm editing, and discrete simulation.</p>
       </div>
       <a class="btn btn--primary btn--xl btn--wide" href="./playground.html">
         <span>Open the playground</span>
@@ -924,6 +1118,7 @@ footer#contact {
           <ul>
             <li><a href="./playground.html">Playground</a></li>
             <li><a href="./examples.html">Examples</a></li>
+            <li><a href="./guide/demonstrations.html">Domain demos</a></li>
           </ul>
         </div>
         <div class="footer__col span-2">
@@ -931,6 +1126,7 @@ footer#contact {
           <ul>
             <li><a href="./guide/getting-started.html">Getting started</a></li>
             <li><a href="./guide/editing.html">Structured editing</a></li>
+            <li><a href="./guide/cli.html">CLI reference</a></li>
           </ul>
         </div>
         <div class="footer__col span-2">
@@ -938,12 +1134,14 @@ footer#contact {
           <ul>
             <li><a href="./runtime/simulation.html">Queue simulation</a></li>
             <li><a href="./runtime/statecharts.html">Statecharts</a></li>
+            <li><a href="./runtime/views.html">Views &amp; steps</a></li>
           </ul>
         </div>
         <div class="footer__col span-2">
           <h3>Tooling</h3>
           <ul>
             <li><a href="./guide/lsp.html">Language server</a></li>
+            <li><a href="./guide/hugo.html">Hugo &amp; Kroki</a></li>
             <li><a href="./api/smarter_diagrams/index.html">Rust API docs</a></li>
           </ul>
         </div>
@@ -964,7 +1162,368 @@ footer#contact {
 <script type="module" src="assets/system.js"></script>
 <script type="module" src="assets/motion/motion.js"></script>
 <script type="module" src="assets/layout/layout.js"></script>
-<script type="module" src="assets/diagrams/mount.js"></script>
+<script type="module">
+import initEditor, { WasmDocument, available_themes_json } from './demo/pkg/smarter_diagrams.js';
+import initRuntime, { WasmStatechart } from './demo/pkg-runtime/smarter_diagrams.js';
+import { DiagramViewport } from './demo/diagram-viewport.js';
+import { DiagramSnapping } from './demo/diagram-snapping.js';
+import { NodeDragController } from './demo/node-drag.js';
+import { patchSvg } from './demo/svg-patch.js';
+import { sourceEditor } from './demo/source-editor.js';
+
+function syncThemeAssets() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  for (const img of document.querySelectorAll('img[data-light-src][data-dark-src]')) {
+    const next = dark ? img.dataset.darkSrc : img.dataset.lightSrc;
+    if (next && img.getAttribute('src') !== next) img.setAttribute('src', next);
+  }
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) metaTheme.setAttribute('content', dark ? '#141820' : '#ffffff');
+  window.tasteBackgrounds?.detect?.();
+}
+syncThemeAssets();
+
+function computeLineDiff(beforeText, afterText) {
+  const a = beforeText.replace(/\r\n/g, '\n').split('\n');
+  const b = afterText.replace(/\r\n/g, '\n').split('\n');
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1));
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const ops = [];
+  let i = 0, j = 0;
+  while (i < m && j < n) {
+    if (a[i] === b[j]) { ops.push({ kind: 'ctx', text: a[i] }); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { ops.push({ kind: 'del', text: a[i] }); i++; }
+    else { ops.push({ kind: 'add', text: b[j] }); j++; }
+  }
+  while (i < m) ops.push({ kind: 'del', text: a[i++] });
+  while (j < n) ops.push({ kind: 'add', text: b[j++] });
+  return ops;
+}
+
+// 1. Live Wasm Editor & CST Git Diff (#editor)
+const sourceEl = document.querySelector('#home-editor-source');
+const canvasEl = document.querySelector('#home-editor-canvas');
+const controlsEl = document.querySelector('#home-editor-controls');
+const statusEl = document.querySelector('#home-editor-status');
+const diffEl = document.querySelector('#home-editor-diff');
+const themeSelect = document.querySelector('#home-editor-theme');
+const INITIAL_EDITOR_SOURCE = sourceEl.value.replace(/\r\n/g, '\n');
+
+sourceEditor(sourceEl);
+const view = new DiagramViewport(canvasEl, controlsEl, 'Interactive diagram canvas');
+const snapping = new DiagramSnapping(canvasEl, controlsEl);
+const moveButton = document.createElement('button');
+moveButton.type = 'button';
+moveButton.textContent = 'Move nodes';
+moveButton.setAttribute('aria-pressed', 'false');
+controlsEl.append(moveButton);
+
+let doc = null, dragController = null, activeTheme = 'auto', touchMove = false, inputTimer = 0;
+
+function updateDiff() {
+  if (!doc) return;
+  const beforeNorm = INITIAL_EDITOR_SOURCE.replace(/\r\n/g, '\n').trimEnd();
+  const current = doc.source().replace(/\r\n/g, '\n').trimEnd();
+  if (current === beforeNorm) {
+    diffEl.textContent = 'No canvas edits yet — drag any node or edit source.';
+    return;
+  }
+  const ops = computeLineDiff(beforeNorm, current);
+  const changed = ops.map((op, idx) => op.kind !== 'ctx' ? idx : -1).filter(idx => idx >= 0);
+  const frag = document.createDocumentFragment();
+  let lastShown = -2;
+  for (let k = 0; k < ops.length; k++) {
+    const near = changed.some(c => Math.abs(c - k) <= 1);
+    if (!near) continue;
+    if (k > lastShown + 1 && lastShown >= 0) {
+      const sep = document.createElement('span');
+      sep.className = 'sd-diff-ctx';
+      sep.textContent = '@@ ... @@';
+      frag.append(sep);
+    }
+    const op = ops[k];
+    const line = document.createElement('span');
+    line.className = op.kind === 'add' ? 'sd-diff-add' : op.kind === 'del' ? 'sd-diff-del' : 'sd-diff-ctx';
+    const prefix = op.kind === 'add' ? '+ ' : op.kind === 'del' ? '- ' : '  ';
+    line.textContent = prefix + op.text;
+    frag.append(line);
+    lastShown = k;
+  }
+  diffEl.replaceChildren(frag);
+}
+
+function showEditorSvg(svgMarkup, bounds) {
+  const left = canvasEl.scrollLeft, top = canvasEl.scrollTop;
+  const svgNode = patchSvg(canvasEl, svgMarkup);
+  if (activeTheme === 'auto') {
+    for (const prop of [...svgNode.style]) {
+      if (prop.startsWith('--sd-') || prop === 'background' || prop.startsWith('background-')) {
+        svgNode.style.removeProperty(prop);
+      }
+    }
+    svgNode.style.removeProperty('background');
+  }
+  view.attach(svgNode, bounds);
+  if (!view.fitted) canvasEl.scrollTo(left, top);
+  canvasEl.style.background = activeTheme === 'auto' ? '' : (svgNode.style.background || svgNode.style.getPropertyValue('--sd-bg') || '');
+  snapping.draw();
+}
+
+function renderEditor() {
+  dragController?.cancel();
+  clearTimeout(inputTimer);
+  try {
+    if (doc) doc.replace_source(doc.revision(), sourceEl.value);
+    else doc = new WasmDocument(sourceEl.value);
+    showEditorSvg(doc.svg_themed(activeTheme));
+    sourceEl.value = doc.source();
+    statusEl.textContent = `${Number(doc.revision())} · source revision`;
+    updateDiff();
+  } catch (err) {
+    statusEl.textContent = String(err);
+  }
+}
+
+moveButton.onclick = () => {
+  dragController?.cancel();
+  touchMove = !touchMove;
+  moveButton.setAttribute('aria-pressed', String(touchMove));
+  canvasEl.classList.toggle('touch-edit', touchMove);
+  view.updateHint?.(touchMove);
+};
+
+document.querySelector('#home-editor-undo').onclick = () => {
+  dragController?.cancel();
+  clearTimeout(inputTimer);
+  if (doc?.undo()) {
+    view.frame = undefined;
+    view.fitted = true;
+    showEditorSvg(doc.svg_themed(activeTheme));
+    sourceEl.value = doc.source();
+    statusEl.textContent = `${Number(doc.revision())} · source revision`;
+    updateDiff();
+  }
+};
+document.querySelector('#home-editor-redo').onclick = () => {
+  dragController?.cancel();
+  clearTimeout(inputTimer);
+  if (doc?.redo()) {
+    view.frame = undefined;
+    view.fitted = true;
+    showEditorSvg(doc.svg_themed(activeTheme));
+    sourceEl.value = doc.source();
+    statusEl.textContent = `${Number(doc.revision())} · source revision`;
+    updateDiff();
+  }
+};
+document.querySelector('#home-editor-reset').onclick = () => {
+  dragController?.cancel();
+  clearTimeout(inputTimer);
+  view.frame = undefined;
+  view.fitted = true;
+  sourceEl.value = INITIAL_EDITOR_SOURCE;
+  renderEditor();
+};
+sourceEl.addEventListener('input', () => {
+  dragController?.cancel();
+  clearTimeout(inputTimer);
+  inputTimer = setTimeout(renderEditor, 180);
+});
+
+(async () => {
+  try {
+    await initEditor();
+    for (const entry of JSON.parse(available_themes_json())) {
+      const opt = document.createElement('option');
+      opt.value = entry.id;
+      opt.textContent = entry.label;
+      themeSelect.append(opt);
+    }
+    themeSelect.onchange = () => {
+      activeTheme = themeSelect.value;
+      if (doc) showEditorSvg(doc.svg_themed(activeTheme));
+    };
+    renderEditor();
+    dragController = new NodeDragController({
+      canvas: canvasEl,
+      view,
+      status: statusEl,
+      getDocument: () => doc,
+      touchEnabled: () => touchMove,
+      beforeStart: () => {
+        if (sourceEl.value !== doc.source()) renderEditor();
+        if (sourceEl.value !== doc.source()) return false;
+      },
+      snapping,
+      show: showEditorSvg,
+      onCommit: () => {
+        view.frame = undefined;
+        view.fitted = true;
+        showEditorSvg(doc.svg_themed(activeTheme));
+        sourceEl.value = doc.source();
+        statusEl.textContent = `${Number(doc.revision())} · source revision`;
+        updateDiff();
+      }
+    });
+  } catch (err) {
+    statusEl.textContent = `Wasm editor unavailable: ${String(err)}`;
+  }
+})();
+
+// 2. Live WasmStatechart Coupled Simulation (#runtime)
+const simCanvasEl = document.querySelector('#home-sim-canvas');
+const simStatesEl = document.querySelector('#home-sim-states');
+const simEventsEl = document.querySelector('#home-sim-events');
+const simMetricsEl = document.querySelector('#home-sim-metrics');
+const simRateEl = document.querySelector('#home-sim-rate');
+const simRateValEl = document.querySelector('#home-sim-rate-val');
+const simPlayBtn = document.querySelector('#home-sim-play');
+const simSourceText = document.querySelector('#home-sim-source').textContent.trim();
+
+let chart = null, simTimer = null;
+
+function syncSimulationUi() {
+  if (!chart) return;
+  patchSvg(simCanvasEl, chart.svg());
+  const svgEl = simCanvasEl.querySelector('svg');
+  if (svgEl) svgEl.removeAttribute('style');
+
+  const snap = JSON.parse(chart.state_json());
+  const evs = JSON.parse(chart.events_json());
+
+  const stateBadges = [];
+  for (const leaf of snap.leaf_states || []) {
+    const b = document.createElement('span');
+    b.className = 'sd-badge';
+    b.textContent = `state: ${leaf}`;
+    stateBadges.push(b);
+  }
+  for (const [k, v] of Object.entries(snap.context || {})) {
+    const b = document.createElement('span');
+    b.className = 'sd-badge';
+    b.textContent = `${k}=${v}`;
+    stateBadges.push(b);
+  }
+  simStatesEl.replaceChildren(...stateBadges);
+
+  const eventButtons = [];
+  for (const ev of evs) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sd-inv-btn';
+    btn.disabled = !ev.enabled;
+    btn.textContent = ev.guard ? `${ev.name} [${ev.guard}]` : ev.name;
+    btn.onclick = () => { chart.dispatch(ev.name); syncSimulationUi(); };
+    eventButtons.push(btn);
+  }
+  simEventsEl.replaceChildren(...eventButtons);
+
+  const sim = snap.simulation;
+  const apiRate = sim?.traits?.api?.rate;
+  if (Number.isFinite(apiRate)) {
+    const roundedRate = Math.round(apiRate);
+    if (Number(simRateEl.value) !== roundedRate) simRateEl.value = String(roundedRate);
+    simRateValEl.textContent = `${roundedRate}/s`;
+  }
+  if (sim?.nodes) {
+    const tiles = [];
+    for (const [id, q] of Object.entries(sim.nodes)) {
+      const trait = sim.traits?.[id];
+      const hasSimTrait = Boolean(
+        !id.includes('.') &&
+        trait &&
+        (trait.rate > 0 || (trait.queue_cap > 0 && trait.queue_cap < 10000) || (trait.service_rate > 0 && trait.service_rate < 100))
+      );
+      if (!hasSimTrait && q.arrival_rate <= 0 && q.queued <= 0 && q.dropped <= 0) continue;
+      const tile = document.createElement('div');
+      tile.className = 'sd-metric-tile';
+      const strong = document.createElement('strong');
+      strong.textContent = id;
+      const inSpan = document.createElement('span');
+      inSpan.textContent = `in ${q.arrival_rate.toFixed(1)}/s`;
+      const outSpan = document.createElement('span');
+      outSpan.textContent = `out ${q.throughput.toFixed(1)}/s`;
+      const qSpan = document.createElement('span');
+      qSpan.textContent = `q ${q.queued.toFixed(1)}`;
+      const satSpan = document.createElement('span');
+      satSpan.textContent = `sat ${(q.saturation * 100).toFixed(0)}%`;
+      if (q.saturation >= 0.85) satSpan.className = 'sd-hot';
+      tile.append(strong, inSpan, outSpan, qSpan, satSpan);
+      if (q.dropped > 0.05) {
+        const dropSpan = document.createElement('span');
+        dropSpan.className = 'sd-hot';
+        dropSpan.textContent = `drop ${q.dropped.toFixed(1)}`;
+        tile.append(dropSpan);
+      }
+      tiles.push(tile);
+    }
+    simMetricsEl.replaceChildren(...tiles);
+  }
+}
+
+function stopSimPlay() {
+  if (simTimer) { clearInterval(simTimer); simTimer = null; }
+  simPlayBtn.textContent = 'Play';
+}
+
+document.querySelector('#home-sim-step').onclick = () => {
+  if (!chart) return;
+  chart.step_coupled(10);
+  syncSimulationUi();
+};
+simPlayBtn.onclick = () => {
+  if (!chart) return;
+  if (simTimer) { stopSimPlay(); return; }
+  simPlayBtn.textContent = 'Pause';
+  simTimer = setInterval(() => { chart.step_coupled(10); syncSimulationUi(); }, 180);
+};
+document.querySelector('#home-sim-reset').onclick = () => {
+  if (!chart) return;
+  stopSimPlay();
+  chart.reset();
+  simRateEl.value = '95';
+  simRateValEl.textContent = '95/s';
+  syncSimulationUi();
+};
+simRateEl.oninput = () => {
+  const rate = Number(simRateEl.value);
+  simRateValEl.textContent = `${rate}/s`;
+  if (chart) {
+    chart.set_rate('api', rate);
+    syncSimulationUi();
+  }
+};
+simCanvasEl.addEventListener('click', ev => {
+  if (!chart || !ev.shiftKey) return;
+  const edgeEl = ev.target?.closest?.('[data-edge]');
+  const edgeId = edgeEl?.dataset?.edge;
+  if (!edgeId) return;
+  const snap = JSON.parse(chart.state_json());
+  const severed = snap.simulation?.severed || [];
+  chart.sever(edgeId, !severed.includes(edgeId));
+  syncSimulationUi();
+});
+
+(async () => {
+  try {
+    await initRuntime();
+    chart = new WasmStatechart(simSourceText);
+    syncSimulationUi();
+  } catch (err) {
+    simStatesEl.textContent = `Simulation runtime unavailable: ${String(err)}`;
+  }
+})();
+
+addEventListener('diagram-theme-change', () => {
+  syncThemeAssets();
+  if (doc && activeTheme === 'auto') showEditorSvg(doc.svg_themed('auto'));
+});
+</script>
 <script>
 (() => {
   const links = [...document.querySelectorAll('.nav__links a[href^="#"]')];

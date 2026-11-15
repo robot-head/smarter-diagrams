@@ -23,8 +23,121 @@ const url = path => new URL(path, base).href;
   assert(ready, `Site unavailable: ${base.href}`);
   await page.goto(base.href);
   await page.getByRole('heading', { name: 'Diagram compiler for software engineers' }).waitFor();
+  await page.waitForFunction(() => document.querySelector('#home-editor-status')?.textContent.includes('revision'));
+  await page.waitForFunction(() => document.querySelector('#home-sim-metrics')?.textContent.includes('workers'));
+  assert.equal(await page.locator('[data-ui],[data-ui-load],.ui-win,.ui-pipe,.ui-term,[data-placeholder]').count(), 0, 'homepage must contain no fake UI or placeholder markers');
   fs.mkdirSync('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/docs-home.png', fullPage: true });
+  const initialHomeSource = await page.locator('#home-editor-source').inputValue();
+  const homeNode = page.locator('#home-editor-canvas [data-node="gateway"]');
+  await homeNode.scrollIntoViewIfNeeded();
+  const homeBox = await homeNode.boundingBox();
+  const homeScale = await homeNode.evaluate(el => el.ownerSVGElement.getScreenCTM().a);
+  await page.mouse.move(homeBox.x + homeBox.width / 2, homeBox.y + homeBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(homeBox.x + homeBox.width / 2, homeBox.y + homeBox.height / 2 + 64 * homeScale, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForFunction(orig => document.querySelector('#home-editor-source')?.value !== orig, initialHomeSource);
+  const draggedSource = await page.locator('#home-editor-source').inputValue();
+  assert(draggedSource.includes('@pin('), 'homepage node drag must insert @pin coordinates');
+  assert(draggedSource.includes('# Production ingress'), 'homepage node drag must preserve leading comments');
+  assert.match(await page.locator('#home-editor-diff').textContent(), /@pin\(/, 'homepage CST diff must show @pin edit');
+  await page.click('#home-editor-undo');
+  assert.equal(await page.locator('#home-editor-source').inputValue(), initialHomeSource, 'homepage undo must restore original source');
+
+  // Verify touch-action: none on homepage editor viewport + mobile touch pan & pinch
+  const touchActions = await page.evaluate(() => ({
+    canvas: getComputedStyle(document.querySelector('#home-editor-canvas')).touchAction,
+    svg: getComputedStyle(document.querySelector('#home-editor-canvas svg')).touchAction,
+  }));
+  assert.equal(touchActions.canvas, 'none', '#home-editor-canvas must set touch-action: none');
+  assert.equal(touchActions.svg, 'none', '#home-editor-canvas svg must set touch-action: none');
+  const touchContext = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
+  const touchPage = await touchContext.newPage();
+  await touchPage.goto(base.href);
+  await touchPage.waitForFunction(() => document.querySelector('#home-editor-status')?.textContent.includes('revision'));
+  const touchCanvas = touchPage.locator('#home-editor-canvas');
+  await touchCanvas.scrollIntoViewIfNeeded();
+  await touchPage.locator('#home-editor-controls').getByRole('button', { name: 'Actual size (100%)', exact: true }).click();
+  const cdp = await touchContext.newCDPSession(touchPage);
+  const tBox = await touchCanvas.boundingBox();
+  const swipeY = tBox.y + tBox.height / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 0, x: tBox.x + tBox.width - 30, y: swipeY }] });
+  for (let i = 1; i <= 6; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 0, x: tBox.x + tBox.width - 30 - 25 * i, y: swipeY }] });
+    await touchPage.waitForTimeout(20);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await touchPage.waitForFunction(() => document.querySelector('#home-editor-canvas').scrollLeft > 50);
+  assert.equal(await touchPage.locator('#home-editor-source').inputValue(), initialHomeSource, 'touch panning must not modify source');
+  const cx = tBox.x + tBox.width / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 0, x: cx - 30, y: swipeY }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 0, x: cx - 30, y: swipeY }, { id: 1, x: cx + 30, y: swipeY }] });
+  for (let i = 1; i <= 5; i++) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ id: 0, x: cx - 30 - 15 * i, y: swipeY }, { id: 1, x: cx + 30 + 15 * i, y: swipeY }],
+    });
+    await touchPage.waitForTimeout(20);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await touchPage.waitForFunction(() => Number.parseInt(document.querySelector('#home-editor-controls output')?.textContent || '0', 10) > 100);
+  await touchContext.close();
+
+  // Verify switching theme preset -> Auto clears inline --sd-* palette overrides and follows site theme toggle
+  const initialAutoBg = await page.evaluate(() => getComputedStyle(document.querySelector('#home-editor-canvas svg')).getPropertyValue('--sd-bg').trim());
+  await page.selectOption('#home-editor-theme', 'catppuccin-mocha');
+  const presetState = await page.evaluate(() => {
+    const svg = document.querySelector('#home-editor-canvas svg');
+    return {
+      attr: svg.getAttribute('data-explicit-theme'),
+      sdBg: svg.style.getPropertyValue('--sd-bg').trim(),
+    };
+  });
+  assert.equal(presetState.attr, 'catppuccin-mocha');
+  assert(presetState.sdBg.length > 0, 'preset theme must set inline --sd-bg');
+  await page.selectOption('#home-editor-theme', 'auto');
+  const autoState = await page.evaluate(() => {
+    const svg = document.querySelector('#home-editor-canvas svg');
+    return {
+      attr: svg.getAttribute('data-explicit-theme'),
+      inlineSdBg: svg.style.getPropertyValue('--sd-bg').trim(),
+      inlineBg: svg.style.background,
+      inlineWidth: svg.style.width,
+      inlineHeight: svg.style.height,
+      computedSdBg: getComputedStyle(svg).getPropertyValue('--sd-bg').trim(),
+    };
+  });
+  assert.equal(autoState.attr, null, 'auto theme must clear data-explicit-theme');
+  assert.equal(autoState.inlineSdBg, '', 'auto theme must clear inline --sd-bg');
+  assert.equal(autoState.inlineBg, '', 'auto theme must clear inline background');
+  assert(autoState.inlineWidth.length > 0 && autoState.inlineHeight.length > 0, 'auto theme must preserve viewport SVG sizing');
+  assert.equal(autoState.computedSdBg, initialAutoBg, 'auto theme must restore light site --sd-bg');
+  await page.click('#theme-toggle');
+  const darkAutoBg = await page.evaluate(() => getComputedStyle(document.querySelector('#home-editor-canvas svg')).getPropertyValue('--sd-bg').trim());
+  assert.notEqual(darkAutoBg, initialAutoBg, 'auto theme SVG must respond to site dark theme toggle');
+  await page.click('#theme-toggle');
+
+  // Verify statechart transitions synchronize #home-sim-rate and #home-sim-rate-val
+  const initialMetrics = await page.locator('#home-sim-metrics').textContent();
+  await page.click('#home-sim-step');
+  await page.waitForFunction(prev => document.querySelector('#home-sim-metrics')?.textContent !== prev, initialMetrics);
+  assert.match(await page.locator('#home-sim-metrics').textContent(), /workers/);
+  const probeBtn = page.locator('#home-sim-events button:not([disabled])', { hasText: /^probe\b/ });
+  for (let attempt = 0; attempt < 8 && (await probeBtn.count()) === 0; attempt++) {
+    await page.click('#home-sim-step');
+  }
+  assert.equal(await probeBtn.count(), 1, 'breaker must reach Open state with enabled probe action');
+  await probeBtn.click();
+  assert.equal(await page.locator('#home-sim-rate').inputValue(), '30', 'probe action must update ingress slider to 30');
+  assert.equal(await page.locator('#home-sim-rate-val').textContent(), '30/s', 'probe action must update ingress label to 30/s');
+  const stabilizedBtn = page.locator('#home-sim-events button:not([disabled])', { hasText: /^stabilized\b/ });
+  await stabilizedBtn.click();
+  assert.equal(await page.locator('#home-sim-rate').inputValue(), '55', 'stabilized action must update ingress slider to 55');
+  assert.equal(await page.locator('#home-sim-rate-val').textContent(), '55/s', 'stabilized action must update ingress label to 55/s');
+  await page.click('#home-sim-reset');
+  assert.equal(await page.locator('#home-sim-rate').inputValue(), '95', 'reset must restore ingress slider to 95');
+  assert.equal(await page.locator('#home-sim-rate-val').textContent(), '95/s', 'reset must restore ingress label to 95/s');
 
   // Crawl the rendered documentation and same-site static assets. rustdoc has
   // its own generated cross-reference graph; inspect its principal entries below.

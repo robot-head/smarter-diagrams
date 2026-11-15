@@ -551,7 +551,7 @@ function guards() {
   const html = document.documentElement;
   let n = 0;
   const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode: t => (t.parentElement?.closest('script, style, template, noscript') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    acceptNode: t => (t.parentElement?.closest('script, style, template, noscript, code, pre, textarea') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
   });
   for (let t = walk.nextNode(); t; t = walk.nextNode()) {
     if (PLACEHOLDER.test(t.textContent)) { t.parentElement.setAttribute('data-placeholder', ''); n++; }
