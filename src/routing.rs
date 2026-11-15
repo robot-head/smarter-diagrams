@@ -141,7 +141,7 @@ pub fn obstacles(scene: &SceneGraph, l: &Layout, e: &Edge, margin: f64) -> Vec<R
         let r = l.nodes[&n.id];
         // Reserve container headers and SQL table title bands as solid obstacles
         // with port-side apertures carved where an endpoint stub attaches.
-        if let Some(header) = crate::layout::container_header_rect(n, r)
+        if let Some(header) = crate::layout::container_header_rect_with_ports(n, r, &l.ports)
             && exclude.contains(&n.id)
         {
             bodies.extend(carve_rect_for_stubs(
@@ -150,14 +150,16 @@ pub fn obstacles(scene: &SceneGraph, l: &Layout, e: &Edge, margin: f64) -> Vec<R
                 margin,
             ));
         }
-        if let Some(title) = crate::layout::sql_table_title_rect(n, r)
-            && exclude.contains(&n.id)
-        {
-            bodies.extend(carve_rect_for_stubs(
-                title.inflate(margin / 2.),
-                &stubs,
-                margin,
-            ));
+        if let Some(title) = crate::layout::sql_table_title_rect(n, r) {
+            if exclude.contains(&n.id) {
+                bodies.extend(carve_rect_for_stubs(
+                    title.inflate(margin / 2.),
+                    &stubs,
+                    margin,
+                ));
+            } else {
+                bodies.push(title.inflate(margin));
+            }
         }
     }
     if let Some(lca) = strict_lca(scene, &e.source.node, &e.target.node)
@@ -319,6 +321,11 @@ fn route_single_edge(
         && let Some(r) = old.routes.get(&e.id)
         && route_is_valid(scene, l, e, r, o.margin)
         && route_conflict_counts(l, &e.id, &r.points).1 == 0
+        && {
+            let (cur_cnt, cur_sev) = route_proximity_penalty(l, &e.id, &r.points, o.lane_spacing);
+            let (old_cnt, old_sev) = route_proximity_penalty(old, &e.id, &r.points, o.lane_spacing);
+            cur_cnt <= old_cnt && cur_sev <= old_sev + 1e-3
+        }
     {
         return Ok((r.clone(), true));
     }
@@ -439,6 +446,8 @@ fn route_single_edge(
                 target: b.stub,
                 segs: &balanced_segs,
                 hotspots: &history.hotspots,
+                min_lane_spacing: o.lane_spacing.max(0.0),
+                pref_lane_spacing: o.lane_spacing.max(12.0),
             };
             step_route_cost(p[0], p[1], prev_d, nd, prev, &step_ctx) < 1e-6
         })
@@ -1166,6 +1175,110 @@ pub(crate) fn route_conflict_counts(l: &Layout, edge_id: &str, pts: &[Point]) ->
     }
     (cross, ovlp)
 }
+/// Returns `(transverse_gap, longitudinal_overlap)` when two orthogonal segments share
+/// the same orientation and strictly overlap along their parallel axis.
+pub(crate) fn parallel_segment_gap(
+    a0: Point,
+    a1: Point,
+    b0: Point,
+    b1: Point,
+) -> Option<(f64, f64)> {
+    let a_horiz = (a0.y - a1.y).abs() < 1e-6;
+    let b_horiz = (b0.y - b1.y).abs() < 1e-6;
+    if a_horiz != b_horiz {
+        return None;
+    }
+    if a_horiz {
+        let lo = a0.x.min(a1.x).max(b0.x.min(b1.x));
+        let hi = a0.x.max(a1.x).min(b0.x.max(b1.x));
+        let ov = hi - lo;
+        (ov > 1e-6).then(|| ((a0.y - b0.y).abs(), ov))
+    } else {
+        let lo = a0.y.min(a1.y).max(b0.y.min(b1.y));
+        let hi = a0.y.max(a1.y).min(b0.y.max(b1.y));
+        let ov = hi - lo;
+        (ov > 1e-6).then(|| ((a0.x - b0.x).abs(), ov))
+    }
+}
+/// Counts parallel overlapping segment pairs closer than `min_spacing` and sums their
+/// `(shortfall * clamped_overlap)` severity against existing routes in `l`.
+pub(crate) fn route_proximity_penalty(
+    l: &Layout,
+    edge_id: &str,
+    pts: &[Point],
+    min_spacing: f64,
+) -> (usize, f64) {
+    if min_spacing <= 1e-6 {
+        return (0, 0.0);
+    }
+    let c = coalesced(pts);
+    let mut count = 0usize;
+    let mut severity = 0.0f64;
+    for (other_id, other) in &l.routes {
+        if other_id == edge_id || other_id.starts_with("@reserved-") {
+            continue;
+        }
+        let co = coalesced(&other.points);
+        for p in c.windows(2) {
+            for q in co.windows(2) {
+                if let Some((gap, ov)) = parallel_segment_gap(p[0], p[1], q[0], q[1])
+                    && gap > 1e-6
+                    && gap < min_spacing - 1e-6
+                {
+                    count += 1;
+                    severity += (min_spacing - gap) * ov.min(200.0);
+                }
+            }
+        }
+    }
+    (count, severity)
+}
+fn batch_proximity_violations(
+    routes: &std::collections::BTreeMap<String, Route>,
+    targets: &std::collections::BTreeMap<String, Route>,
+    min_spacing: f64,
+) -> (usize, f64) {
+    if min_spacing <= 1e-6 || targets.is_empty() {
+        return (0, 0.0);
+    }
+    let all_ids: std::collections::BTreeSet<&str> = routes
+        .keys()
+        .chain(targets.keys())
+        .map(String::as_str)
+        .filter(|id| !id.starts_with("@reserved-"))
+        .collect();
+    let all_coalesced: Vec<(&str, Vec<Point>)> = all_ids
+        .into_iter()
+        .filter_map(|id| {
+            targets
+                .get(id)
+                .or_else(|| routes.get(id))
+                .map(|r| (id, coalesced(&r.points)))
+        })
+        .collect();
+    let mut count = 0usize;
+    let mut severity = 0.0f64;
+    for (i, (id_a, ca)) in all_coalesced.iter().enumerate() {
+        let a_in = targets.contains_key(*id_a);
+        for (id_b, cb) in &all_coalesced[i + 1..] {
+            if !a_in && !targets.contains_key(*id_b) {
+                continue;
+            }
+            for p in ca.windows(2) {
+                for q in cb.windows(2) {
+                    if let Some((gap, ov)) = parallel_segment_gap(p[0], p[1], q[0], q[1])
+                        && gap > 1e-6
+                        && gap < min_spacing - 1e-6
+                    {
+                        count += 1;
+                        severity += (min_spacing - gap) * ov.min(200.0);
+                    }
+                }
+            }
+        }
+    }
+    (count, severity)
+}
 fn restore_explicit_stubs(c: &[Point], a: &PortPlacement, b: &PortPlacement) -> Vec<Point> {
     let mut out = Vec::with_capacity(c.len() + 2);
     out.push(c[0]);
@@ -1249,6 +1362,8 @@ fn dejitter(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
                 }
                 let cur_len = polyline_length(current);
                 let (base_cross, base_ovlp) = route_conflict_counts(l, &e.id, current);
+                let (base_prox_cnt, base_prox_sev) =
+                    route_proximity_penalty(l, &e.id, current, o.lane_spacing);
                 let mut updated = None;
                 for k in indices {
                     let prev_dx = c[k].x - c[k - 1].x;
@@ -1317,7 +1432,13 @@ fn dejitter(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
                         } else {
                             ovlp <= base_ovlp
                         };
-                        if cross <= base_cross && ovlp_ok {
+                        let (prox_cnt, prox_sev) =
+                            route_proximity_penalty(l, &e.id, &cand_route.points, o.lane_spacing);
+                        if cross <= base_cross
+                            && ovlp_ok
+                            && prox_cnt <= base_prox_cnt
+                            && prox_sev <= base_prox_sev + 1e-3
+                        {
                             updated = Some(cand_route);
                             break;
                         }
@@ -1767,6 +1888,8 @@ struct StepCostCtx<'a> {
     target: Point,
     segs: &'a [ExistingSegment],
     hotspots: &'a [(Point, f64)],
+    min_lane_spacing: f64,
+    pref_lane_spacing: f64,
 }
 fn step_route_cost(
     u: Point,
@@ -1792,6 +1915,8 @@ fn step_route_cost_over<'s>(
         start,
         target,
         hotspots,
+        min_lane_spacing,
+        pref_lane_spacing,
         ..
     } = ctx;
     let u_horiz = nd == 0 || nd == 2;
@@ -1799,12 +1924,23 @@ fn step_route_cost_over<'s>(
     let vx_max = u.x.max(v.x);
     let vy_min = u.y.min(v.y);
     let vy_max = u.y.max(v.y);
+    let prox_band = pref_lane_spacing.max(min_lane_spacing);
     let mut cost = 0.0;
     for seg in segs {
-        if vx_max < seg.x_min - 1e-6
-            || vx_min > seg.x_max + 1e-6
-            || vy_max < seg.y_min - 1e-6
-            || vy_min > seg.y_max + 1e-6
+        let band_x = if u_horiz == seg.horiz && !u_horiz && prox_band > 1e-6 {
+            prox_band - 1e-6
+        } else {
+            1e-6
+        };
+        let band_y = if u_horiz == seg.horiz && u_horiz && prox_band > 1e-6 {
+            prox_band - 1e-6
+        } else {
+            1e-6
+        };
+        if vx_max < seg.x_min - band_x
+            || vx_min > seg.x_max + band_x
+            || vy_max < seg.y_min - band_y
+            || vy_min > seg.y_max + band_y
         {
             continue;
         }
@@ -1825,6 +1961,29 @@ fn step_route_cost_over<'s>(
                         && v.distance(seg.b) < 1e-6))
             {
                 cost += 1e6;
+            } else if let Some((gap, ov)) = parallel_segment_gap(u, v, seg.a, seg.b)
+                && gap > 1e-6
+                && gap < prox_band - 1e-6
+            {
+                let already = prev_pt.is_some_and(|pr| {
+                    d == nd
+                        && parallel_segment_gap(pr, u, seg.a, seg.b)
+                            .is_some_and(|(pg, _)| (pg - gap).abs() < 1e-6)
+                });
+                if gap < min_lane_spacing - 1e-6 {
+                    if !already {
+                        cost +=
+                            650.0 + 450.0 * (min_lane_spacing - gap) / min_lane_spacing.max(1.0);
+                    }
+                    cost += 0.25 * ov;
+                } else if gap < pref_lane_spacing - 1e-6 {
+                    if !already {
+                        cost += 80.0
+                            + 120.0 * (pref_lane_spacing - gap)
+                                / (pref_lane_spacing - min_lane_spacing).max(1.0);
+                    }
+                    cost += 0.05 * ov;
+                }
             }
             continue;
         }
@@ -2044,6 +2203,8 @@ fn search_with_history(
     }
     let base_cross = o.weights.crossing;
     let segs = build_existing_segments(routed, base_cross, history);
+    let min_lane_spacing = o.lane_spacing.max(0.0);
+    let pref_lane_spacing = o.lane_spacing.max(12.0);
     let corridor_bounds = (!segs.is_empty() && o.weights.crossing <= 2500.).then(|| {
         let mut min_x = start.x.min(target.x);
         let mut max_x = start.x.max(target.x);
@@ -2080,6 +2241,8 @@ fn search_with_history(
                 target,
                 segs: &segs,
                 hotspots: &history.hotspots,
+                min_lane_spacing,
+                pref_lane_spacing,
             },
         ) < 1e-6
         && exit_cross_cost(target, sd, arrival, &segs) < 1e-6
@@ -2124,6 +2287,8 @@ fn search_with_history(
         xs.extend([p.x - gap, p.x, p.x + gap]);
         ys.extend([p.y - gap, p.y, p.y + gap]);
     }
+    let mut route_xs = Vec::new();
+    let mut route_ys = Vec::new();
     for (id, route) in &routed.routes {
         if id.starts_with("@reserved-port:")
             && let Some(p) = route.points.last()
@@ -2147,12 +2312,33 @@ fn search_with_history(
                 }
                 if (a.y - b.y).abs() < 1e-6 {
                     ys.extend([a.y - lane_gap, a.y, a.y + lane_gap]);
+                    route_ys.push(a.y);
                 } else {
                     xs.extend([a.x - lane_gap, a.x, a.x + lane_gap]);
+                    route_xs.push(a.x);
                 }
             }
         }
     }
+    let add_route_midpoints = |coords: &mut Vec<f64>, out: &mut Vec<f64>| {
+        if coords.len() < 2 {
+            return;
+        }
+        coords.sort_by(f64::total_cmp);
+        coords.dedup_by(|a, b| (*a - *b).abs() < 1e-3);
+        let lo = (2. * min_lane_spacing - 1e-6).max(2.0);
+        let hi = 2. * lane_gap - 1e-6;
+        if lo <= hi {
+            for w in coords.windows(2) {
+                let d = w[1] - w[0];
+                if d >= lo && d <= hi {
+                    out.push((w[0] + w[1]) * 0.5);
+                }
+            }
+        }
+    };
+    add_route_midpoints(&mut route_xs, &mut xs);
+    add_route_midpoints(&mut route_ys, &mut ys);
     if let Some(min) = xs.iter().copied().reduce(f64::min) {
         xs.push(min - o.stub);
     }
@@ -2171,8 +2357,8 @@ fn search_with_history(
     let ny = ys.len();
     // Per-row/column candidate lists. A horizontal step on row `y` can only be
     // blocked by an obstacle whose open band contains `y`, and only meets existing
-    // segments whose closed y-range contains `y` (the exact bounding-box rejects
-    // used by `Rect::blocks`/`contains` and `step_route_cost`), and vice versa.
+    // perpendicular segments whose closed y-range contains `y` or same-orientation
+    // segments within `prox_band`, and vice versa.
     let row_obs: Vec<Vec<usize>> = ys
         .iter()
         .map(|&y| {
@@ -2189,11 +2375,18 @@ fn search_with_history(
                 .collect()
         })
         .collect();
+    let prox_band = pref_lane_spacing.max(min_lane_spacing);
     let row_segs: Vec<Vec<usize>> = ys
         .iter()
         .map(|&y| {
             (0..segs.len())
-                .filter(|&k| y >= segs[k].y_min - 1e-6 && y <= segs[k].y_max + 1e-6)
+                .filter(|&k| {
+                    if segs[k].horiz && prox_band > 1e-6 {
+                        (y - segs[k].a.y).abs() < prox_band - 1e-6
+                    } else {
+                        y >= segs[k].y_min - 1e-6 && y <= segs[k].y_max + 1e-6
+                    }
+                })
                 .collect()
         })
         .collect();
@@ -2201,7 +2394,13 @@ fn search_with_history(
         .iter()
         .map(|&x| {
             (0..segs.len())
-                .filter(|&k| x >= segs[k].x_min - 1e-6 && x <= segs[k].x_max + 1e-6)
+                .filter(|&k| {
+                    if !segs[k].horiz && prox_band > 1e-6 {
+                        (x - segs[k].a.x).abs() < prox_band - 1e-6
+                    } else {
+                        x >= segs[k].x_min - 1e-6 && x <= segs[k].x_max + 1e-6
+                    }
+                })
                 .collect()
         })
         .collect();
@@ -2210,6 +2409,8 @@ fn search_with_history(
         target,
         segs: &segs,
         hotspots: &history.hotspots,
+        min_lane_spacing,
+        pref_lane_spacing,
     };
     let points: Vec<Point> = (0..nx * ny)
         .map(|i| Point::new(xs[i % nx], ys[i / nx]))
@@ -2662,6 +2863,15 @@ pub(crate) fn coordinate_outer_routes(
             }
         }
     }
+    let before_targets: std::collections::BTreeMap<String, Route> = candidates
+        .keys()
+        .filter_map(|id| l.routes.get(id).map(|r| (id.clone(), r.clone())))
+        .collect();
+    let before_prox = batch_proximity_violations(&l.routes, &before_targets, o.lane_spacing);
+    let after_prox = batch_proximity_violations(&l.routes, &candidates, o.lane_spacing);
+    if after_prox.0 > before_prox.0 || after_prox.1 > before_prox.1 + 1e-3 {
+        return false;
+    }
     l.routes.extend(candidates);
     true
 }
@@ -2681,7 +2891,7 @@ fn nudge_channels_axis(
     l: &mut Layout,
     target_horizontal: bool,
 ) {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     #[derive(Clone)]
     struct Segment {
         edge: String,
@@ -2693,6 +2903,14 @@ fn nudge_channels_axis(
         fixed: bool,
         low_stub: f64,
         high_stub: f64,
+    }
+    #[derive(Clone)]
+    struct BarrierSegment {
+        edge: String,
+        index: usize,
+        coord: f64,
+        start: f64,
+        end: f64,
     }
     let pair_cost = |a: &Segment, b: &Segment| -> i32 {
         let mut cost = 0;
@@ -2714,6 +2932,8 @@ fn nudge_channels_axis(
         cost
     };
     let mut raw_segments: Vec<Segment> = Vec::new();
+    let mut ext_segments: Vec<BarrierSegment> = Vec::new();
+    let min_interior_len = o.margin.min(8.);
     for e in &scene.edges {
         let Some(r) = l.routes.get(&e.id) else {
             continue;
@@ -2723,13 +2943,31 @@ fn nudge_channels_axis(
             .any(|a| a.name == "route");
         let a_port = l.ports.get(&port_key(e, true));
         let b_port = l.ports.get(&port_key(e, false));
-        for i in 1..r.points.len().saturating_sub(2) {
+        let seg_count = r.points.len().saturating_sub(1);
+        for i in 0..seg_count {
             let (a, b) = (r.points[i], r.points[i + 1]);
             let horizontal = (a.y - b.y).abs() < 1e-6;
             if horizontal != target_horizontal {
                 continue;
             }
             let coord = if horizontal { a.y } else { a.x };
+            let (start, end) = if horizontal {
+                (a.x.min(b.x), a.x.max(b.x))
+            } else {
+                (a.y.min(b.y), a.y.max(b.y))
+            };
+            if i == 0 || i + 1 >= seg_count || end - start < min_interior_len {
+                if end - start > 1e-6 {
+                    ext_segments.push(BarrierSegment {
+                        edge: e.id.clone(),
+                        index: i,
+                        coord,
+                        start,
+                        end,
+                    });
+                }
+                continue;
+            }
             let before = r.points[i - 1];
             let after = r.points[i + 2];
             let leg = |pt: Point, other: Point| -> (f64, i8) {
@@ -2747,14 +2985,6 @@ fn nudge_channels_axis(
                 };
                 (pos, side)
             };
-            let (start, end) = if horizontal {
-                (a.x.min(b.x), a.x.max(b.x))
-            } else {
-                (a.y.min(b.y), a.y.max(b.y))
-            };
-            if end - start < o.margin.min(8.) {
-                continue;
-            }
             let legs = [leg(a, before), leg(b, after)];
             let fixed = locked || legs[0].1 == 0 || legs[1].1 == 0;
             let mut low_stub = f64::NEG_INFINITY;
@@ -2805,17 +3035,8 @@ fn nudge_channels_axis(
             .total_cmp(&b.coord)
             .then_with(|| a.start.total_cmp(&b.start))
             .then_with(|| a.edge.cmp(&b.edge))
+            .then_with(|| a.index.cmp(&b.index))
     });
-    let mut buckets: Vec<(f64, Vec<Segment>)> = Vec::new();
-    for seg in raw_segments {
-        if let Some((anchor, list)) = buckets.last_mut()
-            && seg.coord - *anchor <= 0.5 + 1e-9
-        {
-            list.push(seg);
-        } else {
-            buckets.push((seg.coord, vec![seg]));
-        }
-    }
     let valid_fixed_order = |items: &[Segment]| -> bool {
         let mut last_fixed = f64::NEG_INFINITY;
         for s in items {
@@ -2864,29 +3085,74 @@ fn nudge_channels_axis(
         }
         (cross, ovlp)
     };
-    for (_, mut segments) in buckets {
-        segments.sort_by(|a, b| a.start.total_cmp(&b.start).then(a.edge.cmp(&b.edge)));
-        let mut groups: Vec<Vec<Segment>> = Vec::new();
-        let mut end = f64::NEG_INFINITY;
-        for s in segments {
-            if s.start >= end - 1e-6 || groups.is_empty() {
-                end = s.end;
-                groups.push(vec![s]);
-            } else {
-                end = end.max(s.end);
-                groups.last_mut().unwrap().push(s);
-            }
+    let preferred_spacing = o.lane_spacing.max(12.);
+    let mut visited = vec![false; raw_segments.len()];
+    let mut groups: Vec<Vec<Segment>> = Vec::new();
+    for seed in 0..raw_segments.len() {
+        if visited[seed] {
+            continue;
         }
-        for mut group in groups {
-            if group.len() < 2 || group.iter().all(|s| s.fixed) {
-                continue;
-            }
-            {
-                let mut seen = std::collections::BTreeSet::new();
-                if !group.iter().all(|s| seen.insert(&s.edge)) {
-                    continue;
+        visited[seed] = true;
+        let mut stack = vec![seed];
+        let mut component = Vec::new();
+        while let Some(cur) = stack.pop() {
+            let seg = &raw_segments[cur];
+            component.push(seg.clone());
+            for (nxt, other) in raw_segments.iter().enumerate() {
+                if !visited[nxt]
+                    && other.edge != seg.edge
+                    && (other.coord - seg.coord).abs() < preferred_spacing - 1e-6
+                    && seg.start < other.end - 1e-6
+                    && other.start < seg.end - 1e-6
+                {
+                    visited[nxt] = true;
+                    stack.push(nxt);
                 }
             }
+        }
+        component.sort_by(|a, b| {
+            a.coord
+                .total_cmp(&b.coord)
+                .then_with(|| a.start.total_cmp(&b.start))
+                .then_with(|| a.edge.cmp(&b.edge))
+                .then_with(|| a.index.cmp(&b.index))
+        });
+        groups.push(component);
+    }
+    let all_barriers: Vec<BarrierSegment> = raw_segments
+        .iter()
+        .map(|s| BarrierSegment {
+            edge: s.edge.clone(),
+            index: s.index,
+            coord: s.coord,
+            start: s.start,
+            end: s.end,
+        })
+        .chain(ext_segments.iter().cloned())
+        .collect();
+    for mut group in groups {
+        if group.iter().all(|s| s.fixed) {
+            continue;
+        }
+        if group.len() < 2 {
+            let solo = &group[0];
+            let near_ext = ext_segments.iter().any(|b| {
+                b.edge != solo.edge
+                    && solo.start < b.end - 1e-6
+                    && b.start < solo.end - 1e-6
+                    && (b.coord - solo.coord).abs() < preferred_spacing - 1e-6
+            });
+            if !near_ext {
+                continue;
+            }
+        }
+        {
+            let mut seen = BTreeSet::new();
+            if !group.iter().all(|s| seen.insert(&s.edge)) {
+                continue;
+            }
+        }
+        if group.len() >= 2 {
             group.sort_by(|a, b| {
                 let ab = a.legs[0].1 as i32 + a.legs[1].1 as i32;
                 let bb = b.legs[0].1 as i32 + b.legs[1].1 as i32;
@@ -2947,169 +3213,221 @@ fn nudge_channels_axis(
                     }
                 }
             }
-            let mut base_bounds: Vec<(f64, f64)> = Vec::with_capacity(group.len());
-            let mut bounds_ok = true;
-            for s in &group {
-                if s.fixed {
-                    base_bounds.push((s.coord, s.coord));
-                    continue;
-                }
-                let e = scene.edge(&s.edge).unwrap();
-                let mut obs = obstacles(scene, l, e, o.margin);
-                obs.extend(endpoint_obstacles(scene, l, e, o.margin));
-                let mut low = (s.coord - 256.).max(s.low_stub);
-                let mut high = (s.coord + 256.).min(s.high_stub);
-                for r in obs {
-                    let along = if target_horizontal {
-                        (r.left(), r.right())
-                    } else {
-                        (r.top(), r.bottom())
-                    };
-                    if along.0 >= s.end - 1e-6 || along.1 <= s.start + 1e-6 {
-                        continue;
-                    }
-                    let normal = if target_horizontal {
-                        (r.top(), r.bottom())
-                    } else {
-                        (r.left(), r.right())
-                    };
-                    if normal.1 <= s.coord + 1e-6 {
-                        low = low.max(normal.1);
-                    }
-                    if normal.0 >= s.coord - 1e-6 {
-                        high = high.min(normal.0);
-                    }
-                }
-                if low > high {
-                    bounds_ok = false;
-                    break;
-                }
-                base_bounds.push((low, high));
-            }
-            if !bounds_ok {
+        }
+        let mut base_bounds: Vec<(f64, f64)> = Vec::with_capacity(group.len());
+        let mut bounds_ok = true;
+        for s in &group {
+            if s.fixed {
+                base_bounds.push((s.coord, s.coord));
                 continue;
             }
-            let desired: Vec<f64> = group.iter().map(|s| s.coord).collect();
-            let weights = vec![1.; group.len()];
-            let before_targets: BTreeMap<String, Route> = group
-                .iter()
-                .map(|s| (s.edge.clone(), l.routes[&s.edge].clone()))
-                .collect();
-            let (before_cross, before_ovlp) = edge_conflicts(&l.routes, &before_targets);
-            let preferred_spacing = o.lane_spacing.max(12.);
-            let spacing_trials = if o.lane_spacing < preferred_spacing - 1e-6 {
-                vec![preferred_spacing, o.lane_spacing]
-            } else {
-                vec![preferred_spacing]
-            };
-            let mut committed = false;
-            for spacing in spacing_trials {
-                let mut constraints = Vec::new();
-                for (i, s) in group.iter().enumerate() {
-                    if i > 0 && !(group[i - 1].fixed && s.fixed) {
-                        constraints.push(crate::solver::Constraint::separation(i - 1, i, spacing));
-                    }
-                    if s.fixed {
-                        constraints.push(crate::solver::Constraint::fixed(i, s.coord));
-                    } else {
-                        let (low, high) = base_bounds[i];
-                        constraints.push(crate::solver::Constraint {
-                            coefficients: vec![(i, 1.)],
-                            rhs: low,
-                            equality: false,
-                        });
-                        constraints.push(crate::solver::Constraint {
-                            coefficients: vec![(i, -1.)],
-                            rhs: -high,
-                            equality: false,
-                        });
-                    }
-                }
-                let Ok(lanes) = crate::solver::project(&desired, &weights, &constraints) else {
-                    continue;
+            let e = scene.edge(&s.edge).unwrap();
+            let mut obs = obstacles(scene, l, e, o.margin);
+            obs.extend(endpoint_obstacles(scene, l, e, o.margin));
+            let mut low = (s.coord - 256.).max(s.low_stub);
+            let mut high = (s.coord + 256.).min(s.high_stub);
+            for r in obs {
+                let along = if target_horizontal {
+                    (r.left(), r.right())
+                } else {
+                    (r.top(), r.bottom())
                 };
-                let mut candidates = BTreeMap::new();
-                for (s, lane) in group.iter().zip(lanes) {
-                    let route = candidates
-                        .entry(s.edge.clone())
-                        .or_insert_with(|| l.routes[&s.edge].clone());
-                    for p in &mut route.points[s.index..=s.index + 1] {
-                        if target_horizontal {
-                            p.y = lane;
-                        } else {
-                            p.x = lane;
+                if along.0 >= s.end - 1e-6 || along.1 <= s.start + 1e-6 {
+                    continue;
+                }
+                let normal = if target_horizontal {
+                    (r.top(), r.bottom())
+                } else {
+                    (r.left(), r.right())
+                };
+                if normal.1 <= s.coord + 1e-6 {
+                    low = low.max(normal.1);
+                }
+                if normal.0 >= s.coord - 1e-6 {
+                    high = high.min(normal.0);
+                }
+            }
+            if low > high {
+                bounds_ok = false;
+                break;
+            }
+            base_bounds.push((low, high));
+        }
+        if !bounds_ok {
+            continue;
+        }
+        let in_group: BTreeSet<(&str, usize)> =
+            group.iter().map(|s| (s.edge.as_str(), s.index)).collect();
+        let desired: Vec<f64> = group.iter().map(|s| s.coord).collect();
+        let weights = vec![1.; group.len()];
+        let before_targets: BTreeMap<String, Route> = group
+            .iter()
+            .map(|s| (s.edge.clone(), l.routes[&s.edge].clone()))
+            .collect();
+        let (before_cross, before_ovlp) = edge_conflicts(&l.routes, &before_targets);
+        let before_prox = batch_proximity_violations(&l.routes, &before_targets, o.lane_spacing);
+        let spacing_trials = if o.lane_spacing < preferred_spacing - 1e-6 {
+            vec![preferred_spacing, o.lane_spacing]
+        } else {
+            vec![preferred_spacing]
+        };
+        let mut committed = false;
+        for spacing in spacing_trials {
+            let mut constraints = Vec::new();
+            let mut trial_bounds_ok = true;
+            for (i, s) in group.iter().enumerate() {
+                if i > 0 && !(group[i - 1].fixed && s.fixed) {
+                    constraints.push(crate::solver::Constraint::separation(i - 1, i, spacing));
+                }
+                if s.fixed {
+                    constraints.push(crate::solver::Constraint::fixed(i, s.coord));
+                } else {
+                    let (mut low, mut high) = base_bounds[i];
+                    if spacing > 1e-6 {
+                        for b in &all_barriers {
+                            if b.edge == s.edge
+                                || in_group.contains(&(b.edge.as_str(), b.index))
+                                || b.start >= s.end - 1e-6
+                                || s.start >= b.end - 1e-6
+                            {
+                                continue;
+                            }
+                            let d = s.coord - b.coord;
+                            if d.abs() < spacing - 1e-6 {
+                                let push_pos = b.coord + spacing;
+                                let push_neg = b.coord - spacing;
+                                let prefer_neg = d < -1e-6
+                                    || (d.abs() <= 1e-6 && (s.legs[0].1 + s.legs[1].1) < 0);
+                                if prefer_neg {
+                                    if push_neg >= low - 1e-6 {
+                                        high = high.min(push_neg);
+                                    } else if push_pos <= high + 1e-6 {
+                                        low = low.max(push_pos);
+                                    } else {
+                                        high = high.min(push_neg);
+                                    }
+                                } else if push_pos <= high + 1e-6 {
+                                    low = low.max(push_pos);
+                                } else if push_neg >= low - 1e-6 {
+                                    high = high.min(push_neg);
+                                } else {
+                                    low = low.max(push_pos);
+                                }
+                            } else if d > 0. {
+                                low = low.max(b.coord + spacing);
+                            } else {
+                                high = high.min(b.coord - spacing);
+                            }
                         }
                     }
-                }
-                let mut valid = true;
-                for (id, r) in &candidates {
-                    let e = scene.edge(id).unwrap();
-                    if !route_geometry_valid(scene, l, e, r, o.margin) {
-                        valid = false;
+                    if low > high + 1e-6 {
+                        trial_bounds_ok = false;
                         break;
                     }
-                    let external = obstacles(scene, l, e, o.margin);
-                    let mut internal = external.clone();
-                    internal.extend(endpoint_obstacles(scene, l, e, o.margin));
-                    for (i, p) in r.points.windows(2).enumerate() {
-                        if (p[0].x - p[1].x).abs() > 1e-6 && (p[0].y - p[1].y).abs() > 1e-6 {
-                            valid = false;
-                            break;
-                        }
-                        let obs = if i == 0 || i + 2 == r.points.len() {
-                            &external
-                        } else {
-                            &internal
-                        };
-                        if obs.iter().any(|ob| ob.blocks(p[0], p[1])) {
-                            valid = false;
-                            break;
-                        }
-                    }
-                    if !valid {
-                        break;
-                    }
-                    let a = &l.ports[&port_key(e, true)];
-                    let b = &l.ports[&port_key(e, false)];
-                    for (port, tip) in [(a, r.points[1]), (b, r.points[r.points.len() - 2])] {
-                        let (nx, ny) = port.side.normal();
-                        let dx = tip.x - port.point.x;
-                        let dy = tip.y - port.point.y;
-                        if dx * nx + dy * ny < o.margin - 1e-6 || (dx * ny - dy * nx).abs() > 1e-6 {
-                            valid = false;
-                        }
-                    }
-                    if !valid {
-                        break;
-                    }
-                }
-                if valid {
-                    let (after_cross, after_ovlp) = edge_conflicts(&l.routes, &candidates);
-                    if after_cross > before_cross || after_ovlp > before_ovlp {
-                        valid = false;
-                    }
-                }
-                if valid && before_ovlp == 0 {
-                    let creates_micro_jog = candidates.iter().any(|(id, cand_r)| {
-                        crate::labels::interior_micro_jog_count(&cand_r.points, 12.0 - 1e-6)
-                            > crate::labels::interior_micro_jog_count(
-                                &l.routes[id].points,
-                                12.0 - 1e-6,
-                            )
+                    constraints.push(crate::solver::Constraint {
+                        coefficients: vec![(i, 1.)],
+                        rhs: low,
+                        equality: false,
                     });
-                    if creates_micro_jog {
+                    constraints.push(crate::solver::Constraint {
+                        coefficients: vec![(i, -1.)],
+                        rhs: -high,
+                        equality: false,
+                    });
+                }
+            }
+            if !trial_bounds_ok {
+                continue;
+            }
+            let Ok(lanes) = crate::solver::project(&desired, &weights, &constraints) else {
+                continue;
+            };
+            let mut candidates = BTreeMap::new();
+            for (s, lane) in group.iter().zip(lanes) {
+                let route = candidates
+                    .entry(s.edge.clone())
+                    .or_insert_with(|| l.routes[&s.edge].clone());
+                for p in &mut route.points[s.index..=s.index + 1] {
+                    if target_horizontal {
+                        p.y = lane;
+                    } else {
+                        p.x = lane;
+                    }
+                }
+            }
+            let mut valid = true;
+            for (id, r) in &candidates {
+                let e = scene.edge(id).unwrap();
+                if !route_geometry_valid(scene, l, e, r, o.margin) {
+                    valid = false;
+                    break;
+                }
+                let external = obstacles(scene, l, e, o.margin);
+                let mut internal = external.clone();
+                internal.extend(endpoint_obstacles(scene, l, e, o.margin));
+                for (i, p) in r.points.windows(2).enumerate() {
+                    if (p[0].x - p[1].x).abs() > 1e-6 && (p[0].y - p[1].y).abs() > 1e-6 {
+                        valid = false;
+                        break;
+                    }
+                    let obs = if i == 0 || i + 2 == r.points.len() {
+                        &external
+                    } else {
+                        &internal
+                    };
+                    if obs.iter().any(|ob| ob.blocks(p[0], p[1])) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if !valid {
+                    break;
+                }
+                let a = &l.ports[&port_key(e, true)];
+                let b = &l.ports[&port_key(e, false)];
+                for (port, tip) in [(a, r.points[1]), (b, r.points[r.points.len() - 2])] {
+                    let (nx, ny) = port.side.normal();
+                    let dx = tip.x - port.point.x;
+                    let dy = tip.y - port.point.y;
+                    if dx * nx + dy * ny < o.margin - 1e-6 || (dx * ny - dy * nx).abs() > 1e-6 {
                         valid = false;
                     }
                 }
-                if valid {
-                    l.routes.extend(candidates);
-                    committed = true;
+                if !valid {
                     break;
                 }
             }
-            if !committed {
-                l.diagnostics.push("A shared channel could not be separated without breaking port/obstacle clearance".into());
+            if valid {
+                let (after_cross, after_ovlp) = edge_conflicts(&l.routes, &candidates);
+                let after_prox = batch_proximity_violations(&l.routes, &candidates, o.lane_spacing);
+                if after_cross > before_cross
+                    || after_ovlp > before_ovlp
+                    || (after_ovlp == before_ovlp
+                        && (after_prox.0 > before_prox.0 || after_prox.1 > before_prox.1 + 1e-3))
+                {
+                    valid = false;
+                }
             }
+            if valid && before_ovlp == 0 {
+                let creates_micro_jog = candidates.iter().any(|(id, cand_r)| {
+                    crate::labels::interior_micro_jog_count(&cand_r.points, 12.0 - 1e-6)
+                        > crate::labels::interior_micro_jog_count(&l.routes[id].points, 12.0 - 1e-6)
+                });
+                if creates_micro_jog {
+                    valid = false;
+                }
+            }
+            if valid {
+                l.routes.extend(candidates);
+                committed = true;
+                break;
+            }
+        }
+        if !committed {
+            l.diagnostics.push(
+                "A shared channel could not be separated without breaking port/obstacle clearance"
+                    .into(),
+            );
         }
     }
 }
@@ -3224,6 +3542,8 @@ mod stage2_routing_tests {
                 target: Point::new(0., 40.),
                 segs: &segs,
                 hotspots: &[],
+                min_lane_spacing: o.lane_spacing,
+                pref_lane_spacing: o.lane_spacing.max(12.0),
             },
         );
         assert!(cross_cost >= 2000.0);
@@ -3233,6 +3553,8 @@ mod stage2_routing_tests {
             target: Point::new(100., 0.),
             segs: &segs,
             hotspots: &[],
+            min_lane_spacing: o.lane_spacing,
+            pref_lane_spacing: o.lane_spacing.max(12.0),
         };
         let first_ovlp = step_route_cost(
             Point::new(0., 0.),
@@ -4053,10 +4375,19 @@ pub(crate) fn retain_detour(
     };
     let (ret_cross, ret_ovlp) = route_conflict_counts(l, &edge.id, &route.points);
     let (fresh_cross, fresh_ovlp) = route_conflict_counts(l, &edge.id, &fresh.points);
+    let (ret_prox_cnt, ret_prox_sev) = route_proximity_penalty(l, &edge.id, &route.points, margin);
+    let (fresh_prox_cnt, fresh_prox_sev) =
+        route_proximity_penalty(l, &edge.id, &fresh.points, margin);
+    let (prior_prox_cnt, prior_prox_sev) =
+        route_proximity_penalty(prior, &edge.id, &old.points, margin);
+    let max_prox_cnt = fresh_prox_cnt.max(prior_prox_cnt);
+    let max_prox_sev = fresh_prox_sev.max(prior_prox_sev);
     (length(&route) <= length(fresh) * 1.25 + 32.
         && route_is_valid(scene, l, edge, &route, margin)
         && ret_ovlp <= fresh_ovlp
-        && ret_cross <= fresh_cross)
+        && ret_cross <= fresh_cross
+        && (ret_prox_cnt < max_prox_cnt
+            || (ret_prox_cnt == max_prox_cnt && ret_prox_sev <= max_prox_sev + 1e-3)))
         .then_some(route)
 }
 
@@ -4185,5 +4516,432 @@ mod detour_tests {
             "expected at most 1 irreducible micro-jog finding on 5eed1203-dag, got {dag_jogs:?}"
         );
         crate::layout::validate(&d.scene, &d.layout, &LayoutOptions::default()).unwrap();
+    }
+
+    #[test]
+    fn obstacles_include_foreign_sql_table_title_and_shifted_container_header() {
+        let margin = 8.;
+        // Foreign sql_table title above body must be inflated by `margin`.
+        let scene = crate::routing::lower(&crate::syntax::parse(
+            "tbl [shape: sql_table, label: \"Users Table\"]\na -> b\n",
+        ));
+        let mut l = Layout::default();
+        l.nodes
+            .insert("tbl".into(), Rect::new(200., 200., 140., 80.));
+        l.nodes.insert("a".into(), Rect::new(40., 130., 40., 30.));
+        l.nodes.insert("b".into(), Rect::new(360., 130., 40., 30.));
+        let e = scene.edge("a->b").unwrap();
+        let obs = obstacles(&scene, &l, e, margin);
+        let title_rect =
+            crate::layout::sql_table_title_rect(scene.node("tbl").unwrap(), l.nodes["tbl"])
+                .expect("expected sql_table_title_rect");
+        let expected_inflated = title_rect.inflate(margin);
+        assert!(
+            obs.iter().any(|r| {
+                (r.x - expected_inflated.x).abs() < 1e-6
+                    && (r.y - expected_inflated.y).abs() < 1e-6
+                    && (r.w - expected_inflated.w).abs() < 1e-6
+                    && (r.h - expected_inflated.h).abs() < 1e-6
+            }),
+            "expected inflated foreign sql_table title in obstacles: {expected_inflated:?} vs {obs:?}"
+        );
+
+        // Container with North port shifts header via container_header_rect_with_ports.
+        let cscene = crate::routing::lower(&crate::syntax::parse(
+            "grp: \"Header\" {\n  inner\n}\next -> grp.N\n",
+        ));
+        let mut cl = Layout::default();
+        let gr = Rect::new(200., 200., 320., 180.);
+        cl.nodes.insert("grp".into(), gr);
+        cl.nodes
+            .insert("grp.inner".into(), Rect::new(200., 230., 80., 40.));
+        cl.nodes.insert("ext".into(), Rect::new(90., 40., 60., 30.));
+        let grp_node = cscene.node("grp").unwrap();
+        let base_hdr = crate::layout::container_header_rect(grp_node, gr).unwrap();
+        cl.ports.insert(
+            "ext->grp:source".into(),
+            PortPlacement {
+                point: Point::new(base_hdr.x, 55.),
+                stub: Point::new(base_hdr.x, 71.),
+                side: Side::S,
+                key: "ext->grp:source".into(),
+            },
+        );
+        cl.ports.insert(
+            "ext->grp:target".into(),
+            PortPlacement {
+                point: Point::new(base_hdr.x, gr.top()),
+                stub: Point::new(base_hdr.x, gr.top() - 16.),
+                side: Side::N,
+                key: "ext->grp:target".into(),
+            },
+        );
+        let ce = cscene.edge("ext->grp").unwrap();
+        let cobs = obstacles(&cscene, &cl, ce, margin);
+        let shifted_hdr =
+            crate::layout::container_header_rect_with_ports(grp_node, gr, &cl.ports).unwrap();
+        assert!(shifted_hdr.left() >= base_hdr.x + 12. - 1e-6);
+        assert!(
+            cobs.iter().any(|r| {
+                r.left() >= shifted_hdr.left() - margin / 2. - 1e-6
+                    && r.right() <= shifted_hdr.right() + margin / 2. + 1e-6
+                    && (r.y - shifted_hdr.y).abs() < 1e-6
+            }),
+            "expected shifted container header in obstacles: shifted={shifted_hdr:?}, obs={cobs:?}"
+        );
+    }
+
+    #[test]
+    fn step_route_cost_parallel_proximity_is_subdivision_invariant_and_midpoint_clear() {
+        let o = LayoutOptions::default();
+        let mut routed = Layout::default();
+        routed.routes.insert(
+            "existing".into(),
+            Route {
+                edge: "existing".into(),
+                points: vec![Point::new(0., 0.), Point::new(100., 0.)],
+            },
+        );
+        let segs =
+            build_existing_segments(&routed, o.weights.crossing, &CongestionHistory::default());
+        let hotspots = Vec::new();
+        let start = Point::new(-20., 4.);
+        let target = Point::new(120., 4.);
+        let ctx = StepCostCtx {
+            start,
+            target,
+            segs: &segs,
+            hotspots: &hotspots,
+            min_lane_spacing: o.lane_spacing,
+            pref_lane_spacing: o.lane_spacing.max(12.),
+        };
+        let whole = step_route_cost(Point::new(0., 4.), Point::new(100., 4.), 0, 0, None, &ctx);
+        let part1 = step_route_cost(Point::new(0., 4.), Point::new(40., 4.), 0, 0, None, &ctx);
+        let part2 = step_route_cost(
+            Point::new(40., 4.),
+            Point::new(100., 4.),
+            0,
+            0,
+            Some(Point::new(0., 4.)),
+            &ctx,
+        );
+        assert!(
+            whole > 500.,
+            "expected substantial proximity penalty at 4px gap, got {whole}"
+        );
+        assert!(
+            (whole - (part1 + part2)).abs() < 1e-6,
+            "subdivided parallel proximity penalty drifted: whole={whole} vs sum={}",
+            part1 + part2
+        );
+
+        // Two existing routes 16px apart create a 16px corridor where midpoint y = 8.0 is >= 8px clear of both.
+        let mut corridor = Layout::default();
+        corridor.routes.insert(
+            "top".into(),
+            Route {
+                edge: "top".into(),
+                points: vec![Point::new(20., 0.), Point::new(100., 0.)],
+            },
+        );
+        corridor.routes.insert(
+            "bot".into(),
+            Route {
+                edge: "bot".into(),
+                points: vec![Point::new(20., 16.), Point::new(100., 16.)],
+            },
+        );
+        let path = search(
+            Point::new(0., 0.),
+            Point::new(120., 16.),
+            0,
+            0,
+            &[],
+            &corridor,
+            &o,
+        )
+        .unwrap();
+        let (cnt, _) = route_proximity_penalty(&corridor, "new", &path, o.lane_spacing);
+        assert_eq!(
+            cnt, 0,
+            "expected search to use clear 8px midline inside 16px corridor, got {path:?}"
+        );
+    }
+
+    #[test]
+    fn nudge_channels_separates_near_parallel_pairs_and_solo_near_terminal_barriers() {
+        let scene = crate::routing::lower(&crate::syntax::parse("a -> b\nc -> d\ne -> f\n"));
+        let mut l = Layout::default();
+        l.nodes.insert("a".into(), Rect::new(0., 0., 40., 40.));
+        l.nodes.insert("b".into(), Rect::new(240., 0., 40., 40.));
+        l.nodes.insert("c".into(), Rect::new(0., 120., 40., 40.));
+        l.nodes.insert("d".into(), Rect::new(240., 120., 40., 40.));
+        l.nodes.insert("e".into(), Rect::new(0., 220., 40., 40.));
+        l.nodes.insert("f".into(), Rect::new(240., 220., 40., 40.));
+        let add_ports = |l: &mut Layout, edge: &str, p0: Point, p1: Point| {
+            l.ports.insert(
+                format!("{edge}:source"),
+                PortPlacement {
+                    point: p0,
+                    stub: Point::new(p0.x + 16., p0.y),
+                    side: Side::E,
+                    key: format!("{edge}:source"),
+                },
+            );
+            l.ports.insert(
+                format!("{edge}:target"),
+                PortPlacement {
+                    point: p1,
+                    stub: Point::new(p1.x - 16., p1.y),
+                    side: Side::W,
+                    key: format!("{edge}:target"),
+                },
+            );
+        };
+        add_ports(&mut l, "a->b", Point::new(20., 0.), Point::new(220., 0.));
+        add_ports(
+            &mut l,
+            "c->d",
+            Point::new(20., 120.),
+            Point::new(220., 120.),
+        );
+        add_ports(
+            &mut l,
+            "e->f",
+            Point::new(20., 220.),
+            Point::new(220., 220.),
+        );
+        // Pair 1 (`a->b` and `c->d`): parallel interior segments at y=58 and y=62 (4px apart > 0.5px).
+        l.routes.insert(
+            "a->b".into(),
+            Route {
+                edge: "a->b".into(),
+                points: vec![
+                    Point::new(20., 0.),
+                    Point::new(50., 0.),
+                    Point::new(50., 58.),
+                    Point::new(190., 58.),
+                    Point::new(190., 0.),
+                    Point::new(220., 0.),
+                ],
+            },
+        );
+        l.routes.insert(
+            "c->d".into(),
+            Route {
+                edge: "c->d".into(),
+                points: vec![
+                    Point::new(20., 120.),
+                    Point::new(60., 120.),
+                    Point::new(60., 62.),
+                    Point::new(180., 62.),
+                    Point::new(180., 120.),
+                    Point::new(220., 120.),
+                ],
+            },
+        );
+        // Pair 1 (`a->b` and `c->d`): parallel interior segments at y=58 and y=62 (4px apart > 0.5px).
+        let o = LayoutOptions::default();
+        nudge_channels(&scene, &o, &mut l);
+        let y_ab = l.routes["a->b"].points[2].y;
+        let y_cd = l.routes["c->d"].points[2].y;
+        assert!(
+            (y_ab - y_cd).abs() >= o.lane_spacing - 1e-4,
+            "expected 4px-apart parallel channels to separate >= {}, got y_ab={y_ab}, y_cd={y_cd}",
+            o.lane_spacing
+        );
+
+        // Now test solo movable channel 4px from a terminal/fixed route.
+        let scene2 = crate::routing::lower(&crate::syntax::parse("a -> b\ne -> f\n"));
+        let mut l2 = Layout::default();
+        l2.nodes.insert("a".into(), Rect::new(0., 0., 40., 40.));
+        l2.nodes.insert("b".into(), Rect::new(240., 0., 40., 40.));
+        l2.nodes.insert("e".into(), Rect::new(0., 220., 40., 40.));
+        l2.nodes.insert("f".into(), Rect::new(240., 220., 40., 40.));
+        add_ports(&mut l2, "a->b", Point::new(20., 0.), Point::new(220., 0.));
+        add_ports(
+            &mut l2,
+            "e->f",
+            Point::new(20., 220.),
+            Point::new(220., 220.),
+        );
+        l2.routes.insert(
+            "a->b".into(),
+            Route {
+                edge: "a->b".into(),
+                points: vec![
+                    Point::new(20., 0.),
+                    Point::new(50., 0.),
+                    Point::new(50., 216.),
+                    Point::new(190., 216.),
+                    Point::new(190., 0.),
+                    Point::new(220., 0.),
+                ],
+            },
+        );
+        l2.routes.insert(
+            "e->f".into(),
+            Route {
+                edge: "e->f".into(),
+                points: vec![Point::new(20., 220.), Point::new(220., 220.)],
+            },
+        );
+        nudge_channels(&scene2, &o, &mut l2);
+        let y_ab2 = l2.routes["a->b"].points[2].y;
+        assert!(
+            (220. - y_ab2).abs() >= o.lane_spacing - 1e-4,
+            "expected solo movable channel near fixed terminal segment to push away >= {}, got y={y_ab2}",
+            o.lane_spacing
+        );
+    }
+
+    #[test]
+    fn dejitter_refuses_to_push_bend_into_parallel_proximity() {
+        let scene = crate::routing::lower(&crate::syntax::parse("a -> b\nc -> d\n"));
+        let mut l = Layout::default();
+        l.nodes.insert("a".into(), Rect::new(0., 0., 40., 40.));
+        l.nodes.insert("b".into(), Rect::new(240., 6., 40., 40.));
+        l.nodes.insert("c".into(), Rect::new(0., 104., 40., 40.));
+        l.nodes.insert("d".into(), Rect::new(240., 104., 40., 40.));
+        l.ports.insert(
+            "a->b:source".into(),
+            PortPlacement {
+                point: Point::new(20., 0.),
+                stub: Point::new(36., 0.),
+                side: Side::E,
+                key: "a->b:source".into(),
+            },
+        );
+        l.ports.insert(
+            "a->b:target".into(),
+            PortPlacement {
+                point: Point::new(220., 6.),
+                stub: Point::new(204., 6.),
+                side: Side::W,
+                key: "a->b:target".into(),
+            },
+        );
+        l.ports.insert(
+            "c->d:source".into(),
+            PortPlacement {
+                point: Point::new(20., 104.),
+                stub: Point::new(36., 104.),
+                side: Side::E,
+                key: "c->d:source".into(),
+            },
+        );
+        l.ports.insert(
+            "c->d:target".into(),
+            PortPlacement {
+                point: Point::new(220., 104.),
+                stub: Point::new(204., 104.),
+                side: Side::W,
+                key: "c->d:target".into(),
+            },
+        );
+        // `c->d` runs along y=104 via intermediate bridge at y=4 over x=[90, 150], strictly between
+        // `a->b`'s x=80 and x=160 legs so `a->b` starts with 0 proximity violations.
+        l.routes.insert(
+            "c->d".into(),
+            Route {
+                edge: "c->d".into(),
+                points: vec![
+                    Point::new(20., 104.),
+                    Point::new(90., 104.),
+                    Point::new(90., 4.),
+                    Point::new(150., 4.),
+                    Point::new(150., 104.),
+                    Point::new(220., 104.),
+                ],
+            },
+        );
+        // `a->b` has a clear detour at y = -30 (distance >= 32 from y=2) and a 6px port step.
+        // Without the proximity guard, dejitter flattens `(20,0)->(80,0)->(80,-30)->(160,-30)->(160,6)->(220,6)`
+        // onto `y=0` or `y=6` directly 2px/4px from `c->d`'s `y=2` segment.
+        let orig_ab = Route {
+            edge: "a->b".into(),
+            points: vec![
+                Point::new(20., 0.),
+                Point::new(80., 0.),
+                Point::new(80., -30.),
+                Point::new(160., -30.),
+                Point::new(160., 6.),
+                Point::new(220., 6.),
+            ],
+        };
+        l.routes.insert("a->b".into(), orig_ab.clone());
+        let o = LayoutOptions {
+            lane_spacing: 8.,
+            ..Default::default()
+        };
+        let (before_cnt, _) = route_proximity_penalty(&l, "a->b", &orig_ab.points, o.lane_spacing);
+        assert_eq!(before_cnt, 0);
+        let mut l_no_guard = l.clone();
+        let mut o_no_guard = o.clone();
+        o_no_guard.lane_spacing = 0.;
+        dejitter(&scene, &o_no_guard, &mut l_no_guard);
+        assert!(
+            coalesced(&l_no_guard.routes["a->b"].points).len() < coalesced(&orig_ab.points).len(),
+            "expected dejitter without proximity guard to collapse the detour: {:?}",
+            l_no_guard.routes["a->b"].points
+        );
+        dejitter(&scene, &o, &mut l);
+        let (after_cnt, _) =
+            route_proximity_penalty(&l, "a->b", &l.routes["a->b"].points, o.lane_spacing);
+        assert_eq!(
+            after_cnt, 0,
+            "dejitter introduced a <8px parallel proximity violation: {:?}",
+            l.routes["a->b"].points
+        );
+    }
+
+    #[test]
+    fn quality_corpus_eliminates_parallel_proximity_violations() {
+        let o = LayoutOptions::default();
+        for (name, src) in [
+            (
+                "10-many-named-ports",
+                include_str!("../tests/fixtures/quality/10-many-named-ports.diagram"),
+            ),
+            (
+                "a11ce002-parallel",
+                include_str!("../tests/fixtures/quality/a11ce002-parallel.diagram"),
+            ),
+            (
+                "5eed1203-sparse-mesh",
+                include_str!("../tests/fixtures/quality/5eed1203-sparse-mesh.diagram"),
+            ),
+            (
+                "abc12345-dag",
+                include_str!("../tests/fixtures/quality/abc12345-dag.diagram"),
+            ),
+        ] {
+            let d = crate::compile(src).unwrap();
+            let (_, ovlp, _, _) = route_crossings_and_overlaps(&d.scene, &d.layout);
+            assert_eq!(ovlp, 0, "{name}: expected 0 overlaps");
+            let edges: Vec<&String> = d.layout.routes.keys().collect();
+            for i in 0..edges.len() {
+                let p1 = &d.layout.routes[edges[i]].points;
+                for j in (i + 1)..edges.len() {
+                    let p2 = &d.layout.routes[edges[j]].points;
+                    for s1 in p1.windows(2) {
+                        for s2 in p2.windows(2) {
+                            if let Some((gap, ov)) =
+                                parallel_segment_gap(s1[0], s1[1], s2[0], s2[1])
+                            {
+                                assert!(
+                                    gap >= o.lane_spacing - 1e-4,
+                                    "{name}: {} and {} came within {gap:.2}px (< {}) over {ov:.1}px",
+                                    edges[i],
+                                    edges[j],
+                                    o.lane_spacing
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            crate::layout::validate(&d.scene, &d.layout, &o).unwrap();
+        }
     }
 }

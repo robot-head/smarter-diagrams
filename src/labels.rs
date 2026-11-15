@@ -3030,7 +3030,9 @@ pub fn polish_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
         .iter()
         .map(|lane| (lane.edge.as_str(), lane.index))
         .collect();
-    let mut lane_obstacles: Vec<Vec<Rect>> = Vec::with_capacity(n);
+    let shape_target = (o.margin + 2.).max(6.);
+    let lane_target = o.lane_spacing.max(12.);
+    let mut lane_obstacles: Vec<Vec<(Rect, f64)>> = Vec::with_capacity(n);
     for lane in &lanes {
         let region = lane.rect.inflate(lane.bound + 28.);
         let mut obs = Vec::new();
@@ -3040,10 +3042,37 @@ pub fn polish_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
                 continue;
             }
             if region.intersects(label.bounds) {
-                obs.push(label.bounds);
+                obs.push((label.bounds, 6.));
             }
         }
-        push_static_obstacles(&mut obs, region, scene, l, &lane.edge);
+        for node in &scene.nodes {
+            let nr = l.nodes[&node.id];
+            if !node.container {
+                if region.intersects(nr) {
+                    obs.push((nr, shape_target));
+                }
+                if node.id != lane.edge
+                    && let Some(tr) = sql_table_title_rect(node, nr)
+                    && region.intersects(tr)
+                {
+                    obs.push((tr, shape_target));
+                }
+            } else if node.id != lane.edge
+                && let Some(hr) = container_header_rect_with_ports(node, nr, &l.ports)
+                && region.intersects(hr)
+            {
+                obs.push((hr, 6.));
+            }
+        }
+        for (pkey, port) in &l.ports {
+            if pkey == &lane.edge {
+                continue;
+            }
+            let pr = Rect::new(port.point.x, port.point.y, 8., 8.);
+            if region.intersects(pr) {
+                obs.push((pr, 6.));
+            }
+        }
         for (other_id, other_route) in &l.routes {
             if *other_id == lane.edge {
                 continue;
@@ -3055,7 +3084,7 @@ pub fn polish_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
                 if let Some(sr) = segment_rect(pair[0], pair[1])
                     && region.intersects(sr)
                 {
-                    obs.push(sr);
+                    obs.push((sr, lane_target));
                 }
             }
         }
@@ -3082,17 +3111,24 @@ pub fn polish_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
             ys.push(y);
         }
         for (i, lane) in lanes.iter().enumerate() {
-            for &obs in &lane_obstacles[i] {
+            for &(obs, target) in &lane_obstacles[i] {
                 let sdf = smooth_sdf(&xs[i], &ys[i], lane.rect, obs);
-                energy = energy.add(&Dual::constant(6., n).sub(&sdf).softplus(2.).square());
+                energy = energy.add(&Dual::constant(target, n).sub(&sdf).softplus(2.).square());
             }
             for j in (i + 1)..n {
                 let other = &lanes[j];
-                if other.edge == lane.edge || !lane.rect.inflate(28.).intersects(other.rect) {
+                if other.edge == lane.edge
+                    || !lane.rect.inflate(28. + lane_target).intersects(other.rect)
+                {
                     continue;
                 }
                 let sdf = smooth_sdf_dual(&xs[i], &ys[i], lane.rect, &xs[j], &ys[j], other.rect);
-                energy = energy.add(&Dual::constant(6., n).sub(&sdf).softplus(2.).square());
+                energy = energy.add(
+                    &Dual::constant(lane_target, n)
+                        .sub(&sdf)
+                        .softplus(2.)
+                        .square(),
+                );
             }
         }
         energy
@@ -3112,6 +3148,12 @@ pub fn polish_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
             continue;
         };
         let before_count = interior_micro_jog_count(&orig_route.points, threshold);
+        let (before_prox_cnt, before_prox_sev) = crate::routing::route_proximity_penalty(
+            &candidate,
+            edge_id,
+            &orig_route.points,
+            o.lane_spacing,
+        );
         let mut accepted = None;
         for scale in [1.0, 0.5, 0.25] {
             let mut trial = orig_route.clone();
@@ -3126,9 +3168,17 @@ pub fn polish_channels(scene: &SceneGraph, o: &LayoutOptions, l: &mut Layout) {
                     }
                 }
             }
+            let (prox_cnt, prox_sev) = crate::routing::route_proximity_penalty(
+                &candidate,
+                edge_id,
+                &trial.points,
+                o.lane_spacing,
+            );
             if interior_micro_jog_count(&trial.points, threshold) <= before_count
                 && crate::routing::route_is_valid(scene, &candidate, edge, &trial, o.margin)
                 && crate::routing::route_conflict_counts(&candidate, edge_id, &trial.points).1 == 0
+                && prox_cnt <= before_prox_cnt
+                && prox_sev <= before_prox_sev + 1e-3
             {
                 accepted = Some(trial);
                 break;
@@ -3579,5 +3629,74 @@ e.E -> f.W: push
             "expected unguarded 32px peer lane to polish downward cleanly: {pts_cd:?}"
         );
         assert_eq!(interior_micro_jog_count(pts_cd, threshold), 0);
+    }
+
+    #[test]
+    fn polish_channels_preserves_parallel_line_clearance() {
+        let src = "\
+a @pin(grid: 0, 0)
+b @pin(grid: 24, 0)
+c @pin(grid: 0, 4)
+d @pin(grid: 24, 4)
+e @pin(grid: 0, 24)
+f @pin(grid: 24, 24)
+a.E -> b.W
+c.E -> d.W
+e.E -> f.W: push
+";
+        let mut diag = crate::compile(src).unwrap();
+        let o = LayoutOptions::default();
+        let ab_pts = &diag.layout.routes["a->b"].points;
+        let a_port = ab_pts[0];
+        let b_port = *ab_pts.last().unwrap();
+        // `c->d` routes straight along `y = cy0` (`a_port.y + 64`) and acts as a static peer barrier.
+        let cd_pts = &diag.layout.routes["c->d"].points;
+        let c_start = cd_pts[0];
+        let c_end = *cd_pts.last().unwrap();
+        let cy0 = c_start.y;
+        // Place `a->b`'s movable lane at `cy0 - 10.0` (10px clear of `c->d`), pushed downward by
+        // a foreign label sitting right above it.
+        let x0 = a_port.x;
+        let x1 = b_port.x;
+        let lane_y = cy0 - 10.;
+        diag.layout.routes.insert(
+            "a->b".into(),
+            Route {
+                edge: "a->b".into(),
+                points: vec![
+                    Point::new(x0, a_port.y),
+                    Point::new(x0 + 16., a_port.y),
+                    Point::new(x0 + 16., lane_y),
+                    Point::new(x1 - 16., lane_y),
+                    Point::new(x1 - 16., b_port.y),
+                    Point::new(x1, b_port.y),
+                ],
+            },
+        );
+        diag.layout.routes.insert(
+            "c->d".into(),
+            Route {
+                edge: "c->d".into(),
+                points: vec![c_start, c_end],
+            },
+        );
+        let mut push_label = diag
+            .layout
+            .labels
+            .iter()
+            .find(|l| l.feature == "e->f")
+            .cloned()
+            .unwrap();
+        push_label.bounds = Rect::new((x0 + x1) * 0.5, lane_y - 12., 48., 16.);
+        diag.layout.labels.retain(|l| l.feature != "e->f");
+        diag.layout.labels.push(push_label);
+        assert!(crate::layout::validate(&diag.scene, &diag.layout, &o).is_ok());
+
+        polish_channels(&diag.scene, &o, &mut diag.layout);
+        let new_lane_y = diag.layout.routes["a->b"].points[2].y;
+        assert!(
+            (cy0 - new_lane_y).abs() >= o.lane_spacing - 1e-4,
+            "polish_channels pushed lane too close to peer route: cy0={cy0}, new_lane_y={new_lane_y}"
+        );
     }
 }

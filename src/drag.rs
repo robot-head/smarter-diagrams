@@ -320,6 +320,21 @@ impl DragSession {
                     route,
                     self.options.margin,
                 )
+                && {
+                    let (cur_cnt, cur_sev) = crate::routing::route_proximity_penalty(
+                        &stable,
+                        &edge.id,
+                        &route.points,
+                        self.options.lane_spacing,
+                    );
+                    let (old_cnt, old_sev) = crate::routing::route_proximity_penalty(
+                        &self.baseline.layout,
+                        &edge.id,
+                        &route.points,
+                        self.options.lane_spacing,
+                    );
+                    cur_cnt <= old_cnt && cur_sev <= old_sev + 1e-3
+                }
                 && stable.routes.get(&edge.id) != Some(route)
             {
                 stable.routes.insert(edge.id.clone(), route.clone());
