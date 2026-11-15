@@ -7,7 +7,14 @@ module.exports=async function siteUsability(browser,page,base){
   for(const theme of ['light','dark']){
     await page.goto(base);await page.evaluate(theme=>localStorage.setItem('vitepress-theme-appearance',theme),theme);
     for(const path of ['', 'guide/getting-started.html','examples.html','playground.html']){
-      await page.goto(url(path));await page.waitForFunction(theme=>document.documentElement.dataset.theme===theme,theme);
+      await page.goto(url(path));
+      if(path===''){
+        await page.getByRole('heading',{name:'Diagram compiler for software engineers'}).waitFor();
+        assert(await page.getByRole('link',{name:'GitHub repository',exact:true}).first().count(),'landing GitHub link');
+        const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
+        assert(!overflow,'landing horizontal overflow');
+      } else {
+      await page.waitForFunction(theme=>document.documentElement.dataset.theme===theme,theme);
       const themeSwitch=page.locator('.VPNavBarAppearance .VPSwitchAppearance');
       assert(await themeSwitch.getAttribute('aria-label'),'theme switch needs an explicit label');
       assert(await page.getByRole('link',{name:'GitHub repository',exact:true}).first().count(),'repository icon label');
@@ -40,6 +47,7 @@ module.exports=async function siteUsability(browser,page,base){
             assert.deepEqual(await page.evaluate(checkSvg,markup),[],'dark example contrast, geometry and bounds');
           }
         }
+      }
       }
       await page.screenshot({path:`artifacts/visual-qa-fixed/${theme}-${path.replace(/\W/g,'-')||'home'}.png`,fullPage:true});
     }

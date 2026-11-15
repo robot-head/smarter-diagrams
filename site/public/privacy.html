@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" data-type="software" data-radius="soft" data-buttons="tonal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Privacy notice · Smarter Diagrams</title>
+<meta name="description" content="How Smarter Diagrams handles diagram source files, browser storage, and local WebAssembly compilation.">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@400..700&family=JetBrains+Mono:wght@400..500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/system.css">
+<style>
+:root {
+  --p-bg: #ffffff; --p-surface: #f4f4f4; --p-ink: #111111; --p-muted: #6b6b6b;
+  --p-accent: #1a4be0; --p-accent-ink: #ffffff; --p-action: #1a4be0; --p-action-ink: #ffffff;
+  --font-display: "Host Grotesk", system-ui, sans-serif;
+  --font-text: "Host Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+.privacy-main { padding-block: clamp(56px, 8vw, 96px); }
+.privacy-doc { max-width: 68ch; display: grid; gap: var(--s-5); }
+.privacy-doc h1 { font-size: clamp(32px, 3.6vw, 48px); line-height: 1.08; letter-spacing: -0.03em; }
+.privacy-doc h2 { font-size: 20px; line-height: 1.3; margin-top: var(--s-3); }
+.privacy-doc p { color: var(--ink); line-height: 1.6; }
+</style>
+</head>
+<body>
+<main class="wrap privacy-main">
+  <article class="privacy-doc">
+    <p><a class="link" href="./index.html">Back to Smarter Diagrams</a></p>
+    <h1>Privacy notice</h1>
+    <p>Smarter Diagrams compiles diagram source, computes orthogonal routes, and runs queue or statechart simulations locally inside your browser WebAssembly runtime or command-line binary.</p>
+    <h2>Diagram source and exports</h2>
+    <p>Text typed or loaded into the browser playground stays in browser memory. Exported SVG, PNG, PDF, GIF, and WebM files are generated client-side and never uploaded to a remote service unless you connect a self-hosted Kroki or LSP backend yourself.</p>
+    <h2>Browser storage and static hosting</h2>
+    <p>The documentation site uses only local browser storage for your light or dark theme preference and sets no advertising or analytics tracking cookies. Static pages load web fonts from Google Fonts over HTTPS when online.</p>
+    <p><a class="btn btn--primary" href="./playground.html">Open the playground</a></p>
+  </article>
+</main>
+</body>
+</html>

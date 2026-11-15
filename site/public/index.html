@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="en" data-type="software" data-radius="soft" data-ground="sky" data-buttons="tonal" data-motion>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Smarter Diagrams: Diagram compiler for software engineers</title>
+<meta name="description" content="Text-authored architecture diagrams compiled to deterministic orthogonal SVG in Rust and WebAssembly, with lossless Git diffs, queue simulation, and LSP support.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Smarter Diagrams · Declarative diagram compiler">
+<meta property="og:description" content="Author system topologies in plain text, refine geometry on a canvas without losing comments, and run queue simulations in Rust and WebAssembly.">
+<meta property="og:image" content="share.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#ffffff">
+<meta name="site-kind" content="software">
+<meta name="page-type" content="software">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@400..700&family=JetBrains+Mono:wght@400..500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/system.css">
+<link rel="stylesheet" href="assets/ui/cards.css">
+<link rel="stylesheet" href="assets/motion/motion.css">
+<link rel="stylesheet" href="assets/backgrounds/backgrounds.css">
+<link rel="stylesheet" href="assets/layout/layout.css">
+<link rel="stylesheet" href="assets/icons/icon.css">
+<style>
+:root {
+  --p-bg: #ffffff; --p-surface: #f4f4f4; --p-ink: #111111; --p-muted: #6b6b6b;
+  --p-accent: #1a4be0; --p-accent-ink: #ffffff; --p-action: #1a4be0; --p-action-ink: #ffffff;
+  --p-inv-bg: #111111; --p-inv-surface: #1e1e1e; --p-inv-ink: #ffffff; --p-inv-muted: #9a9a9a;
+  --p-inv-accent: #ffffff; --p-inv-accent-ink: #111111; --p-inv-action: #ffffff; --p-inv-action-ink: #111111;
+  --font-display: "Host Grotesk", system-ui, sans-serif;
+  --font-text: "Host Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --display-weight: 500;
+  --display-tracking: -0.035em;
+  --display-tracking-xl: -0.04em;
+}
+</style>
+<link rel="stylesheet" href="assets/ui/base.css">
+<link rel="stylesheet" href="assets/ui/window/fragment.css">
+<link rel="stylesheet" href="assets/ui/diff-review/fragment.css">
+<link rel="stylesheet" href="assets/ui/code/fragment.css">
+<link rel="stylesheet" href="assets/ui/pipeline-board/fragment.css">
+<link rel="stylesheet" href="assets/ui/terminal-run/fragment.css">
+<link rel="stylesheet" href="assets/diagrams/diagram.css">
+<script>document.documentElement.classList.add('m-enter');setTimeout(()=>document.documentElement.classList.add('m-enter-done'),700)</script>
+<script src="assets/backgrounds/backgrounds.js"></script>
+<script>document.documentElement.classList.add('mo-js');setTimeout(()=>document.documentElement.classList.add('mo-safe'),2500)</script>
+<link rel="modulepreload" href="assets/moments/moments.js">
+<link rel="modulepreload" href="assets/moments/lib.js">
+<link rel="modulepreload" href="assets/moments/pinned-chapters/moment.js">
+<style>
+/* Secondary button uses a crisp ink outline and opaque white fill so it stays legible over any halo tint */
+html[data-buttons="tonal"] .btn--secondary {
+  background: #ffffff;
+  color: #111111;
+  border: 1.5px solid #4a5058;
+}
+html[data-buttons="tonal"] .btn--secondary:hover {
+  background: #eef2f8;
+  border-color: #111111;
+}
+
+/* Active in-page section indicator matching system nav active line */
+.nav__link[aria-current="location"] {
+  color: var(--ink);
+  font-weight: 500;
+}
+.nav__link[aria-current="location"]::after {
+  content: "";
+  position: absolute;
+  left: var(--s-3);
+  right: var(--s-3);
+  bottom: -2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* Keep navbar cleanly aligned within container bounds at 390px and 320px */
+@media (max-width: 639px) {
+  .nav__bar { gap: 6px; }
+  .nav__logo {
+    font-size: 15px;
+    gap: 6px;
+    letter-spacing: -0.02em;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  .nav:not(.is-open) .nav__actions .btn {
+    height: 44px;
+    padding-inline: 10px;
+    font-size: 13px;
+    letter-spacing: -0.01em;
+  }
+}
+@media (max-width: 374px) {
+  .nav:not(.is-open) .nav__actions { display: none; }
+}
+
+/* Keep hero h1 strictly above h2 at every breakpoint while staying <= 3 lines at 1024px */
+.hero--collage {
+  --ly-h1: clamp(38px, 2.4vw + 22px, 60px);
+  padding-bottom: var(--padb);
+}
+.hero--collage h1 {
+  font-size: var(--ly-h1);
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .hero--collage .hero__text { grid-column: 1 / span 6; }
+  .hero--collage .hero__art { grid-column: 7 / -1; }
+}
+.hero__art {
+  background:
+    radial-gradient(70% 60% at 18% 12%, color-mix(in oklab, var(--ground-surface) 82%, white), transparent 70%),
+    radial-gradient(60% 50% at 90% 100%, color-mix(in oklab, var(--ground-bg) 82%, var(--ground-accent)), transparent 70%),
+    var(--ground-bg);
+}
+.hero__art > .ly-piece--main .ui-win,
+.sd-app .ui-win {
+  width: 100%;
+  max-width: none;
+  --u-accent: var(--p-accent);
+  --u-accent-text: var(--p-accent);
+  --u-tint: color-mix(in oklab, var(--p-accent) 10%, var(--u-bg));
+  --u-fill-2: transparent;
+}
+.hero__art .ui-win__nav.is-on,
+.sd-app .ui-win__nav.is-on {
+  background: transparent;
+  box-shadow: inset 2px 0 0 var(--p-accent);
+}
+.hero__art .ui-win__main { padding-right: var(--ly-cut-room); }
+.hero__art > .ly-piece--note {
+  left: var(--s-6);
+  bottom: var(--s-6);
+  width: 312px;
+  z-index: 2;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #111111;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / .08), 0 18px 44px -20px rgb(0 0 0 / .36);
+}
+.sd-note__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.sd-note__title {
+  margin: 0;
+  font: 600 14px/1.3 var(--font-text);
+  letter-spacing: -0.01em;
+  color: #111111;
+}
+.sd-note__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 99px;
+  font: 500 12px/1 var(--font-text);
+  background: #e6f2ec;
+  color: #135c39;
+}
+.sd-note__line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: #3d4247;
+  border-top: 1px solid rgb(0 0 0 / .06);
+}
+.sd-note__line:first-of-type { border-top: 0; }
+.sd-note__line i {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: #e7eeff;
+  color: #1a4be0;
+  font: 600 11px/1 var(--font-mono);
+}
+.sd-note__line b { font-weight: 500; color: #111111; }
+.hero__proof { font-size: var(--t-body); color: var(--muted); }
+.sd-kind-tag {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font: 600 11px/1 var(--font-mono);
+  background: color-mix(in oklab, var(--p-accent) 10%, var(--u-bg));
+  color: var(--p-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--p-accent) 18%, transparent);
+}
+@media (max-width: 1023px) {
+  .hero__art > .ly-piece--note { left: var(--s-4); bottom: var(--s-4); width: 280px; }
+}
+
+/* Section 2: lossless editor on base white ground with full-height bg-field stage */
+#editor > .wrap {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.sd-editor-stage {
+  position: relative;
+  flex: 1 1 auto;
+  display: grid;
+  align-content: center;
+  border-radius: var(--r-lg);
+  padding: var(--s-6);
+  background-color: var(--ground-bg);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.sd-app {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
+  gap: var(--s-5);
+  align-items: stretch;
+  min-width: 0;
+}
+.sd-app > .ui {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  --u-accent: var(--p-accent);
+  --u-accent-text: var(--p-accent);
+}
+.sd-app .ui-win__body { min-height: 280px; }
+@media (max-width: 1023px) {
+  .sd-editor-stage { padding: var(--s-4); }
+  .sd-app { grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+}
+@media (max-width: 639px) {
+  .sd-app > .ui-win { display: none; }
+}
+
+/* Section 3: pinned-chapters stage */
+.sd-chapter-stage {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 260px;
+  padding: var(--s-5);
+  border-radius: var(--r-md);
+  background:
+    radial-gradient(75% 65% at 20% 10%, color-mix(in oklab, var(--ground-surface) 80%, white), transparent 70%),
+    var(--ground-bg);
+}
+.sd-chapter-stage > .dg {
+  width: 100%;
+  min-height: 220px;
+  height: 100%;
+  --dg-accent: var(--p-accent);
+}
+.sd-chapter-stage > .ui-code {
+  width: min(100%, 440px);
+  max-width: 100%;
+  --u-accent: var(--p-accent);
+}
+.sd-chapter-stage .ui-code__pre {
+  font-size: 12.5px;
+  line-height: 19px;
+}
+#layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__step {
+  border-top: 0;
+  padding-top: 0;
+}
+@media (min-width: 1024px) {
+  #layout {
+    --padt: 112px;
+    --padb: 96px;
+  }
+  #layout[data-moment="pinned-chapters"] .mo-pc__grid {
+    align-items: stretch;
+    padding-top: var(--padt, 112px);
+    padding-bottom: var(--padb, 96px);
+  }
+  #layout[data-moment="pinned-chapters"] .mo-pc__text { align-self: start; }
+  #layout[data-moment="pinned-chapters"] .mo-pc__visuals.frame {
+    height: 100%;
+    min-height: clamp(480px, 70svh, 700px);
+  }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  #layout[data-moment="pinned-chapters"]:not(.is-live) {
+    min-height: 100svh;
+    padding-top: 96px;
+    padding-bottom: 96px;
+  }
+  #layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__grid {
+    flex: 1 1 auto;
+    align-content: start;
+  }
+  #layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__text {
+    height: 100%;
+    gap: var(--s-3);
+  }
+  #layout[data-moment="pinned-chapters"]:not(.is-live) .section-head { margin-bottom: var(--s-2); }
+  #layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__steps { gap: var(--s-3); }
+  #layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__step { gap: var(--s-1); }
+  #layout[data-moment="pinned-chapters"]:not(.is-live) .sd-chapter-stage {
+    height: clamp(180px, 21svh, 256px);
+    min-height: 180px;
+    aspect-ratio: auto;
+    padding: var(--s-3);
+  }
+  #layout[data-moment="pinned-chapters"]:not(.is-live) .sd-chapter-stage > .dg {
+    min-height: 156px;
+    height: 100%;
+  }
+  #layout[data-moment="pinned-chapters"]:not(.is-live) .ui-code__tabs {
+    height: 32px;
+  }
+  #layout[data-moment="pinned-chapters"]:not(.is-live) .ui-code__pre {
+    padding: 6px 0;
+    font-size: 11px;
+    line-height: 1.38;
+  }
+  #layout[data-moment="pinned-chapters"]:not(.is-live) .ui-code__hint { display: none; }
+}
+@media (max-width: 639px) {
+  #layout[data-moment="pinned-chapters"]:not(.is-live) {
+    min-height: calc(var(--hm, 2) * 100lvh);
+    padding-block: var(--padt) var(--padb);
+  }
+  #layout[data-moment="pinned-chapters"]:not(.is-live) .mo-pc__steps { gap: var(--s-6); }
+  .sd-chapter-stage { padding: var(--s-3); min-height: 220px; }
+  .sd-chapter-stage > .dg { min-height: 200px; }
+  .sd-chapter-stage .ui-code__pre { font-size: 11.5px; line-height: 18px; }
+}
+
+/* Section 4: inverse runtime band with daylight-framed dark simulation board */
+#runtime > .wrap {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+#runtime .grid--middle.fill {
+  flex: 1 1 auto;
+}
+#runtime .frame--lit {
+  position: relative;
+  min-height: clamp(460px, 68svh, 660px);
+  height: 100%;
+  overflow: clip;
+  border-color: transparent;
+}
+#runtime .frame--lit > .stage {
+  --fx-bg: #14171d;
+  --fx-surface: #1b1f27;
+  --fx-ink: #ffffff;
+  --fx-muted: #b0b8c4;
+  --fx-accent: #7ea3ff;
+  --fx-accent-ink: #111111;
+}
+#runtime .stage > .at-rise {
+  display: grid;
+  gap: 14px;
+  --ax: 16px;
+  --ay: 16px;
+  --fit-max: 596px;
+}
+#runtime .ui-pipe,
+#runtime .sd-runtime-spec {
+  width: 100%;
+  max-width: none;
+}
+#runtime .sd-runtime-spec .ui-code__pre {
+  font-size: 12px;
+  line-height: 18px;
+}
+#runtime .ui-pipe__tool { background: #ffffff; }
+@media (min-width: 640px) {
+  #runtime {
+    padding-top: 96px;
+    padding-bottom: 96px;
+  }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  #runtime .grid--middle.fill {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--s-5);
+  }
+  #runtime .frame--lit {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+  }
+  #runtime .stage > .at-rise {
+    gap: 16px;
+    --ax: 20px;
+    --ay: 24px;
+    --fit-max: 660px;
+  }
+}
+@media (max-width: 639px) {
+  #runtime .grid--middle.fill {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+  #runtime .frame--lit {
+    flex: 1 1 auto;
+    min-height: 280px;
+  }
+  #runtime .stage > .at-rise {
+    --ax: 14px;
+    --ay: 14px;
+  }
+  #runtime .sd-runtime-spec {
+    display: none;
+  }
+}
+
+/* Section 5: open tooling cards (1 screen on desktop/tablet via display:contents, 2 screens via .g2m on phone) */
+@media (min-width: 640px) {
+  #tooling {
+    padding-top: 96px;
+    padding-bottom: 96px;
+  }
+  #tooling > .wrap {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--gutter);
+    row-gap: var(--card-gap);
+    align-content: start;
+  }
+  #tooling .sd-tooling-group { display: contents; }
+  #tooling .section-head {
+    grid-column: 1 / -1;
+    margin-bottom: var(--s-4);
+  }
+  #tooling .card { grid-column: 1 / -1; }
+}
+@media (min-width: 1024px) {
+  #tooling > .wrap { align-content: space-between; }
+  #tooling .card { grid-column: auto / span 4; }
+  #tooling .panel { --p-h: 280px; }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  #tooling > .wrap { row-gap: var(--s-3); }
+  #tooling .section-head { margin-bottom: var(--s-2); }
+  #tooling .card {
+    display: grid;
+    grid-template-columns: minmax(0, 6.4fr) minmax(0, 5.6fr);
+    grid-auto-rows: min-content;
+    column-gap: var(--s-5);
+    align-content: start;
+    --c-pad: 18px;
+  }
+  #tooling .card > :not(.panel) { grid-column: 1; }
+  #tooling .card > .panel {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    --p-h: clamp(180px, 19svh, 232px);
+    margin: 0;
+  }
+}
+#tooling .panel {
+  --p-h: 248px;
+  background:
+    radial-gradient(80% 70% at 20% 0%, color-mix(in oklab, var(--ground-surface) 80%, white), transparent 70%),
+    var(--ground-bg);
+}
+@media (max-width: 639px) {
+  #tooling .sd-tooling-group { gap: var(--s-4); }
+  #tooling .sd-tooling-group--a > .card { flex: 1 1 auto; }
+  #tooling .sd-tooling-group--a .panel { --p-h: 224px; }
+  #tooling .sd-tooling-group--b .card { --c-pad: 16px; }
+  #tooling .sd-tooling-group--b .panel { --p-h: 172px; }
+  #tooling .sd-tooling-group--b .stage > .at-rise { --ay: 12px; }
+  #tooling .sd-eco-panel { padding: 12px; }
+  #tooling .sd-eco-grid { gap: 8px; }
+  #tooling .sd-eco-grid .ic-tile { --tile: 34px; }
+  #tooling .card > .panel { margin-top: var(--s-3); }
+}
+#tooling .panel .dg {
+  width: 100%;
+  height: 100%;
+  --dg-accent: var(--p-accent);
+}
+#tooling .stage > .at-rise {
+  --ax: 20px;
+  --ay: 24px;
+  --fit-max: 420px;
+}
+#tooling .ui-term {
+  width: 100%;
+  max-width: none;
+}
+#tooling .ui-term__screen {
+  font-size: 12px;
+}
+.sd-eco-panel {
+  padding: 16px;
+  background: var(--u-bg, #ffffff);
+}
+.sd-eco-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  place-items: center;
+  gap: 10px;
+}
+
+/* Closing footer rhythm + grid-aligned legal links */
+footer#contact {
+  padding-top: var(--padt);
+}
+@media (min-width: 640px) {
+  footer#contact { padding-top: 96px; }
+}
+.sd-legal-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-5);
+}
+@media (max-width: 639px) {
+  footer#contact > .wrap { row-gap: var(--s-3); }
+  footer#contact .closing__cta { gap: var(--s-3); }
+  footer#contact .closing__links { gap: var(--s-3); padding-top: var(--s-4); }
+  footer#contact .closing__links > .grid { row-gap: var(--s-3); }
+  footer#contact .closing__links .span-4 { display: none; }
+  footer#contact .closing__links .footer__col { grid-column: auto / span 6; }
+  footer#contact .closing__links .footer__col h3 { margin-bottom: var(--s-1); }
+  footer#contact .footer__legal {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding-top: var(--s-3);
+  }
+  footer#contact .socials a { justify-content: center; }
+}
+</style>
+</head>
+<body>
+<header class="nav nav--centre">
+  <div class="wrap nav__bar">
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <a class="nav__logo" href="#top"><span class="mark" data-mark="arc" aria-hidden="true"></span>Smarter Diagrams</a>
+    <nav class="nav__links" aria-label="Main">
+      <div class="nav__item"><a class="nav__link" href="#editor">Editor</a></div>
+      <div class="nav__item"><a class="nav__link" href="#layout">Layout</a></div>
+      <div class="nav__item"><a class="nav__link" href="#runtime">Simulation</a></div>
+      <div class="nav__item"><a class="nav__link" href="#tooling">Integrations</a></div>
+    </nav>
+    <div class="nav__actions">
+      <a class="btn btn--primary" href="./guide/getting-started.html">Read the guide</a>
+    </div>
+    <button class="nav__toggle" type="button" aria-expanded="false" aria-label="Menu">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 5h14M2 13h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero hero--collage bg-halo" id="top" data-enter aria-labelledby="hero-h">
+    <div class="wrap">
+      <div class="hero-text grid hero__grid">
+        <div class="hero__text span-5">
+          <h1 id="hero-h">Diagram compiler for software engineers</h1>
+          <p class="hero__lead">Author system diagrams in plain text with Rust and WebAssembly. Drag nodes on canvas without breaking Git diffs, simulate queues, and export crisp SVG.</p>
+          <div class="btn-row">
+            <a class="btn btn--primary" href="./playground.html">Open the playground</a>
+            <a class="btn btn--secondary" href="./examples.html">See examples</a>
+          </div>
+          <p class="hero__proof">Lossless rowan CST · 2.4 ms layout at 100 nodes · MIT license</p>
+        </div>
+        <div class="hero__art span-6 start-7" role="img" aria-label="Smarter Diagrams compiler window listing architecture diagrams and live compilation passes">
+          <div class="ly-piece ly-piece--main ui ui-panel ui-win" data-ui="window" data-open="Compiled" data-work="Routing" data-done="Compiled" aria-hidden="true">
+            <div class="ui-win__bar">
+              <span class="ui-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="ui-win__crumb"><b>workspace</b> <i>/</i> <b>topologies</b></span>
+              <span class="ui-spacer"></span>
+              <span class="ui-win__search"><svg class="ui-icon" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><span class="ui-win__ph">Filter</span><span class="ui-kbd">/</span></span>
+            </div>
+            <div class="ui-win__body">
+              <div class="ui-win__side">
+                <span class="ui-win__nav is-on"><svg class="ui-icon" viewBox="0 0 16 16"><path d="M2.5 9h3l1 1.5h3l1-1.5h3"/><path d="M2.5 9 4 3.5h8L13.5 9v3.5h-11z"/></svg>Diagrams<em>21</em></span>
+                <span class="ui-win__nav"><svg class="ui-icon" viewBox="0 0 16 16"><path d="m3.5 8.4 2.8 2.8 6.2-6.4"/></svg>Verified<em>18</em></span>
+                <span class="ui-win__nav"><svg class="ui-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/></svg>Simulated<em>4</em></span>
+                <span class="ui-win__label">Views</span>
+                <span class="ui-win__nav"><span class="ui-win__hash">#</span>overview</span>
+                <span class="ui-win__nav"><span class="ui-win__hash">#</span>incident</span>
+              </div>
+              <div class="ui-win__main">
+                <div class="ui-win__cols"><span>Model</span><span>Detail</span><span>State</span><span>Time</span></div>
+                <ul class="ui-win__rows">
+                  <li class="ui-win__row" data-row><span class="sd-kind-tag">DG</span><span class="ui-win__who">gateway</span><span class="ui-win__sub">12 nodes</span><span class="ui-win__st" data-st>Compiled</span><span class="ui-win__age">0.3ms</span></li>
+                  <li class="ui-win__row" data-row><span class="sd-kind-tag">SC</span><span class="ui-win__who">reconcile</span><span class="ui-win__sub">K8s FSM</span><span class="ui-win__st" data-st>Compiled</span><span class="ui-win__age">0.6ms</span></li>
+                  <li class="ui-win__row" data-row><span class="sd-kind-tag">DB</span><span class="ui-win__who">orders_pg</span><span class="ui-win__sub">sql_table</span><span class="ui-win__st is-you" data-st>Edited</span><span class="ui-win__age">0.4ms</span></li>
+                  <li class="ui-win__row" data-row><span class="sd-kind-tag">NM</span><span class="ui-win__who">nmts_mesh</span><span class="ui-win__sub">550 nodes</span><span class="ui-win__st is-done" data-st>Compiled</span><span class="ui-win__age">2.8ms</span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="ly-piece ly-piece--note" aria-hidden="true" data-ly-steps="700">
+            <div class="sd-note__head">
+              <div class="sd-note__title">Diagram pipeline</div>
+              <span class="sd-note__badge" data-step data-step-at="3">0.31 ms</span>
+            </div>
+            <div class="sd-note__line" data-step><i>1</i><span><b>Rowan CST</b> keeps comments intact</span></div>
+            <div class="sd-note__line" data-step><i>2</i><span><b>Brandes-Kopf</b> aligns orthogonal tiers</span></div>
+            <div class="sd-note__line" data-step><i>3</i><span><b>A* router</b> separates parallel edges</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="editor" aria-labelledby="editor-h">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="editor-h">Diagram editor with lossless Git diffs</h2>
+        <p>Drag nodes in the Wasm playground or LSP to write grid pins straight into the CST while preserving comments and styling.</p>
+      </div>
+      <div class="sd-editor-stage bg-field" aria-hidden="true">
+        <div class="ui app sd-app">
+          <div class="ui ui-panel ui-win" data-ui="window" data-open="Synced" data-work="Patching" data-done="Saved" data-ui-still>
+            <div class="ui-win__bar">
+              <span class="ui-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="ui-win__crumb"><b>services</b> <i>/</i> <b>gateway</b></span>
+              <span class="ui-spacer"></span>
+              <span class="ui-win__search"><svg class="ui-icon" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><span class="ui-win__ph">Files</span><span class="ui-kbd">/</span></span>
+            </div>
+            <div class="ui-win__body">
+              <div class="ui-win__side">
+                <span class="ui-win__nav is-on"><svg class="ui-icon" viewBox="0 0 16 16"><path d="M2.5 9h3l1 1.5h3l1-1.5h3"/><path d="M2.5 9 4 3.5h8L13.5 9v3.5h-11z"/></svg>Workspace<em>5</em></span>
+                <span class="ui-win__nav"><svg class="ui-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/></svg>History<em>14</em></span>
+                <span class="ui-win__label">Views</span>
+                <span class="ui-win__nav"><span class="ui-win__hash">#</span>ingress</span>
+                <span class="ui-win__nav"><span class="ui-win__hash">#</span>storage</span>
+              </div>
+              <div class="ui-win__main">
+                <div class="ui-win__cols"><span>File</span><span>Constraints</span><span>Diff</span><span>Edit</span></div>
+                <ul class="ui-win__rows">
+                  <li class="ui-win__row is-sel" data-row><span class="sd-kind-tag">DG</span><span class="ui-win__who">topology</span><span class="ui-win__sub">@pin(16, 4)</span><span class="ui-win__st is-you" data-st>Modified</span><span class="ui-win__age">now</span></li>
+                  <li class="ui-win__row" data-row><span class="sd-kind-tag">DG</span><span class="ui-win__who">checkout</span><span class="ui-win__sub">4 columns</span><span class="ui-win__st" data-st>Synced</span><span class="ui-win__age">4m</span></li>
+                  <li class="ui-win__row" data-row><span class="sd-kind-tag">DG</span><span class="ui-win__who">reconcile</span><span class="ui-win__sub">6 states</span><span class="ui-win__st" data-st>Synced</span><span class="ui-win__age">12m</span></li>
+                  <li class="ui-win__row" data-row><span class="sd-kind-tag">MD</span><span class="ui-win__who">arch.md</span><span class="ui-win__sub">2 blocks</span><span class="ui-win__st is-done" data-st>Clean</span><span class="ui-win__age">1h</span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="ui ui-panel ui-diff" data-ui="diff-review" data-ui-still>
+            <div class="ui-diff__head">
+              <svg class="ui-icon ui-diff__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 6.25 3.5 3.5 3.5-3.5"/></svg>
+              <span class="ui-diff__tool" aria-hidden="true"><img src="assets/icons/rust.svg" alt="" width="16" height="16" loading="lazy"></span>
+              <span class="ui-diff__repo">smarter-diagrams</span><i class="ui-diff__slash" aria-hidden="true">/</i>
+              <span class="ui-diff__path"><span class="ui-diff__dir">services/</span><b>topology.diagram</b></span>
+              <span class="ui-spacer"></span>
+              <span class="ui-diff__stat"><b class="is-add"><span class="ui-diff__was">+2</span><span class="ui-diff__now">+2</span></b><b class="is-del"><span class="ui-diff__was">&minus;1</span><span class="ui-diff__now">&minus;1</span></b><span class="ui-diff__bar" aria-hidden="true"><i class="is-add"></i><i class="is-add"></i><i class="is-del"></i></span></span>
+            </div>
+            <div class="ui-diff__hunk"><span>@@ -6,7 +6,8 @@</span> <em class="ui-diff__sig">node declarations · lossless CST patch</em></div>
+            <div class="ui-diff__lines">
+              <div class="ui-diff__ln"><i>6</i><i>6</i><span class="ui-diff__code" data-i="0"><span class="c"># Public edge routes traffic into bounded queue</span></span></div>
+              <div class="ui-diff__ln"><i>7</i><i>7</i><span class="ui-diff__code" data-i="0"><span class="k">gateway</span>: <span class="s">"API Gateway"</span> [port <span class="f">E: rpc</span>]</span></div>
+              <div class="ui-diff__ln is-del"><i>8</i><i></i><span class="ui-diff__code" data-i="0"><span class="k">worker</span>: <span class="s">"Job Worker"</span> <mark class="ui-diff__w">[shape: <span class="f">queue</span>]</mark></span></div>
+              <div class="ui-diff__ln is-add"><i></i><i>8</i><span class="ui-diff__code" data-i="0"><span class="k">worker</span>: <span class="s">"Job Worker"</span> <mark class="ui-diff__w">@pin(grid: 16, 4)</mark> [shape: <span class="f">queue</span>]</span></div>
+              <div class="ui-diff__ln is-target" data-diff-target><i>9</i><i>9</i><span class="ui-diff__code" data-i="0"><span class="k">ledger</span>: <span class="s">"PostgresCluster"</span> [shape: <span class="f">class</span>]</span></div>
+              <div class="ui-diff__sug" data-diff-sug><div class="ui-diff__ln is-add"><i></i><i>10</i><span class="ui-diff__code" data-i="0"><span class="k">align row</span> [<span class="f">gateway</span>, worker, ledger]</span></div></div>
+              <div class="ui-diff__ln"><i>10</i><i>11</i><span class="ui-diff__code" data-i="0"><span class="k">gateway.rpc</span> -&gt; <span class="k">worker.W</span>: <span class="s">"enqueue"</span> [style: <span class="f">dashed</span>]</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="layout" data-moment="pinned-chapters" style="--hm: 2" aria-labelledby="layout-h">
+    <div class="wrap mo-pc__grid">
+      <div class="mo-pc__text">
+        <h2 id="layout-h">Diagram layout compiler</h2>
+        <p>Combine hierarchical tiers, explicit row alignment, typed record ports, and progressive views in one file.</p>
+        <ol class="mo-pc__steps">
+          <li class="mo-pc__step">
+            <h3>Orthogonal diagram routing</h3>
+            <p>Sugiyama layering, Brandes-Kopf alignment, and A* channels separate edges and labels.</p>
+            <div class="mo-pc__visual mo-pc__visual--lit sd-chapter-stage">
+              <div class="dg" data-diagram><script type="application/json">{
+                "layout": "hub",
+                "alt": "Smarter Diagrams compilation pipeline from CST parse to orthogonal SVG",
+                "ground": "rings",
+                "motion": { "cycle": 3.2 },
+                "center": { "label": "Layout Core", "icon": "rust" },
+                "spokes": [
+                  { "label": "Rowan CST", "kind": "pill", "kindCompact": "pill", "icon": "ui:layers" },
+                  { "label": "Brandes-Kopf", "kind": "pill", "kindCompact": "pill", "icon": "ui:cpu" },
+                  { "label": "A* Router", "kind": "pill", "kindCompact": "pill", "icon": "ui:git-branch" },
+                  { "label": "SVG Output", "kind": "pill", "kindCompact": "pill", "icon": "ui:check" }
+                ]
+              }</script></div>
+            </div>
+          </li>
+          <li class="mo-pc__step">
+            <h3>Class and schema diagrams</h3>
+            <p>Render typed UML compartments, SQL tables with pinned ports, and highlighted code blocks.</p>
+            <div class="mo-pc__visual mo-pc__visual--lit sd-chapter-stage">
+              <div class="ui ui-panel ui-code" data-ui="code" data-ui-still>
+                <div class="ui-code__tabs">
+                  <span class="ui-code__tab is-on"><i class="ui-code__lang">DG</i>cluster.dgm</span>
+                  <span class="ui-spacer"></span>
+                  <span class="ui-chip ui-chip--plain ui-code__chip">class</span>
+                </div>
+                <pre class="ui-code__pre"><code><span class="ui-code__ln" data-n="1"><span class="k">cr</span>: <span class="s">"PostgresCR"</span> [<span class="f">class</span>] {</span>
+<span class="ui-code__ln" data-n="2">  <span class="k">port</span> pods: <span class="f">"int32"</span></span>
+<span class="ui-code__ln is-mark" data-n="3">  <span class="k">port</span> state: <span class="f">"Ready"</span></span>
+<span class="ui-code__ln" data-n="4">}</span>
+<span class="ui-code__ln" data-n="5"><span class="k">q</span>: <span class="s">"```sql\nSELECT 1\n```"</span></span></code></pre>
+                <div class="ui-code__hint"><span class="ui-dot"></span><span>Typed fields align with ports.</span></div>
+              </div>
+            </div>
+          </li>
+          <li class="mo-pc__step">
+            <h3>Layered diagram views and lenses</h3>
+            <p>Reveal detail progressively with declarative views and elliptical boundary zones.</p>
+            <div class="mo-pc__visual mo-pc__visual--lit sd-chapter-stage">
+              <div class="ui ui-panel ui-code" data-ui="code" data-ui-still>
+                <div class="ui-code__tabs">
+                  <span class="ui-code__tab is-on"><i class="ui-code__lang">DG</i>views.dgm</span>
+                  <span class="ui-spacer"></span>
+                  <span class="ui-chip ui-chip--plain ui-code__chip">views</span>
+                </div>
+                <pre class="ui-code__pre"><code><span class="ui-code__ln" data-n="1"><span class="k">zone</span> mesh [<span class="f">api</span>, cache] {</span>
+<span class="ui-code__ln" data-n="2">  <span class="c"># Elliptical hull</span></span>
+<span class="ui-code__ln" data-n="3">}</span>
+<span class="ui-code__ln is-mark" data-n="4"><span class="k">view</span> edge [<span class="f">api</span>, db]</span>
+<span class="ui-code__ln" data-n="5"><span class="k">flow</span> edge: api -&gt; db</span></code></pre>
+                <div class="ui-code__hint"><span class="ui-dot"></span><span>Layer progressive views cleanly.</span></div>
+              </div>
+            </div>
+          </li>
+        </ol>
+        <p><a class="link" href="./language/basics.html">See language specs</a></p>
+      </div>
+      <div class="mo-pc__visuals frame"></div>
+    </div>
+  </section>
+
+  <section class="section ground-inverse" id="runtime" aria-labelledby="runtime-h">
+    <div class="wrap">
+      <div class="grid grid--middle fill">
+        <div class="split-col span-5">
+          <div class="section-head">
+            <h2 id="runtime-h">Queue and statechart diagram simulation</h2>
+            <p>Stress-test service queues in a Web Worker, step hierarchical statecharts, and export animated GIF or WebM loops.</p>
+          </div>
+          <div class="split-col__end">
+            <a class="link" href="./runtime/simulation.html">Explore diagram simulation</a>
+          </div>
+        </div>
+        <div class="frame frame--split frame--lit frame--fill span-6 start-7" aria-hidden="true">
+          <div class="stage">
+            <div class="at-rise fit">
+              <div class="ui ui-panel ui-code sd-runtime-spec" data-ui="code" data-ui-still>
+                <div class="ui-code__tabs">
+                  <span class="ui-code__tab is-on"><i class="ui-code__lang">SC</i>reconcile.dgm</span>
+                  <span class="ui-spacer"></span>
+                  <span class="ui-chip ui-chip--plain ui-code__chip">sim</span>
+                </div>
+                <pre class="ui-code__pre"><code><span class="ui-code__ln" data-n="1"><span class="k">queue</span> work_q [capacity: <span class="f">64</span>]</span>
+<span class="ui-code__ln is-mark" data-n="2"><span class="k">state</span> Sync -&gt; Ready [guard: <span class="f">ok</span>]</span>
+<span class="ui-code__ln" data-n="3"><span class="k">state</span> Retry -&gt; Backoff [limit: <span class="f">5</span>]</span>
+<span class="ui-code__ln" data-n="4"><span class="k">sim</span> work_q [rate: <span class="f">180rps</span>]</span>
+<span class="ui-code__ln" data-n="5"><span class="k">trace</span> db [warn: <span class="f">drift &gt; 12ms</span>]</span>
+<span class="ui-code__ln" data-n="6"><span class="k">export</span> gif [fps: <span class="f">24</span>, loop: <span class="f">true</span>]</span></code></pre>
+                <div class="ui-code__hint"><span class="ui-dot"></span><span>Worker simulation checks guards and latency.</span></div>
+              </div>
+              <div class="ui ui-panel ui-pipe" data-ui="pipeline-board" data-ui-still>
+                <div class="ui-pipe__head">
+                  <svg class="ui-icon ui-pipe__branch" viewBox="0 0 16 16" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.5"/><circle cx="4.5" cy="12.5" r="1.5"/><circle cx="11.5" cy="5" r="1.5"/><path d="M4.5 5v6M11.5 6.5c0 2.6-2.2 3.6-5.6 4.6"/></svg>
+                  <span class="ui-pipe__repo">runtime</span><i class="ui-pipe__slash">/</i><code class="ui-pipe__ref">queue</code>
+                  <span class="ui-spacer"></span>
+                  <span class="ui-pipe__total"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8.5" r="5.5"/><path d="M8 5.5v3l2 1.25M6.5 1.75h3"/></svg><span data-pipe-total>180 rps</span></span>
+                  <span class="ui-chip ui-chip--ink ui-chip--live ui-pipe__chip" data-pipe-chip data-done="Verified">Passed</span>
+                </div>
+                <div class="ui-pipe__commit">
+                  <span class="sd-kind-tag">SC</span>
+                  <span class="ui-pipe__msg">work_queue + cr_reconcile</span>
+                  <code class="ui-pipe__sha">2.4 ms</code>
+                </div>
+                <ol class="ui-pipe__steps">
+                  <li class="ui-pipe__step is-done" data-step="parse"><span class="ui-pipe__ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5"/></svg></span><span class="ui-pipe__name"><span class="ui-pipe__tool" aria-hidden="true"><img src="assets/icons/git.svg" alt="" width="16" height="16" loading="lazy"></span><span class="ui-pipe__nm">Parse</span></span><code class="ui-pipe__cmd">rowan AST</code><span class="ui-pipe__time" data-time>0.2 ms</span><span class="ui-pipe__bar"><i></i></span></li>
+                  <li class="ui-pipe__step is-done" data-step="sim"><span class="ui-pipe__ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5"/></svg></span><span class="ui-pipe__name"><span class="ui-pipe__tool" aria-hidden="true"><img src="assets/icons/rust.svg" alt="" width="16" height="16" loading="lazy"></span><span class="ui-pipe__nm">Queue</span></span><code class="ui-pipe__cmd">100% full</code><span class="ui-pipe__time" data-time>1.1 ms</span><span class="ui-pipe__bar"><i></i></span></li>
+                  <li class="ui-pipe__step is-done" data-step="sc"><span class="ui-pipe__ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5"/></svg></span><span class="ui-pipe__name"><span class="ui-pipe__tool" aria-hidden="true"><img src="assets/icons/kubernetes.svg" alt="" width="16" height="16" loading="lazy"></span><span class="ui-pipe__nm">Guards</span></span><code class="ui-pipe__cmd">Sync guard</code><span class="ui-pipe__time" data-time>0.4 ms</span><span class="ui-pipe__bar"><i></i></span></li>
+                  <li class="ui-pipe__step is-done" data-step="drift"><span class="ui-pipe__ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5"/></svg></span><span class="ui-pipe__name"><span class="ui-pipe__tool" aria-hidden="true"><img src="assets/icons/opentelemetry.svg" alt="" width="16" height="16" loading="lazy"></span><span class="ui-pipe__nm">Trace</span></span><code class="ui-pipe__cmd">0 hops</code><span class="ui-pipe__time" data-time>0.5 ms</span><span class="ui-pipe__bar"><i></i></span></li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section g2m" id="tooling" aria-labelledby="tooling-h">
+    <div class="wrap">
+      <div class="group sd-tooling-group sd-tooling-group--a">
+        <div class="section-head section-head--split">
+          <div>
+            <h2 id="tooling-h">Diagram compiler integrations</h2>
+            <p>Compile in CI builds, Neovim buffers, Hugo sites, LSP workspaces, or Kroki gateways.</p>
+          </div>
+          <a class="link" href="./guide/lsp.html">See integrations</a>
+        </div>
+        <article class="card card--open">
+          <h3>Rust CLI and Wasm runtime</h3>
+          <p>Ship 299 KB Brotli core Wasm with static SVG, PNG, and GIF export.</p>
+          <div class="panel panel--inset" aria-hidden="true">
+            <div class="stage stage--fade-br">
+              <div class="at-rise fit">
+                <div class="ui ui-panel ui-term" data-ui="terminal-run" data-ui-still>
+                  <div class="ui-term__head">
+                    <span class="ui-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span class="ui-term__title">smarter-diagrams</span>
+                    <span class="ui-meta">cli</span>
+                    <span class="ui-spacer"></span>
+                    <span class="ui-chip ui-chip--plain ui-term__branch">v0.4</span>
+                  </div>
+                  <div class="ui-term__screen">
+                    <div class="ui-term__track">
+                      <div class="ui-term__ln ui-term__cmd is-ran"><span class="ui-term__cwd">~</span><span class="ui-term__sig">$</span><span class="ui-term__typed">sd check --all</span></div>
+                      <div class="ui-term__ln ui-term__log"><svg class="ui-term__tick" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.4 2.8 2.8 6.2-6.4"/></svg><span class="ui-term__path">examples/*.dgm</span><span class="ui-term__n">21</span><span class="ui-term__t">19ms</span></div>
+                      <div class="ui-term__ln ui-term__log"><svg class="ui-term__tick" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.4 2.8 2.8 6.2-6.4"/></svg><span class="ui-term__path">wasm-core.br</span><span class="ui-term__n">299KB</span><span class="ui-term__t">MIT</span></div>
+                      <div class="ui-term__ln ui-term__done"><span class="ui-term__ok"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.3 2.4 2.4 4.6-5"/></svg></span><b>Clean</b><span class="ui-term__dim">70.5ms · 550</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="group sd-tooling-group sd-tooling-group--b">
+        <article class="card card--open">
+          <h3>Diagram editor and Kroki plugins</h3>
+          <p>Go to definition, preview via Neovim vim.ui.img, or inline Hugo blocks.</p>
+          <div class="panel panel--inset">
+            <div class="dg" data-diagram><script type="application/json">{
+              "layout": "hub",
+              "alt": "Smarter Diagrams editor, static site, and runtime integrations",
+              "ground": "rings",
+              "motion": { "cycle": 3.0 },
+              "center": { "label": "Smarter Diagrams", "icon": "rust" },
+              "spokes": [
+                { "label": "GitHub CI", "icon": "github" },
+                { "label": "VS Code LSP", "icon": "vscode" },
+                { "label": "Docker Kroki", "icon": "docker" },
+                { "label": "Kubernetes", "icon": "kubernetes" },
+                { "label": "PostgreSQL", "icon": "postgres" },
+                { "label": "OpenTelemetry", "icon": "opentelemetry" }
+              ]
+            }</script></div>
+          </div>
+        </article>
+
+        <article class="card card--open">
+          <h3>Diagram benchmarks and specs</h3>
+          <p>Laid out in 70.5 ms at 550 entities with MIT-compatible crates.</p>
+          <div class="panel panel--inset" aria-hidden="true">
+            <div class="stage">
+              <div class="at-rise fit">
+                <div class="ui ui-panel sd-eco-panel">
+                  <div class="sd-eco-grid" aria-label="Supported runtimes, tools, and schema integrations">
+                    <span class="ic-tile"><img class="ic ic-24 ic-ink" src="assets/icons/rust.svg" alt="Rust" width="24" height="24" loading="lazy"></span>
+                    <span class="ic-tile"><svg class="ic ic-svg ic-24" role="img" aria-label="WebAssembly" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M157.29 0H256v256H0V0h98.71c0 .46-.07.91-.07 1.38 0 16.21 13.14 29.36 29.36 29.36s29.36-13.15 29.36-29.36c0-.47-.05-.92-.07-1.38Zm58.33 228.6h17.6L206.56 138H179.8l-21.95 90.6h17.06l4.44-20.18h30.49l5.78 20.18Zm-93.4 0h16.84l21.61-90.6h-16.63l-13.24 62.45h-.21l-12.57-62.45h-15.87L88.16 199.66h-.21L76.34 138H59.39l19.53 90.6h17.17l13.44-61.69h.22l12.47 61.69Zm67.78-68.29h7.13l8.5 33.26H182.6l7.4-33.26Z"/></svg></span>
+                    <span class="ic-tile"><img class="ic ic-24" src="assets/icons/kubernetes.svg" alt="Kubernetes" width="24" height="24" loading="lazy"></span>
+                    <span class="ic-tile"><img class="ic ic-24" src="assets/icons/opentelemetry.svg" alt="OpenTelemetry" width="24" height="24" loading="lazy"></span>
+                    <span class="ic-tile"><img class="ic ic-24" src="assets/icons/postgres.svg" alt="PostgreSQL" width="24" height="24" loading="lazy"></span>
+                    <span class="ic-tile"><img class="ic ic-24 ic-ink" src="assets/icons/github.svg" alt="GitHub" width="24" height="23" loading="lazy"></span>
+                    <span class="ic-tile"><img class="ic ic-24" src="assets/icons/git.svg" alt="Git" width="24" height="24" loading="lazy"></span>
+                    <span class="ic-tile"><img class="ic ic-24" src="assets/icons/vscode.svg" alt="VS Code" width="24" height="24" loading="lazy"></span>
+                    <span class="ic-tile"><img class="ic ic-24 ic-land" src="assets/icons/docker.svg" alt="Docker" width="24" height="17" loading="lazy"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer closing footer--statement" id="contact">
+  <div class="wrap">
+    <div class="closing__cta close--type">
+      <div class="section-head">
+        <h2>Compile diagrams from text</h2>
+        <p>Write plain source files once for Git reviews, static Hugo docs, Wasm editing, and simulation.</p>
+      </div>
+      <a class="btn btn--primary btn--xl btn--wide" href="./playground.html">
+        <span>Open the playground</span>
+        <svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"/><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"/></svg>
+      </a>
+    </div>
+    <div class="closing__links">
+      <div class="grid">
+        <div class="span-4">
+          <p class="footer__lede">Deterministic diagram compilation in Rust and WebAssembly.</p>
+        </div>
+        <div class="footer__col span-2">
+          <h3>Explore</h3>
+          <ul>
+            <li><a href="./playground.html">Playground</a></li>
+            <li><a href="./examples.html">Examples</a></li>
+          </ul>
+        </div>
+        <div class="footer__col span-2">
+          <h3>Guide</h3>
+          <ul>
+            <li><a href="./guide/getting-started.html">Getting started</a></li>
+            <li><a href="./guide/editing.html">Structured editing</a></li>
+          </ul>
+        </div>
+        <div class="footer__col span-2">
+          <h3>Runtime</h3>
+          <ul>
+            <li><a href="./runtime/simulation.html">Queue simulation</a></li>
+            <li><a href="./runtime/statecharts.html">Statecharts</a></li>
+          </ul>
+        </div>
+        <div class="footer__col span-2">
+          <h3>Tooling</h3>
+          <ul>
+            <li><a href="./guide/lsp.html">Language server</a></li>
+            <li><a href="./api/smarter_diagrams/index.html">Rust API docs</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer__legal">
+        <div class="sd-legal-copy">
+          <span>MIT License · Smarter Diagrams contributors.</span>
+          <a href="./privacy.html">Privacy notice</a>
+        </div>
+        <div class="socials">
+          <a href="https://github.com/robot-head/smarter-diagrams" aria-label="GitHub repository"><img class="ic ic-20 ic-ink" src="assets/icons/github.svg" alt="" width="20" height="20" loading="lazy"></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script type="module" src="assets/system.js"></script>
+<script type="module" src="assets/motion/motion.js"></script>
+<script type="module" src="assets/layout/layout.js"></script>
+<script type="module" src="assets/diagrams/mount.js"></script>
+<script>
+(() => {
+  const links = [...document.querySelectorAll('.nav__links a[href^="#"]')];
+  const targets = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  if (!links.length || !targets.length) return;
+  let raf = 0;
+  const sync = () => {
+    raf = 0;
+    const pivot = window.innerHeight * 0.35;
+    let active = '';
+    for (const el of targets) {
+      if (el.getBoundingClientRect().top <= pivot) active = el.id;
+    }
+    for (const a of links) {
+      if (active && a.getAttribute('href') === '#' + active) a.setAttribute('aria-current', 'location');
+      else a.removeAttribute('aria-current');
+    }
+  };
+  const onScroll = () => { if (!raf) raf = requestAnimationFrame(sync); };
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll, { passive: true });
+  sync();
+})();
+</script>
+</body>
+</html>
