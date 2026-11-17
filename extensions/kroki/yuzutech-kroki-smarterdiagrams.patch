@@ -1,0 +1,693 @@
+From 4022d02a7a36ed297e92ab6e2e3cc962fe682705 Mon Sep 17 00:00:00 2001
+From: Matthew Stone <matthew.d.stone@gmail.com>
+Date: Sat, 14 Nov 2026 17:24:18 -0800
+Subject: [PATCH] Add Smarter Diagrams support
+
+Smarter Diagrams compiles text to SVG, PNG and PDF with a single pure-Rust
+binary. The service pipes the source into 'smarter-diagrams - --format <fmt>'
+and returns stdout. Only built-in themes and validated view/step identifiers
+are accepted (--theme-file and -o are not exposed), so local files are never
+read or written regardless of KROKI_SAFE_MODE.
+
+The binary is built in its own Docker stage with cargo install --locked
+--features export from the pinned v0.1.0 release tag.
+---
+ CHANGELOG.md                                  |   1 +
+ DOCKERHUB.md                                  |   2 +-
+ README.adoc                                   |   2 +-
+ ci/tasks/update-versions.js                   |   7 +
+ ci/tests/diagrams/services.diagram            |  14 ++
+ ci/tests/smoke.js                             |   4 +
+ docs/antora.yml                               |   1 +
+ docs/modules/ROOT/pages/architecture.adoc     |   4 +
+ docs/modules/ROOT/pages/diagram-types.adoc    |   1 +
+ docs/modules/ROOT/pages/index.adoc            |   2 +-
+ docs/modules/setup/pages/configuration.adoc   |   5 +
+ docs/modules/setup/pages/diagram-options.adoc |  38 ++++
+ docs/modules/setup/pages/install.adoc         |   2 +
+ server/ops/docker/Dockerfile                  |  29 +++
+ .../src/main/java/io/kroki/server/Server.java |   1 +
+ .../kroki/server/service/SmarterDiagrams.java | 141 ++++++++++++++
+ server/src/main/resources/web/hello.html      |   2 +-
+ .../service/SmarterDiagramsServiceTest.java   | 172 ++++++++++++++++++
+ 18 files changed, 424 insertions(+), 4 deletions(-)
+ create mode 100644 ci/tests/diagrams/services.diagram
+ create mode 100644 server/src/main/java/io/kroki/server/service/SmarterDiagrams.java
+ create mode 100644 server/src/test/java/io/kroki/server/service/SmarterDiagramsServiceTest.java
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 7a041a1..7456d28 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -13,6 +13,7 @@ versioned entry and uses it as the GitHub release notes.
+ 
+ ### Added
+ 
++- Add support for [Smarter Diagrams](https://github.com/robot-head/smarter-diagrams) (`smarterdiagrams`), with `theme`, `view` and `step` options and SVG, PNG and PDF output
+ - Serve an OpenAPI description of the HTTP API at `/openapi.json`, generated from the diagram types and options available on the server ([#2270](https://github.com/yuzutech/kroki/pull/2270))
+ 
+ ### Changed
+diff --git a/DOCKERHUB.md b/DOCKERHUB.md
+index 4f1d3e2..a61b8bd 100644
+--- a/DOCKERHUB.md
++++ b/DOCKERHUB.md
+@@ -2,7 +2,7 @@
+ 
+ Convert plain text diagrams to images !
+ 
+-Kroki provides a unified API with support for BlockDiag (BlockDiag, SeqDiag, ActDiag, NwDiag, PacketDiag, RackDiag), BPMN, Bytefield, C4 (with PlantUML), D2, DBML, Ditaa, Erd, Excalidraw, GoAT, GraphViz, Lini, Mermaid, Nomnoml, Pikchr, PlantUML, SvgBob, Symbolator, UMLet, Vega, Vega-Lite, WaveDrom... and more to come!
++Kroki provides a unified API with support for BlockDiag (BlockDiag, SeqDiag, ActDiag, NwDiag, PacketDiag, RackDiag), BPMN, Bytefield, C4 (with PlantUML), D2, DBML, Ditaa, Erd, Excalidraw, GoAT, GraphViz, Lini, Mermaid, Nomnoml, Pikchr, PlantUML, Smarter Diagrams, SvgBob, Symbolator, UMLet, Vega, Vega-Lite, WaveDrom... and more to come!
+ 
+ ## Getting Started
+ 
+diff --git a/README.adoc b/README.adoc
+index a279350..a2c32fc 100644
+--- a/README.adoc
++++ b/README.adoc
+@@ -19,7 +19,7 @@ image:https://github.com/yuzutech/kroki/actions/workflows/main.yaml/badge.svg[Gi
+ image:https://img.shields.io/badge/zulip-join_chat-brightgreen.svg[Zulip chat, link=https://kroki.zulipchat.com/]
+ endif::[]
+ 
+-{uri-kroki}[Kroki] provides a unified API with support for BlockDiag (BlockDiag, SeqDiag, ActDiag, NwDiag, PacketDiag, RackDiag), BPMN, Bytefield, C4 (with PlantUML), D2, DBML, Diagrams.net (experimental), Ditaa, Erd, Excalidraw, GoAT, GraphViz, Lini, Mermaid, Nomnoml, Pikchr, PlantUML, SvgBob, Symbolator, UMLet, Vega, Vega-Lite, WaveDrom and WireViz... and more to come!
++{uri-kroki}[Kroki] provides a unified API with support for BlockDiag (BlockDiag, SeqDiag, ActDiag, NwDiag, PacketDiag, RackDiag), BPMN, Bytefield, C4 (with PlantUML), D2, DBML, Diagrams.net (experimental), Ditaa, Erd, Excalidraw, GoAT, GraphViz, Lini, Mermaid, Nomnoml, Pikchr, PlantUML, Smarter Diagrams, SvgBob, Symbolator, UMLet, Vega, Vega-Lite, WaveDrom and WireViz... and more to come!
+ 
+ == Hosting Providers
+ 
+diff --git a/ci/tasks/update-versions.js b/ci/tasks/update-versions.js
+index e9bee4b..dd7ed90 100755
+--- a/ci/tasks/update-versions.js
++++ b/ci/tasks/update-versions.js
+@@ -137,6 +137,7 @@ const diagramLibraryNames = [
+   'plantuml',
+   'rackdiag',
+   'seqdiag',
++  'smarterdiagrams',
+   'structurizr',
+   'svgbob',
+   'symbolator',
+@@ -228,6 +229,11 @@ try {
+       const { version } = goatVersionFound.groups
+       diagramLibraryVersions.goat = version
+     }
++    const smarterdiagramsVersionFound = line.match(/^ARG SMARTERDIAGRAMS_VERSION=(?<version>.+)$/)
++    if (smarterdiagramsVersionFound) {
++      const { version } = smarterdiagramsVersionFound.groups
++      diagramLibraryVersions.smarterdiagrams = version
++    }
+   }
+ 
+   const cargoContent = await fs.readFile(ospath.join(rootDir, 'server', 'ops', 'docker', 'Cargo.toml'), 'utf8')
+@@ -283,6 +289,7 @@ try {
+   await updateServiceGetVersion('Nomnoml.java', diagramLibraryVersions.nomnoml)
+   await updateServiceGetVersion('Pikchr.java', diagramLibraryVersions.pikchr)
+   await updateServiceGetVersion('Plantuml.java', diagramLibraryVersions.plantuml)
++  await updateServiceGetVersion('SmarterDiagrams.java', diagramLibraryVersions.smarterdiagrams)
+   await updateServiceGetVersion('Structurizr.java', diagramLibraryVersions.structurizr)
+   await updateServiceGetVersion('Svgbob.java', diagramLibraryVersions.svgbob)
+   await updateServiceGetVersion('Symbolator.java', diagramLibraryVersions.symbolator)
+diff --git a/ci/tests/diagrams/services.diagram b/ci/tests/diagrams/services.diagram
+new file mode 100644
+index 0000000..22632ad
+--- /dev/null
++++ b/ci/tests/diagrams/services.diagram
+@@ -0,0 +1,14 @@
++client: "Client" [shape: actor]
++api: "API Gateway"
++db: "Postgres" [shape: database]
++
++client -> api: "HTTPS"
++api -> db: "SQL"
++
++view overview {
++  include client, api
++}
++
++step s1: "Step 1" {
++  include client -> api
++}
+diff --git a/ci/tests/smoke.js b/ci/tests/smoke.js
+index c9ce276..5f84a9d 100755
+--- a/ci/tests/smoke.js
++++ b/ci/tests/smoke.js
+@@ -62,6 +62,10 @@ const tests = [
+   { engine: 'lini', file: 'services.lini', options: {}, outputFormat: ['svg'] },
+   { engine: 'lini', file: 'services.lini', options: { theme: 'dark' }, outputFormat: ['svg'] },
+   { engine: 'lini', file: 'services.lini', options: { static: 'true' }, outputFormat: ['svg'] },
++  { engine: 'smarterdiagrams', file: 'services.diagram', options: {}, outputFormat: ['svg', 'png', 'pdf'] },
++  { engine: 'smarterdiagrams', file: 'services.diagram', options: { theme: 'catppuccin-mocha' }, outputFormat: ['svg'] },
++  { engine: 'smarterdiagrams', file: 'services.diagram', options: { view: 'overview' }, outputFormat: ['svg'] },
++  { engine: 'smarterdiagrams', file: 'services.diagram', options: { step: 's1' }, outputFormat: ['svg'] },
+ ]
+ 
+ const mimeType = {
+diff --git a/docs/antora.yml b/docs/antora.yml
+index dd3b7bf..0c658c0 100644
+--- a/docs/antora.yml
++++ b/docs/antora.yml
+@@ -44,6 +44,7 @@ asciidoc:
+     rackdiag-version: 3.4.3
+     # renovate: datasource=github-tags depName=yuzutech/blockdiag extractVersion=^v(?<version>.+)$
+     seqdiag-version: 3.4.3
++    smarterdiagrams-version: 0.1.0
+     # renovate: datasource=maven depName=com.structurizr:structurizr-dsl
+     structurizr-version: 6.2.4
+     # renovate: datasource=crate depName=svgbob_cli
+diff --git a/docs/modules/ROOT/pages/architecture.adoc b/docs/modules/ROOT/pages/architecture.adoc
+index f3c6e6b..6441458 100644
+--- a/docs/modules/ROOT/pages/architecture.adoc
++++ b/docs/modules/ROOT/pages/architecture.adoc
+@@ -83,6 +83,10 @@ The `yuzutech/kroki` Docker image contains the following diagrams libraries out-
+ |https://github.com/blockdiag/seqdiag[SeqDiag]
+ |{seqdiag-version}
+ 
++|https://github.com/robot-head/smarter-diagrams[Smarter Diagrams]
++|{smarterdiagrams-version}
++//|Binary `/usr/bin/smarter-diagrams`
++
+ |https://github.com/structurizr/dsl[Structurizr]
+ |{structurizr-version}
+ //|Java library/DSL
+diff --git a/docs/modules/ROOT/pages/diagram-types.adoc b/docs/modules/ROOT/pages/diagram-types.adoc
+index 38c62c6..cc190e7 100644
+--- a/docs/modules/ROOT/pages/diagram-types.adoc
++++ b/docs/modules/ROOT/pages/diagram-types.adoc
+@@ -44,6 +44,7 @@ Diagram::
+ * WireViz
+ * GoAT
+ * Lini
++* https://github.com/robot-head/smarter-diagrams[Smarter Diagrams]
+ 
+ Visualization::
+ * Bar charts
+diff --git a/docs/modules/ROOT/pages/index.adoc b/docs/modules/ROOT/pages/index.adoc
+index a09a6fd..894cade 100644
+--- a/docs/modules/ROOT/pages/index.adoc
++++ b/docs/modules/ROOT/pages/index.adoc
+@@ -4,7 +4,7 @@
+ [discrete.tagline]
+ === Convert plain text diagrams to images !
+ 
+-Kroki provides a unified HTTP API with support for BlockDiag (BlockDiag, SeqDiag, ActDiag, NwDiag, PacketDiag, RackDiag), BPMN, Bytefield, C4 (with PlantUML), Diagrams.net (experimental), Ditaa, Erd, Excalidraw, GoAT, GraphViz, Lini, Mermaid, Nomnoml, PlantUML, Structurizr, SvgBob, Symbolator, UMLet, Vega, Vega-Lite, WaveDrom and WireViz... and more to come!
++Kroki provides a unified HTTP API with support for BlockDiag (BlockDiag, SeqDiag, ActDiag, NwDiag, PacketDiag, RackDiag), BPMN, Bytefield, C4 (with PlantUML), Diagrams.net (experimental), Ditaa, Erd, Excalidraw, GoAT, GraphViz, Lini, Mermaid, Nomnoml, PlantUML, Smarter Diagrams, Structurizr, SvgBob, Symbolator, UMLet, Vega, Vega-Lite, WaveDrom and WireViz... and more to come!
+ 
+ Kroki is available as a Self-Managed instance. +
+ We are also _actively_ looking for sponsors to provide Kroki as a free service:
+diff --git a/docs/modules/setup/pages/configuration.adoc b/docs/modules/setup/pages/configuration.adoc
+index a445729..bc22488 100644
+--- a/docs/modules/setup/pages/configuration.adoc
++++ b/docs/modules/setup/pages/configuration.adoc
+@@ -133,6 +133,10 @@ A node's `icon` or `background` naming a URL or a local file is ignored instead
+ Unless Kroki is running in `UNSAFE` mode, Lini runs with its `--no-fs` flag and never reads a file.
+ An image (`|image|`) can only point at a URL or a `data:` URI: a local file path is an error, and the `theme` option only accepts the built-in themes.
+ 
++=== Smarter Diagrams
++
++Smarter Diagrams reads its diagram source from standard input (`-`), writes rendered output to standard output, and only accepts built-in theme names via `theme` (`--theme-file` is not exposed), so it never reads local files regardless of `KROKI_SAFE_MODE`.
++
+ === Mermaid, diagrams.net, Excalidraw and BPMN
+ 
+ These companion services render diagrams in a headless Chromium instance.
+@@ -202,6 +206,7 @@ you can override its location manually using an environment variable or a Java s
+ `KROKI_NOMNOML_BIN_PATH`:: Path to `nomnoml` binary (defaults: `/usr/bin/nomnoml`)
+ `KROKI_PIKCHR_BIN_PATH`:: Path to `pikchr` binary (defaults: `/usr/bin/pikchr`)
+ `KROKI_PLANTUML_BIN_PATH`:: Path to `plantuml` binary (defaults: `/usr/bin/plantuml`)
++`KROKI_SMARTERDIAGRAMS_BIN_PATH`:: Path to `smarter-diagrams` binary (defaults: `/usr/bin/smarter-diagrams`)
+ `KROKI_SVGBOB_BIN_PATH`:: Path to `svgbob` binary (defaults: `/usr/bin/svgbob`)
+ `KROKI_SYMBOLATOR_BIN_PATH`:: Path to `symbolator` binary (defaults: `/usr/bin/symbolator`)
+ `KROKI_TIKZ2SVG_BIN_PATH`:: Path to `tikz2svg` binary (defaults: `/usr/bin/tikz2svg`)
+diff --git a/docs/modules/setup/pages/diagram-options.adoc b/docs/modules/setup/pages/diagram-options.adoc
+index d82b664..1b7f8da 100644
+--- a/docs/modules/setup/pages/diagram-options.adoc
++++ b/docs/modules/setup/pages/diagram-options.adoc
+@@ -297,6 +297,44 @@ empty string ("")
+ |Do not save the diagram's source code in the generated SVG/PNG metadata
+ |===
+ 
++== Smarter Diagrams
++
++[cols="1m,1a,2a",opts="header"]
++|===
++|Name
++|Allowable Values
++|Description
++
++|theme
++|_string_
++
++* `light`
++* `dark`
++* `catppuccin-latte`
++* `catppuccin-frappe`
++* `catppuccin-macchiato`
++* `catppuccin-mocha`
++* `solarized-light`
++* `solarized-dark`
++* `base16-eighties`
++* `base16-ocean`
++* `base16-gruvbox-dark`
++* `base16-nord`
++* `base16-onedark`
++* `base16-dracula`
++* `base16-tokyo-night`
++* `base16-github`
++|Built-in color theme of the diagram.
++
++|view
++|_string_
++|Named view projection defined in the diagram (cannot be combined with `step`).
++
++|step
++|_string_
++|Progressive disclosure step ID defined in the diagram (cannot be combined with `view`).
++|===
++
+ == Structurizr
+ 
+ [cols="1m,1a,2a",opts="header"]
+diff --git a/docs/modules/setup/pages/install.adoc b/docs/modules/setup/pages/install.adoc
+index e8fc623..26b39ac 100644
+--- a/docs/modules/setup/pages/install.adoc
++++ b/docs/modules/setup/pages/install.adoc
+@@ -107,6 +107,7 @@ The {uri-docker-kroki-image}[yuzutech/kroki] image contains the gateway server,
+ * https://github.com/plantuml/plantuml[PlantUML] including https://github.com/RicardoNiepel/C4-PlantUML[C4 model]
+ * {uri-rackdiag}[RackDiag]
+ * {uri-seqdiag}[SeqDiag]
++* https://github.com/robot-head/smarter-diagrams[Smarter Diagrams]
+ * https://github.com/structurizr/dsl[Structurizr]
+ * https://github.com/ivanceras/svgbob[Svgbob]
+ * https://github.com/hdl/symbolator[Symbolator]
+@@ -138,6 +139,7 @@ In other words, the following endpoints will be available:
+ /plantuml
+ /rackdiag
+ /seqdiag
++/smarterdiagrams
+ /structurizr
+ /svgbob
+ /symbolator
+diff --git a/server/ops/docker/Dockerfile b/server/ops/docker/Dockerfile
+index e8ebd89..5cdc116 100644
+--- a/server/ops/docker/Dockerfile
++++ b/server/ops/docker/Dockerfile
+@@ -130,6 +130,33 @@ RUN LINI_VERSION=`cat Cargo.toml | grep "^lini =" | sed -r 's/.*"([^"]+)"/\1/'`
+     rustup target add $RUST_TARGET_ARCH-unknown-linux-gnu && \
+     cargo install --quiet --locked --target $RUST_TARGET_ARCH-unknown-linux-gnu --version $LINI_VERSION lini
+ 
++## Smarter Diagrams
++FROM --platform=$BUILDPLATFORM rust:1.98-slim-bullseye AS kroki-builder-static-smarterdiagrams
++
++ARG SMARTERDIAGRAMS_VERSION=0.1.0
++
++# Install git and cross-compilation tools
++RUN apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -qq --no-install-recommends --yes \
++    ca-certificates \
++    git \
++    gcc-aarch64-linux-gnu \
++    gcc-x86-64-linux-gnu \
++    libc6-dev-amd64-cross \
++    libc6-dev-arm64-cross > /dev/null && \
++    apt-get clean && apt-get autoremove -qq > /dev/null
++
++COPY ops/docker/.cargo .cargo
++
++ARG TARGETARCH
++ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
++RUN case $TARGETARCH in \
++        "amd64") RUST_TARGET_ARCH=x86_64 ;; \
++        "arm64") RUST_TARGET_ARCH=aarch64 ;; \
++        *) RUST_TARGET_ARCH=$TARGETARCH ;; \
++    esac && \
++    rustup target add $RUST_TARGET_ARCH-unknown-linux-gnu && \
++    cargo install --quiet --locked --git https://github.com/robot-head/smarter-diagrams.git --tag "v${SMARTERDIAGRAMS_VERSION}" --features export --target $RUST_TARGET_ARCH-unknown-linux-gnu smarter-diagrams
++
+ ## Erd (built by the "Tool images" workflow, see tools/erd)
+ # renovate: datasource=github-tags depName=BurntSushi/erd extractVersion=^v(?<version>.+)$
+ FROM ghcr.io/yuzutech/kroki-builder-erd:0.2.2 AS erd
+@@ -248,6 +275,7 @@ COPY --from=kroki-builder-wavedrom /app/build/app.bin /usr/bin/wavedrom
+ COPY --from=tikz tikz2svg dvi-strip-ps-specials /usr/bin/
+ COPY --from=kroki-builder-goat /go/bin/goat /usr/bin/goat
+ COPY --from=kroki-builder-static-lini /usr/local/cargo/bin/lini /usr/bin/lini
++COPY --from=kroki-builder-static-smarterdiagrams /usr/local/cargo/bin/smarter-diagrams /usr/bin/smarter-diagrams
+ 
+ COPY --chown=kroki:kroki ops/docker/logback.xml /etc/kroki/logback.xml
+ 
+@@ -270,6 +298,7 @@ ENV KROKI_DITAA_BIN_PATH=/usr/bin/ditaa
+ ENV KROKI_SYMBOLATOR_BIN_PATH=/usr/bin/symbolator
+ ENV KROKI_WIREVIZ_BIN_PATH=/usr/bin/wireviz
+ ENV KROKI_LINI_BIN_PATH=/usr/bin/lini
++ENV KROKI_SMARTERDIAGRAMS_BIN_PATH=/usr/bin/smarter-diagrams
+ ENV JAVA_OPTS="-Dlogback.configurationFile=/etc/kroki/logback.xml -Dvertx.logger-delegate-factory-class-name=io.vertx.core.logging.SLF4JLogDelegateFactory"
+ 
+ COPY --chown=kroki:kroki target/kroki-server.jar /usr/local/kroki/kroki-server.jar
+diff --git a/server/src/main/java/io/kroki/server/Server.java b/server/src/main/java/io/kroki/server/Server.java
+index 66a2387..8bb6f01 100644
+--- a/server/src/main/java/io/kroki/server/Server.java
++++ b/server/src/main/java/io/kroki/server/Server.java
+@@ -199,6 +199,7 @@ public class Server extends AbstractVerticle {
+     registry.register(new Wireviz(vertx, config, commander), "wireviz");
+     registry.register(new Goat(vertx, config, commander), "goat");
+     registry.register(new Lini(vertx, config, commander), "lini");
++    registry.register(new SmarterDiagrams(vertx, config, commander), "smarterdiagrams");
+   }
+ 
+   /**
+diff --git a/server/src/main/java/io/kroki/server/service/SmarterDiagrams.java b/server/src/main/java/io/kroki/server/service/SmarterDiagrams.java
+new file mode 100644
+index 0000000..9cad774
+--- /dev/null
++++ b/server/src/main/java/io/kroki/server/service/SmarterDiagrams.java
+@@ -0,0 +1,141 @@
++package io.kroki.server.service;
++
++import io.kroki.server.action.Commander;
++import io.kroki.server.decode.DiagramSource;
++import io.kroki.server.decode.SourceDecoder;
++import io.kroki.server.error.BadRequestException;
++import io.kroki.server.error.DecodeException;
++import io.kroki.server.error.UnsupportedFormatException;
++import io.kroki.server.format.FileFormat;
++import io.kroki.server.option.DiagramOption;
++import io.vertx.core.Future;
++import io.vertx.core.Vertx;
++import io.vertx.core.buffer.Buffer;
++import io.vertx.core.json.JsonObject;
++
++import java.io.IOException;
++import java.nio.charset.StandardCharsets;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.regex.Pattern;
++
++public class SmarterDiagrams implements DiagramService {
++
++  private static final List<FileFormat> SUPPORTED_FORMATS = List.of(FileFormat.SVG, FileFormat.PNG, FileFormat.PDF);
++  private static final Pattern IDENTIFIER = Pattern.compile("[a-zA-Z0-9_.:][a-zA-Z0-9_.:-]{0,127}");
++  private static final DiagramOption THEME = DiagramOption.oneOf(
++    "theme",
++    "Built-in color theme of the diagram.",
++    "light",
++    "dark",
++    "catppuccin-latte",
++    "catppuccin-frappe",
++    "catppuccin-macchiato",
++    "catppuccin-mocha",
++    "solarized-light",
++    "solarized-dark",
++    "base16-eighties",
++    "base16-ocean",
++    "base16-gruvbox-dark",
++    "base16-nord",
++    "base16-onedark",
++    "base16-dracula",
++    "base16-tokyo-night",
++    "base16-github"
++  );
++  private static final DiagramOption VIEW = DiagramOption.value("view", "Named view projection defined in the diagram (cannot be combined with step).");
++  private static final DiagramOption STEP = DiagramOption.value("step", "Progressive disclosure step ID defined in the diagram (cannot be combined with view).");
++
++  private final Vertx vertx;
++  private final String binPath;
++  private final SourceDecoder sourceDecoder;
++  private final Commander commander;
++
++  public SmarterDiagrams(Vertx vertx, JsonObject config, Commander commander) {
++    this.vertx = vertx;
++    this.binPath = config.getString("KROKI_SMARTERDIAGRAMS_BIN_PATH", "smarter-diagrams");
++    this.sourceDecoder = new SourceDecoder() {
++      @Override
++      public String decode(String encoded) throws DecodeException {
++        return DiagramSource.decode(encoded);
++      }
++    };
++    this.commander = commander;
++  }
++
++  @Override
++  public List<FileFormat> getSupportedFormats() {
++    return SUPPORTED_FORMATS;
++  }
++
++  @Override
++  public SourceDecoder getSourceDecoder() {
++    return sourceDecoder;
++  }
++
++  @Override
++  public String getVersion() {
++    return "0.1.0";
++  }
++
++  @Override
++  public List<DiagramOption> getOptions() {
++    return List.of(THEME, VIEW, STEP);
++  }
++
++  @Override
++  public Future<Buffer> convert(String sourceDecoded, String serviceName, FileFormat fileFormat, JsonObject options) {
++    if (fileFormat == null || !SUPPORTED_FORMATS.contains(fileFormat)) {
++      return Future.failedFuture(new UnsupportedFormatException(fileFormat == null ? null : fileFormat.getName(), serviceName, SUPPORTED_FORMATS));
++    }
++    return vertx.executeBlocking(() -> {
++      byte[] result = smarterDiagrams(sourceDecoded.getBytes(StandardCharsets.UTF_8), fileFormat, options);
++      return Buffer.buffer(result);
++    });
++  }
++
++  private byte[] smarterDiagrams(byte[] source, FileFormat fileFormat, JsonObject options) throws IOException, InterruptedException, IllegalStateException {
++    List<String> commands = new ArrayList<>();
++    commands.add(binPath);
++    commands.add("-"); // read from stdin
++    commands.add("--format");
++    commands.add(fileFormat.getName());
++
++    String theme = THEME.get(options);
++    if (theme != null) {
++      if (!THEME.values().contains(theme)) {
++        throw new BadRequestException("Unknown Smarter Diagrams theme: " + theme);
++      }
++      commands.add("--theme");
++      commands.add(theme);
++    }
++
++    String view = VIEW.get(options);
++    if (view != null) {
++      if (!IDENTIFIER.matcher(view).matches()) {
++        throw new BadRequestException("Invalid value for option view: must be a valid identifier.");
++      }
++    }
++
++    String step = STEP.get(options);
++    if (step != null) {
++      if (!IDENTIFIER.matcher(step).matches()) {
++        throw new BadRequestException("Invalid value for option step: must be a valid identifier.");
++      }
++    }
++
++    if (view != null && step != null) {
++      throw new BadRequestException("Options view and step cannot be combined.");
++    }
++    if (view != null) {
++      commands.add("--view");
++      commands.add(view);
++    }
++    if (step != null) {
++      commands.add("--step");
++      commands.add(step);
++    }
++
++    return commander.execute(source, commands.toArray(new String[0]));
++  }
++}
+diff --git a/server/src/main/resources/web/hello.html b/server/src/main/resources/web/hello.html
+index ce02f73..7c90626 100644
+--- a/server/src/main/resources/web/hello.html
++++ b/server/src/main/resources/web/hello.html
+@@ -13,7 +13,7 @@
+     <h1 class="subtitle">Creates <strong>diagrams</strong> from <strong>textual</strong> descriptions!</h1>
+     <div class="content">
+       <p>
+-        Kroki provides a unified API with support for BlockDiag (BlockDiag, SeqDiag, ActDiag, NwDiag, PacketDiag, RackDiag), BPMN, Bytefield, C4 (with PlantUML), D2, DBML, Diagrams.net (experimental), Ditaa, Erd, Excalidraw, GoAT, GraphViz, Lini, Mermaid, Nomnoml, Pikchr, PlantUML, Structurizr, SvgBob, Symbolator, UMLet, Vega, Vega-Lite, WaveDrom and WireViz... and more to come!
++        Kroki provides a unified API with support for BlockDiag (BlockDiag, SeqDiag, ActDiag, NwDiag, PacketDiag, RackDiag), BPMN, Bytefield, C4 (with PlantUML), D2, DBML, Diagrams.net (experimental), Ditaa, Erd, Excalidraw, GoAT, GraphViz, Lini, Mermaid, Nomnoml, Pikchr, PlantUML, Smarter Diagrams, Structurizr, SvgBob, Symbolator, UMLet, Vega, Vega-Lite, WaveDrom and WireViz... and more to come!
+       </p>
+     </div>
+ 
+diff --git a/server/src/test/java/io/kroki/server/service/SmarterDiagramsServiceTest.java b/server/src/test/java/io/kroki/server/service/SmarterDiagramsServiceTest.java
+new file mode 100644
+index 0000000..91d810c
+--- /dev/null
++++ b/server/src/test/java/io/kroki/server/service/SmarterDiagramsServiceTest.java
+@@ -0,0 +1,172 @@
++package io.kroki.server.service;
++
++import io.kroki.server.action.Commander;
++import io.kroki.server.error.BadRequestException;
++import io.kroki.server.error.UnsupportedFormatException;
++import io.kroki.server.format.FileFormat;
++import io.vertx.core.Vertx;
++import io.vertx.core.buffer.Buffer;
++import io.vertx.core.json.JsonObject;
++import io.vertx.junit5.VertxExtension;
++import io.vertx.junit5.VertxTestContext;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.Mockito;
++
++import java.nio.charset.StandardCharsets;
++import java.util.concurrent.TimeUnit;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.mock;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(VertxExtension.class)
++public class SmarterDiagramsServiceTest {
++
++  private static final String SOURCE = "client -> api: \"HTTPS\"\n";
++
++  private static Commander commanderMock() throws Exception {
++    Commander commanderMock = mock(Commander.class);
++    when(commanderMock.execute(any(), any(String[].class))).thenReturn("<svg>smarterdiagrams</svg>".getBytes(StandardCharsets.UTF_8));
++    return commanderMock;
++  }
++
++  private static SmarterDiagrams newService(Vertx vertx, Commander commander) {
++    JsonObject config = new JsonObject().put("KROKI_SMARTERDIAGRAMS_BIN_PATH", "/path/to/smarter-diagrams");
++    return new SmarterDiagrams(vertx, config, commander);
++  }
++
++  @Test
++  public void should_call_smarter_diagrams_with_svg_format(Vertx vertx) throws Throwable {
++    Commander commanderMock = commanderMock();
++    Buffer buffer = newService(vertx, commanderMock)
++      .convert(SOURCE, "smarterdiagrams", FileFormat.SVG, new JsonObject())
++      .await(2, TimeUnit.SECONDS);
++    assertThat(buffer.toString()).isEqualTo("<svg>smarterdiagrams</svg>");
++    Mockito.verify(commanderMock).execute(
++      SOURCE.getBytes(StandardCharsets.UTF_8),
++      "/path/to/smarter-diagrams",
++      "-",
++      "--format",
++      "svg"
++    );
++  }
++
++  @Test
++  public void should_call_smarter_diagrams_with_png_and_pdf_formats(Vertx vertx) throws Throwable {
++    Commander commanderMock = commanderMock();
++    SmarterDiagrams service = newService(vertx, commanderMock);
++
++    service.convert(SOURCE, "smarterdiagrams", FileFormat.PNG, new JsonObject()).await(2, TimeUnit.SECONDS);
++    Mockito.verify(commanderMock).execute(
++      SOURCE.getBytes(StandardCharsets.UTF_8),
++      "/path/to/smarter-diagrams",
++      "-",
++      "--format",
++      "png"
++    );
++
++    service.convert(SOURCE, "smarterdiagrams", FileFormat.PDF, new JsonObject()).await(2, TimeUnit.SECONDS);
++    Mockito.verify(commanderMock).execute(
++      SOURCE.getBytes(StandardCharsets.UTF_8),
++      "/path/to/smarter-diagrams",
++      "-",
++      "--format",
++      "pdf"
++    );
++  }
++
++  @Test
++  public void should_pass_theme_and_step_options(Vertx vertx) throws Throwable {
++    Commander commanderMock = commanderMock();
++    JsonObject options = new JsonObject()
++      .put("theme", "catppuccin-mocha")
++      .put("step", "s1");
++    newService(vertx, commanderMock)
++      .convert(SOURCE, "smarterdiagrams", FileFormat.SVG, options)
++      .await(2, TimeUnit.SECONDS);
++    Mockito.verify(commanderMock).execute(
++      SOURCE.getBytes(StandardCharsets.UTF_8),
++      "/path/to/smarter-diagrams",
++      "-",
++      "--format",
++      "svg",
++      "--theme",
++      "catppuccin-mocha",
++      "--step",
++      "s1"
++    );
++  }
++
++  @Test
++  public void should_pass_view_option(Vertx vertx) throws Throwable {
++    Commander commanderMock = commanderMock();
++    JsonObject options = new JsonObject().put("view", "overview");
++    newService(vertx, commanderMock)
++      .convert(SOURCE, "smarterdiagrams", FileFormat.SVG, options)
++      .await(2, TimeUnit.SECONDS);
++    Mockito.verify(commanderMock).execute(
++      SOURCE.getBytes(StandardCharsets.UTF_8),
++      "/path/to/smarter-diagrams",
++      "-",
++      "--format",
++      "svg",
++      "--view",
++      "overview"
++    );
++  }
++
++  @Test
++  public void should_reject_unknown_theme(Vertx vertx, VertxTestContext context) throws Throwable {
++    Commander commanderMock = commanderMock();
++    JsonObject options = new JsonObject().put("theme", "--theme-file");
++    newService(vertx, commanderMock)
++      .convert(SOURCE, "smarterdiagrams", FileFormat.SVG, options)
++      .onComplete(context.failing(error -> context.verify(() -> {
++        assertThat(error).isInstanceOf(BadRequestException.class);
++        assertThat(error.getMessage()).contains("Unknown Smarter Diagrams theme");
++        context.completeNow();
++      })));
++  }
++
++  @Test
++  public void should_reject_combining_view_and_step(Vertx vertx, VertxTestContext context) throws Throwable {
++    Commander commanderMock = commanderMock();
++    JsonObject options = new JsonObject().put("view", "overview").put("step", "s1");
++    newService(vertx, commanderMock)
++      .convert(SOURCE, "smarterdiagrams", FileFormat.SVG, options)
++      .onComplete(context.failing(error -> context.verify(() -> {
++        assertThat(error).isInstanceOf(BadRequestException.class);
++        assertThat(error.getMessage()).contains("cannot be combined");
++        context.completeNow();
++      })));
++  }
++
++  @Test
++  public void should_reject_option_starting_with_dash_or_invalid_characters(Vertx vertx, VertxTestContext context) throws Throwable {
++    Commander commanderMock = commanderMock();
++    newService(vertx, commanderMock)
++      .convert(SOURCE, "smarterdiagrams", FileFormat.SVG, new JsonObject().put("view", "--help"))
++      .onComplete(context.failing(error1 -> context.verify(() -> {
++        assertThat(error1).isInstanceOf(BadRequestException.class);
++        newService(vertx, commanderMock)
++          .convert(SOURCE, "smarterdiagrams", FileFormat.SVG, new JsonObject().put("step", "../etc"))
++          .onComplete(context.failing(error2 -> context.verify(() -> {
++            assertThat(error2).isInstanceOf(BadRequestException.class);
++            context.completeNow();
++          })));
++      })));
++  }
++
++  @Test
++  public void should_reject_unsupported_format(Vertx vertx, VertxTestContext context) throws Throwable {
++    Commander commanderMock = commanderMock();
++    newService(vertx, commanderMock)
++      .convert(SOURCE, "smarterdiagrams", FileFormat.TXT, new JsonObject())
++      .onComplete(context.failing(error -> context.verify(() -> {
++        assertThat(error).isInstanceOf(UnsupportedFormatException.class);
++        context.completeNow();
++      })));
++  }
++}
+-- 
+2.55.0.windows.3
+

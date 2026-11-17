@@ -26,4 +26,4 @@ curl -X POST http://127.0.0.1:8008/smarterdiagrams/svg \
   --data-binary 'client -> api: HTTPS'
 ```
 
-See [UPSTREAM_PR.md](./UPSTREAM_PR.md) for the `yuzutech/kroki` upstream integration specification.
+See [UPSTREAM_PR.md](./UPSTREAM_PR.md) and [`yuzutech-kroki-smarterdiagrams.patch`](./yuzutech-kroki-smarterdiagrams.patch) for the native `yuzutech/kroki` upstream integration (submitted in [yuzutech/kroki#2297](https://github.com/yuzutech/kroki/pull/2297)).
