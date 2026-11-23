@@ -1,6 +1,6 @@
 services:
   kroki:
-    image: yuzutech/kroki:latest@sha256:de0f2fdc42e926d54706ac962aa5cfb38c5c387035a1b30d07ce297bbc37057b
+    image: yuzutech/kroki:latest@sha256:e8860a4abf233b706e8979e54266599713f254a7e695ff927c85f0c7043e34ab
     ports:
       - "8000:8000"
     environment:
