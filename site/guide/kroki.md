@@ -30,4 +30,8 @@ curl -X POST http://127.0.0.1:8008/smarterdiagrams/svg \
   --data-binary 'client -> api: HTTPS'
 ```
 
-Docker and Docker Compose definitions live in `extensions/kroki/Dockerfile` and `extensions/kroki/docker-compose.yml`, and `extensions/kroki/UPSTREAM_PR.md` documents the `yuzutech/kroki` upstream Vert.x `DiagramService` integration.
+Docker and Docker Compose definitions live in `extensions/kroki/Dockerfile` and `extensions/kroki/docker-compose.yml`.
+
+## Native `yuzutech/kroki` integration
+
+Upstream native gateway support (compiling `.diagram` source via `smarter-diagrams - --format <svg|png|pdf>` inside `yuzutech/kroki`) is submitted in [yuzutech/kroki#2297](https://github.com/yuzutech/kroki/pull/2297) against pinned release [`v0.1.0`](https://github.com/robot-head/smarter-diagrams/releases/tag/v0.1.0), with the full git patch archived at [`extensions/kroki/yuzutech-kroki-smarterdiagrams.patch`](https://github.com/robot-head/smarter-diagrams/blob/main/extensions/kroki/yuzutech-kroki-smarterdiagrams.patch) and documented in [`extensions/kroki/UPSTREAM_PR.md`](https://github.com/robot-head/smarter-diagrams/blob/main/extensions/kroki/UPSTREAM_PR.md).
