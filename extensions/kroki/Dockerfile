@@ -4,7 +4,7 @@ WORKDIR /src
 COPY . .
 RUN cargo build --release --locked --features export --bin smarter-diagrams
 
-FROM node:26-bookworm-slim@sha256:b822af76043e2656ffc172072036fe0968a3c09a692e4ad05eb9348ad5dbdf4c
+FROM node:26-bookworm-slim@sha256:0042e17d232a87a2cd485be1da7900fca4d10a4ad11b29e9285da1d2e54798c9
 
 RUN useradd --create-home --shell /bin/false kroki
 COPY --from=builder /src/target/release/smarter-diagrams /usr/local/bin/smarter-diagrams
