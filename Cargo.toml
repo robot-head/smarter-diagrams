@@ -18,7 +18,7 @@ export = ["dep:resvg", "dep:svg2pdf"]
 code-bindings = ["dep:tree-sitter", "dep:tree-sitter-rust"]
 
 [dependencies]
-rowan = "0.16"
+rowan = "0.17"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 thiserror = "2"
